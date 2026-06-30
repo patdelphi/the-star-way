@@ -3,6 +3,7 @@
  * 星标仓库页面，用静态 Demo 展示指定开发者的 Star 仓库列表、筛选排序和聚合分析。
  */
 import { useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -192,7 +193,7 @@ const sampleRepos: StarRepo[] = [
     starredAt: "2024-01-22",
     updatedAt: "2024-08-03",
     topics: ["admin", "template", "dashboard"],
-    autoTags: ["Dead Stars", "前端模板", "协议关注"],
+    autoTags: ["Sleep Stars", "前端模板", "协议关注"],
     category: "前端模板",
     score: 41,
     health: "stale",
@@ -203,8 +204,6 @@ const sampleRepos: StarRepo[] = [
 ]
 
 const activeFilters = [
-  { key: "lang", label: "Python" },
-  { key: "topic", label: "agent" },
   { key: "tag", label: "RAG 前置" },
 ]
 
@@ -265,20 +264,43 @@ const healthMeta: Record<RepoHealth, { label: string; className: string }> = {
 }
 
 export default function StarExplorer() {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedLanguage, setSelectedLanguage] = useState("")
+  const [selectedTopic, setSelectedTopic] = useState("")
+  const [selectedLicense, setSelectedLicense] = useState("")
+  const [sortKey, setSortKey] = useState("starred_at")
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState("Markdown")
   const [analysisStatus, setAnalysisStatus] = useState("已加载指定开发者 @patdelphi 的 Star 仓库 Demo 分析。")
 
   const filteredRepos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    if (!query) return sampleRepos
-    return sampleRepos.filter((repo) =>
-      [repo.fullName, repo.description, repo.language, repo.category, ...repo.topics, ...repo.autoTags]
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    )
-  }, [searchQuery])
+    const result = sampleRepos.filter((repo) => {
+      const matchesQuery = !query ||
+        [repo.fullName, repo.description, repo.language, repo.category, ...repo.topics, ...repo.autoTags]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      const matchesLanguage = !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
+      const matchesTopic = !selectedTopic || repo.topics.includes(selectedTopic)
+      const matchesLicense = !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
+      return matchesQuery && matchesLanguage && matchesTopic && matchesLicense
+    })
+
+    const parseCount = (value: string) => {
+      if (value.endsWith("k")) return Number(value.replace("k", "")) * 1000
+      return Number(value)
+    }
+
+    return [...result].sort((a, b) => {
+      if (sortKey === "stars") return parseCount(b.stars) - parseCount(a.stars)
+      if (sortKey === "forks") return parseCount(b.forks) - parseCount(a.forks)
+      if (sortKey === "updated_at") return b.updatedAt.localeCompare(a.updatedAt)
+      return b.starredAt.localeCompare(a.starredAt)
+    })
+  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey])
 
   const totalPages = Math.max(1, Math.ceil(filteredRepos.length / ITEMS_PER_PAGE))
   const paginatedRepos = useMemo(() => {
@@ -287,11 +309,13 @@ export default function StarExplorer() {
   }, [currentPage, filteredRepos])
 
   const handleExport = (format: string) => {
-    setAnalysisStatus(`已模拟导出当前筛选结果为 ${format}，真实导出后续接本地 Exporter。`)
+    setExportFormat(format)
+    setExportOpen(true)
+    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}，真实导出后续接本地 Exporter。`)
   }
 
   const handleBatchAnalyze = () => {
-    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、Hidden Gems、Dead Stars、协议风险均已刷新。")
+    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、Hidden Gems / 隐藏宝石、Sleep Stars / 沉睡星标、协议风险均已刷新。")
   }
 
   const handleRemoveFilter = (filterKey: string) => {
@@ -299,8 +323,17 @@ export default function StarExplorer() {
   }
 
   const openRepoAnalysis = (fullName: string) => {
+    localStorage.setItem("selected-star-repo", fullName)
     setAnalysisStatus(`已选择 ${fullName}，请进入“单个仓库”页查看深度分析。`)
+    navigate("/analysis")
   }
+
+  const visibleFilters = [
+    selectedLanguage && { key: "lang", label: selectedLanguage },
+    selectedTopic && { key: "topic", label: selectedTopic },
+    selectedLicense && { key: "license", label: selectedLicense },
+    ...activeFilters,
+  ].filter(Boolean) as { key: string; label: string }[]
 
   return (
     <div className="min-h-[calc(100vh-8rem)] bg-grid-pattern">
@@ -333,8 +366,11 @@ export default function StarExplorer() {
           <MetricCard icon={Star} label="Star 仓库概览" value={developerProfile.totalStars.toString()} detail="本地 Demo 数据总量" />
           <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
           <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="topics / name / description 规则命中" />
-          <MetricCard icon={Flame} label="Hidden Gems" value="27" detail="低 Star 高价值候选" />
-          <MetricCard icon={AlertTriangle} label="Dead Stars" value="34" detail="长期未更新或协议需关注" />
+          <MetricCard icon={Flame} label="Hidden Gems / 隐藏宝石" value="27" detail="低 Star 高价值候选" />
+          <MetricCard icon={AlertTriangle} label="Sleep Stars / 沉睡星标" value="34" detail="长期未更新或需复核项目" />
+          <MetricCard icon={Activity} label="活跃仓库" value="512" detail="最近 90 天有更新" />
+          <MetricCard icon={LineChart} label="Removed Stars" value="18" detail="疑似取消 Star 但不删除" />
+          <MetricCard icon={AlertTriangle} label="License 风险" value="31" detail="GPL 或未知协议需复核" />
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -521,25 +557,25 @@ export default function StarExplorer() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:w-[620px]">
-                <Select defaultValue="">
+                <Select value={selectedLanguage} onChange={(event) => setSelectedLanguage(event.target.value)}>
                   <SelectOption value="">语言</SelectOption>
                   <SelectOption value="python">Python</SelectOption>
                   <SelectOption value="typescript">TypeScript</SelectOption>
                   <SelectOption value="rust">Rust</SelectOption>
                 </Select>
-                <Select defaultValue="">
+                <Select value={selectedTopic} onChange={(event) => setSelectedTopic(event.target.value)}>
                   <SelectOption value="">主题</SelectOption>
                   <SelectOption value="ai">AI</SelectOption>
                   <SelectOption value="mcp">MCP</SelectOption>
                   <SelectOption value="rag">RAG</SelectOption>
                 </Select>
-                <Select defaultValue="">
+                <Select value={selectedLicense} onChange={(event) => setSelectedLicense(event.target.value)}>
                   <SelectOption value="">协议</SelectOption>
                   <SelectOption value="mit">MIT</SelectOption>
                   <SelectOption value="apache">Apache-2.0</SelectOption>
                   <SelectOption value="gpl">GPL-3.0</SelectOption>
                 </Select>
-                <Select defaultValue="starred_at">
+                <Select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
                   <SelectOption value="starred_at">排序：starred_at</SelectOption>
                   <SelectOption value="stars">排序：stars</SelectOption>
                   <SelectOption value="forks">排序：forks</SelectOption>
@@ -550,7 +586,7 @@ export default function StarExplorer() {
 
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">已筛选:</span>
-              {activeFilters.map((filter) => (
+              {visibleFilters.map((filter) => (
                 <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 font-mono text-xs">
                   {filter.label}
                   <button onClick={() => handleRemoveFilter(filter.key)} className="ml-1 rounded-full hover:bg-surface-container-high">
@@ -558,7 +594,18 @@ export default function StarExplorer() {
                   </button>
                 </Badge>
               ))}
-              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground" onClick={() => handleRemoveFilter("all")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 text-xs text-muted-foreground"
+                onClick={() => {
+                  setSelectedLanguage("")
+                  setSelectedTopic("")
+                  setSelectedLicense("")
+                  setSearchQuery("")
+                  handleRemoveFilter("all")
+                }}
+              >
                 <Filter className="h-3 w-3" />
                 清除全部
               </Button>
@@ -572,71 +619,83 @@ export default function StarExplorer() {
 
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[280px]">仓库</TableHead>
-                  <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
-                  <TableHead className="text-right">分数</TableHead>
-                  <TableHead className="hidden sm:table-cell">语言</TableHead>
-                  <TableHead className="hidden lg:table-cell">协议</TableHead>
-                  <TableHead className="hidden xl:table-cell">最近更新</TableHead>
-                  <TableHead className="hidden xl:table-cell">自动标签</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedRepos.map((repo) => (
-                  <TableRow
-                    key={repo.fullName}
-                    className="transition-colors hover:bg-surface-container"
-                  >
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-on-surface">{repo.fullName}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
-                          <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="space-y-1">
-                        <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
-                        <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground">{repo.license}</span>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {repo.autoTags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
-                        <LineChart className="h-4 w-4" />
-                        查看单个仓库
-                      </Button>
-                    </TableCell>
+            {filteredRepos.length === 0 ? (
+              <div className="p-10 text-center">
+                <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                <h3 className="text-base font-semibold text-on-surface">无搜索结果</h3>
+                <p className="mt-1 text-sm text-muted-foreground">调整关键词、语言、主题或协议筛选后再试。</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[280px]">仓库</TableHead>
+                    <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
+                    <TableHead className="text-right">分数</TableHead>
+                    <TableHead className="hidden sm:table-cell">语言</TableHead>
+                    <TableHead className="hidden lg:table-cell">协议</TableHead>
+                    <TableHead className="hidden xl:table-cell">最近更新</TableHead>
+                    <TableHead className="hidden xl:table-cell">自动标签</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRepos.map((repo) => (
+                    <TableRow key={repo.fullName} className="transition-colors hover:bg-surface-container">
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-on-surface">{repo.fullName}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
+                            <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="space-y-1">
+                          <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
+                          <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">{repo.license}</span>
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">
+                        <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {repo.autoTags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
+                          <LineChart className="h-4 w-4" />
+                          查看单个仓库
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-status-warning/40 bg-surface-container-low">
+          <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>GitHub API 限流、用户不存在、网络失败等状态会在真实同步时显示在这里。</span>
+            <Badge variant="outline" className="w-fit">Demo error state</Badge>
           </CardContent>
         </Card>
 
@@ -654,6 +713,33 @@ export default function StarExplorer() {
             </Button>
           </div>
         </div>
+
+        {exportOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+            <Card className="w-full max-w-lg">
+              <CardHeader>
+                <CardTitle>导出预览</CardTitle>
+                <CardDescription>导出格式：{exportFormat}，内容与当前筛选结果一致。</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3 text-sm text-muted-foreground">
+                  当前将导出 {filteredRepos.length} 个仓库，排序方式为 {sortKey}。
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {["CSV", "JSON", "Markdown", "HTML"].map((format) => (
+                    <Button key={format} variant={format === exportFormat ? "default" : "outline"} onClick={() => setExportFormat(format)}>
+                      {format}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setExportOpen(false)}>取消</Button>
+                  <Button onClick={() => setExportOpen(false)}>确认导出</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

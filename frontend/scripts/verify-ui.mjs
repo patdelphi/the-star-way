@@ -13,11 +13,13 @@ const files = {
   sidebar: readFileSync(resolve(root, "src/components/layout/Sidebar.tsx"), "utf8"),
   analysis: readFileSync(resolve(root, "src/pages/RepositoryAnalysis.tsx"), "utf8"),
   explorer: readFileSync(resolve(root, "src/pages/StarExplorer.tsx"), "utf8"),
+  developers: readFileSync(resolve(root, "src/pages/Developers.tsx"), "utf8"),
 }
 
 const checks = [
   ["顶部无二级导航", !files.topbar.includes("探索者") && !files.topbar.includes("单个仓库")],
   ["顶部搜索仓库占位", files.topbar.includes('placeholder="搜索仓库"')],
+  ["顶部搜索结果下拉", files.topbar.includes("搜索结果") && files.topbar.includes("匹配仓库")],
   ["单个仓库路由", files.app.includes('path="/analysis"')],
   [
     "单个仓库导航",
@@ -36,12 +38,29 @@ const checks = [
   ["兴趣时间线模块", files.explorer.includes("兴趣时间线")],
   ["License 分布模块", files.explorer.includes("License 分布")],
   ["导出一致性模块", files.explorer.includes("导出一致性")],
+  [
+    "顶部 8 个信息块",
+    [
+      "Star 仓库概览",
+      "最近同步",
+      "自动标签覆盖",
+      "Hidden Gems / 隐藏宝石",
+      "Sleep Stars / 沉睡星标",
+      "活跃仓库",
+      "Removed Stars",
+      "License 风险",
+    ].every((label) => files.explorer.includes(label)),
+  ],
   ["Removed Stars 模块", files.explorer.includes("Removed Stars")],
-  ["Hidden Gems 模块", files.explorer.includes("Hidden Gems")],
-  ["Dead Stars 模块", files.explorer.includes("Dead Stars")],
+  ["Hidden Gems 双语模块", files.explorer.includes("Hidden Gems / 隐藏宝石")],
+  ["Sleep Stars 双语模块", files.explorer.includes("Sleep Stars / 沉睡星标")],
+  ["旧 Dead Stars 文案已移除", !files.explorer.includes("Dead Stars")],
   ["更新星标仓库分析入口", files.explorer.includes("更新星标仓库分析") && !files.explorer.includes("批量分析")],
   ["全部星标仓库列表标题", files.explorer.includes("全部星标仓库列表")],
   ["列表上方导出报告", files.explorer.includes("全部星标仓库列表") && files.explorer.includes("导出报告")],
+  ["筛选排序真实状态", files.explorer.includes("selectedLanguage") && files.explorer.includes("sortKey")],
+  ["导出预览弹窗", files.explorer.includes("导出预览") && files.explorer.includes("导出格式")],
+  ["空状态和错误状态", files.explorer.includes("无搜索结果") && files.explorer.includes("GitHub API 限流")],
   ["排序控件", files.explorer.includes("排序") && files.explorer.includes("starred_at")],
   [
     "星标仓库页不含单仓库分析面板",
@@ -53,6 +72,7 @@ const checks = [
   ],
   ["README 摘要模块", files.analysis.includes("README 摘要")],
   ["单个仓库页面标题", files.analysis.includes("单个仓库") && !files.analysis.includes("仓库分析")],
+  ["单个仓库本地选择", files.analysis.includes("selected-star-repo")],
   ["活跃度分析模块", files.analysis.includes("活跃度分析")],
   ["协议风险模块", files.analysis.includes("协议风险")],
   ["技术栈解析模块", files.analysis.includes("技术栈解析")],
@@ -60,6 +80,7 @@ const checks = [
   ["相似项目模块", files.analysis.includes("相似项目")],
   ["AI 关闭提示", files.analysis.includes("本页仍为静态 Demo")],
   ["列表页只保留全局分析", files.explorer.includes("开发者 Star 全局分析")],
+  ["开发者同步状态", files.developers.includes("syncStatus") && files.developers.includes("GitHub API 限流")],
 ]
 
 const failed = checks.filter(([, passed]) => !passed)

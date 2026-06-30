@@ -9,7 +9,7 @@ the-star-way import-demo
 the-star-way ui
 the-star-way tag <username>
 the-star-way export <username> --format csv|json|markdown|html
-the-star-way report <username> --type dna|hidden-gems|dead-stars
+the-star-way report <username> --type dna|hidden-gems|sleep-stars
 the-star-way translate <username> --to zh-CN
 ```
 
@@ -34,6 +34,13 @@ GET /api/users/:login/tags
 GET /api/users/:login/export?format=markdown
 POST /api/sync
 POST /api/tag
+```
+
+后续多语言 UI 可以增加本地配置接口，但当前 Demo 先用前端 `localStorage` 保存语言偏好，不依赖后端：
+
+```text
+GET /api/config/ui
+PATCH /api/config/ui
 ```
 
 ## 4. 查询参数

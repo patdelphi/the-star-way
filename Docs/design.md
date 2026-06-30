@@ -96,7 +96,7 @@ AI 分类延后到 P1/P2。
 
 ## 8. UI 信息架构
 
-MVP 页面：
+目标 MVP 页面：
 
 - Dashboard：总数、Top Language、Top Topics、最近同步时间。
 - Star List：主列表、筛选、排序、导出。
@@ -106,18 +106,51 @@ MVP 页面：
 P1 页面：
 
 - Map：标签云、兴趣时间线。
-- Reports：Star DNA、Hidden Gems、Dead Stars。
+- Reports：Star DNA、Hidden Gems / 隐藏宝石、Sleep Stars / 沉睡星标。
 - Learning Path：学习路径建议。
 
-## 9. 测试策略
+当前前端 Demo 页面：
+
+- Dashboard：全局概览入口。
+- 星标仓库：展示开发者全部 Star 仓库的整体分析、筛选列表和导出预览，不展示单仓库分析内容。
+- 单个仓库：展示当前选中仓库的 README、依赖、活跃度、license、复用建议等单仓库分析。
+- 开发者：展示目标开发者、同步任务状态和限流提示。
+- 设置：暂缓实现。
+
+星标仓库页顶部信息块固定为 8 个：
+
+| 信息块 | 含义 |
+|---|---|
+| Star 仓库概览 | 本地 Demo 数据总量 |
+| 最近同步 | 增量同步后的统计更新时间 |
+| 自动标签覆盖 | topics / name / description 规则命中率 |
+| Hidden Gems / 隐藏宝石 | 低 Star 高价值候选 |
+| Sleep Stars / 沉睡星标 | 长期未更新或需复核项目 |
+| 活跃仓库 | 最近 90 天有更新的仓库 |
+| Removed Stars | 疑似取消 Star 但不删除的记录 |
+| License 风险 | GPL 或未知协议需复核项目 |
+
+## 9. 多语言设计
+
+前端多语言建议使用 `react-i18next + i18next`：
+
+- 文案资源放在 `locales/zh-CN.json` 和 `locales/en-US.json`。
+- 组件中只使用稳定 key，例如 `t("starExplorer.hiddenGems")`。
+- 语言状态先由前端保存到 `localStorage`。
+- 首批迁移范围为导航、按钮、标题、说明、空状态、错误状态、弹窗和信息块文案。
+- Demo 数据和 GitHub 原始字段保持原文，不进入翻译资源。
+- 当前双语标题后续拆为语言包文案：中文显示“隐藏宝石”，英文显示“Hidden Gems”。
+
+## 10. 测试策略
 
 - Core：用 fixture 测 GitHub 响应解析、同步差异、分类规则。
 - DB：用临时 SQLite 测事务、WAL、upsert、removed_at。
 - Exporter：用固定输入校验 CSV/JSON/Markdown 输出。
 - CLI：用 mock core 校验参数解析和错误提示。
 - UI：用 Demo 数据校验筛选、排序和导出入口。
+- UI 多语言：校验语言切换后关键导航、页面标题、信息块、错误提示和导出弹窗均来自语言资源。
 
-## 10. 安全策略
+## 11. 安全策略
 
 - Token 只存本地配置，不上传。
 - 日志不输出 token。

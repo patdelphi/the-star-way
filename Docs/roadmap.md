@@ -11,10 +11,12 @@
 - 排序和筛选。
 - CSV、JSON、Markdown 导出。
 - Demo 数据导入。
+- 静态前端 Demo 先完成星标仓库全局分析、单个仓库分析和开发者同步状态展示。
 
 ## V0.2：自动分类与翻译
 
 - 自动打标。
+- UI 多语言切换，支持中文和英文。
 - 中文/英文简介翻译。
 - 标签云。
 - 项目详情页。
@@ -26,8 +28,8 @@
 - Star DNA。
 - 兴趣趋势。
 - 年度/季度 Star Wrapped。
-- Hidden Gems。
-- Dead Stars。
+- Hidden Gems / 隐藏宝石。
+- Sleep Stars / 沉睡星标。
 - Markdown/HTML 报告导出。
 
 ## V0.4：学习路径与复用建议

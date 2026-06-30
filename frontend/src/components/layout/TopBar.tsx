@@ -37,8 +37,14 @@ export function TopBar() {
   const { theme, toggleTheme } = useTheme()
   const [lang, setLang] = useState("zh")
   const [langOpen, setLangOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const currentLang = languages.find((l) => l.code === lang) ?? languages[0]
+  const searchResults = [
+    { name: "microsoft/markitdown", meta: "匹配仓库 · 文档处理" },
+    { name: "modelcontextprotocol/servers", meta: "匹配仓库 · MCP" },
+    { name: "astral-sh/uv", meta: "匹配仓库 · Python 工具链" },
+  ].filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   return (
     <header className="flex justify-between items-center w-full px-4 md:px-6 h-16 bg-surface/80 backdrop-blur-xl border-b border-outline-variant sticky top-0 z-30">
@@ -53,8 +59,25 @@ export function TopBar() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <Input
             placeholder="搜索仓库"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
             className="pl-10 w-64 bg-surface-container-lowest border-outline-variant text-sm font-sans"
           />
+          {searchQuery && (
+            <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-lg border border-outline-variant bg-surface-container-lowest p-2 shadow-lg">
+              <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">搜索结果</div>
+              {searchResults.length > 0 ? (
+                searchResults.map((item) => (
+                  <button key={item.name} className="block w-full rounded-md px-2 py-2 text-left hover:bg-surface-container">
+                    <div className="text-sm font-medium text-on-surface">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.meta}</div>
+                  </button>
+                ))
+              ) : (
+                <div className="px-2 py-3 text-sm text-muted-foreground">没有匹配仓库</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

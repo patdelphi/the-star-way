@@ -107,12 +107,21 @@ const radarData = [
 ]
 
 const ITEMS_PER_PAGE = 12
+const syncStates = [
+  "待同步",
+  "同步中",
+  "同步成功",
+  "GitHub API 限流",
+  "用户不存在",
+  "网络失败",
+]
 
 export default function Developers() {
   const [developers, setDevelopers] = useState(demoDevelopers)
   const [searchInput, setSearchInput] = useState("")
   const [searchResult, setSearchResult] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [syncStatus, setSyncStatus] = useState(syncStates[0])
 
   // 分页数据
   const totalPages = Math.ceil(developers.length / ITEMS_PER_PAGE)
@@ -169,6 +178,15 @@ export default function Developers() {
   const handleSearch = () => {
     if (searchInput.trim()) {
       setSearchResult(searchInput.trim())
+    }
+  }
+
+  const runMockSync = (name: string) => {
+    const currentIndex = syncStates.indexOf(syncStatus)
+    const nextStatus = syncStates[(currentIndex + 1) % syncStates.length]
+    setSyncStatus(nextStatus)
+    if (nextStatus === "同步成功") {
+      setSearchResult(`@${name} 星标已更新`)
     }
   }
 
@@ -382,14 +400,18 @@ export default function Developers() {
               {/* 同步当前开发者星标 */}
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
-                onClick={() => {
-                  // eslint-disable-next-line no-console
-                  console.log(`同步开发者 ${activeDev.name} 的星标项目`)
-                }}
+                onClick={() => runMockSync(activeDev.name)}
               >
                 <RotateCw className="w-4 h-4" />
                 同步星标
               </Button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">同步状态</span>
+              <Badge variant={syncStatus === "同步成功" ? "default" : "outline"}>
+                {syncStatus}
+              </Badge>
+              <span className="text-xs text-muted-foreground">模拟 401/404/限流/网络失败状态，不调用 GitHub API。</span>
             </div>
             <div className="flex items-baseline gap-2 pt-2">
               <span className="text-4xl font-bold tracking-tight text-primary">

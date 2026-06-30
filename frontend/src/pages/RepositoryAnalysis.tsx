@@ -2,7 +2,7 @@
  * RepositoryAnalysis.tsx
  * 单个仓库页静态 Demo，用模拟数据展示 README 摘要、技术栈、活跃度、协议风险和相似项目。
  */
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Activity,
   AlertTriangle,
@@ -174,6 +174,14 @@ const repoAnalyses: RepoAnalysis[] = [
 export default function RepositoryAnalysis() {
   const [selectedRepo, setSelectedRepo] = useState(repoAnalyses[0].fullName)
   const [status, setStatus] = useState("本页仍为静态 Demo，分析结果来自内置样例。")
+
+  useEffect(() => {
+    const storedRepo = localStorage.getItem("selected-star-repo")
+    if (storedRepo && repoAnalyses.some((repo) => repo.fullName === storedRepo)) {
+      setSelectedRepo(storedRepo)
+      setStatus(`已从星标仓库列表带入 ${storedRepo}。`)
+    }
+  }, [])
 
   const activeRepo = useMemo(
     () => repoAnalyses.find((repo) => repo.fullName === selectedRepo) ?? repoAnalyses[0],
