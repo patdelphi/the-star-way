@@ -1,10 +1,10 @@
 /**
  * TopBar 组件 - 顶部应用栏
- * 玻璃态效果，包含搜索、导航和右侧开发者信息/主题切换/语言选择
+ * 玻璃态效果，包含搜索、导航和右侧开发者信息/主题切换/语言下拉框
  */
 import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { Search, Sun, Moon, Globe } from "lucide-react"
+import { Search, Sun, Moon, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -28,9 +28,18 @@ function useTheme() {
   return { theme, toggleTheme }
 }
 
+// 支持的语言列表
+const languages = [
+  { code: "zh", label: "中文" },
+  { code: "en", label: "English" },
+]
+
 export function TopBar() {
   const { theme, toggleTheme } = useTheme()
-  const [lang, setLang] = useState<"zh" | "en">("zh")
+  const [lang, setLang] = useState("zh")
+  const [langOpen, setLangOpen] = useState(false)
+
+  const currentLang = languages.find((l) => l.code === lang) ?? languages[0]
 
   return (
     <header className="flex justify-between items-center w-full px-4 md:px-6 h-16 bg-surface/80 backdrop-blur-xl border-b border-outline-variant sticky top-0 z-30">
@@ -66,7 +75,7 @@ export function TopBar() {
         </nav>
       </div>
 
-      {/* Right side: Developer name + Theme toggle + Language switch */}
+      {/* Right side: Developer name + Theme toggle + Language dropdown */}
       <div className="flex items-center gap-3">
         {/* Developer name */}
         <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant text-sm font-sans text-on-surface tracking-wide">
@@ -88,16 +97,46 @@ export function TopBar() {
           )}
         </Button>
 
-        {/* Language switch */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-on-surface-variant hover:text-primary font-sans text-sm tracking-wider gap-1.5"
-          onClick={() => setLang((l) => (l === "zh" ? "en" : "zh"))}
-        >
-          <Globe className="w-4 h-4" />
-          {lang === "zh" ? "中文" : "Eng"}
-        </Button>
+        {/* Language dropdown */}
+        <div className="relative">
+          <Button
+            variant="ghost"
+            className="text-on-surface-variant hover:text-primary font-sans text-sm tracking-wider gap-1.5"
+            onClick={() => setLangOpen(!langOpen)}
+          >
+            {currentLang.label}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${langOpen ? "rotate-180" : ""}`} />
+          </Button>
+
+          {/* Dropdown menu */}
+          {langOpen && (
+            <>
+              {/* 遮罩关闭 */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setLangOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-lg border border-outline-variant bg-surface-container-lowest shadow-lg py-1">
+                {languages.map((l) => (
+                  <button
+                    key={l.code}
+                    className={`w-full text-left px-4 py-2 text-sm font-sans transition-colors ${
+                      l.code === lang
+                        ? "text-primary bg-surface-container font-medium"
+                        : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                    }`}
+                    onClick={() => {
+                      setLang(l.code)
+                      setLangOpen(false)
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   )

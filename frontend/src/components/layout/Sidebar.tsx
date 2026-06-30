@@ -4,15 +4,14 @@
  */
 import { Link, useLocation } from "react-router-dom"
 import {
-  LayoutDashboard,
-  Star,
-  BarChart3,
+  Users,
+  Compass,
   Map,
   Settings,
-  RotateCw,
   FileText,
   Terminal,
   Menu,
+  Star,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -24,10 +23,9 @@ import {
 } from "@/components/ui/sheet"
 
 const navItems = [
-  { path: "/", label: "仪表盘", icon: LayoutDashboard },
-  { path: "/catalog", label: "星项目目录", icon: Star },
-  { path: "/repo", label: "仓库详情", icon: BarChart3 },
-  { path: "#", label: "趋势地图", icon: Map },
+  { path: "/developers", label: "开发者", icon: Users },
+  { path: "/explorer", label: "星系探索", icon: Compass },
+  { path: "#", label: "待定...", icon: Map },
   { path: "#", label: "设置", icon: Settings },
 ]
 
@@ -57,7 +55,7 @@ function SidebarContent() {
       </div>
 
       {/* Main Nav */}
-      <div className="flex-1 px-4 flex flex-col gap-1">
+      <div className="flex-1 px-4 flex flex-col gap-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path
           const Icon = item.icon
@@ -66,7 +64,7 @@ function SidebarContent() {
               key={item.label}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors duration-200",
+                "flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors duration-200",
                 isActive
                   ? "text-primary font-bold border-r-2 border-primary bg-surface-container"
                   : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
@@ -83,10 +81,6 @@ function SidebarContent() {
 
       {/* Footer */}
       <div className="px-6 mt-auto flex flex-col gap-4">
-        <Button className="w-full bg-primary text-on-primary hover:bg-primary/90 font-sans text-sm tracking-wide rounded-lg flex items-center justify-center gap-2">
-          <RotateCw className="w-4 h-4" />
-          同步星标
-        </Button>
         <div className="flex flex-col gap-1">
           {footerLinks.map((item) => {
             const Icon = item.icon
