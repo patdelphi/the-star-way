@@ -64,13 +64,13 @@ const developerProfile = {
   login: "patdelphi",
   totalStars: 691,
   syncedAt: "2026-06-30 22:40",
-  demoMode: "Demo 数据：691 条 GitHub starred repositories",
+  demoMode: "演示数据：691 条 GitHub 星标仓库",
 }
 
 const sampleRepos: StarRepo[] = [
   {
     fullName: "microsoft/markitdown",
-    description: "Python tool for converting files and office documents to Markdown.",
+    description: "用于把文件和办公文档转换为 Markdown 的 Python 工具。",
     stars: "40.2k",
     forks: "1.8k",
     language: "Python",
@@ -89,7 +89,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "modelcontextprotocol/servers",
-    description: "Reference implementations and community servers for Model Context Protocol.",
+    description: "Model Context Protocol 的参考实现和社区服务器集合。",
     stars: "18.7k",
     forks: "2.3k",
     language: "TypeScript",
@@ -108,7 +108,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "astral-sh/uv",
-    description: "An extremely fast Python package and project manager, written in Rust.",
+    description: "用 Rust 编写的高速 Python 包管理和项目管理工具。",
     stars: "58.1k",
     forks: "1.6k",
     language: "Rust",
@@ -127,7 +127,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "langchain-ai/langgraph",
-    description: "Build resilient language agents as graphs.",
+    description: "用图结构构建更可靠的语言智能体。",
     stars: "15.9k",
     forks: "2.7k",
     language: "Python",
@@ -146,7 +146,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "neovim/neovim",
-    description: "Vim-fork focused on extensibility and usability.",
+    description: "专注可扩展性和可用性的 Vim 分支编辑器。",
     stars: "82.1k",
     forks: "5.6k",
     language: "C",
@@ -165,7 +165,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "jina-ai/reader",
-    description: "Convert any URL to an LLM-friendly input.",
+    description: "把任意网页链接转换为适合大模型读取的输入。",
     stars: "8.4k",
     forks: "620",
     language: "TypeScript",
@@ -184,7 +184,7 @@ const sampleRepos: StarRepo[] = [
   },
   {
     fullName: "oldtools/archive-ui",
-    description: "A once-popular admin template with limited recent maintenance.",
+    description: "曾经流行但近期维护有限的后台管理模板。",
     stars: "6.2k",
     forks: "1.1k",
     language: "JavaScript",
@@ -193,7 +193,7 @@ const sampleRepos: StarRepo[] = [
     starredAt: "2024-01-22",
     updatedAt: "2024-08-03",
     topics: ["admin", "template", "dashboard"],
-    autoTags: ["Sleep Stars", "前端模板", "协议关注"],
+    autoTags: ["沉睡星标", "前端模板", "协议关注"],
     category: "前端模板",
     score: 41,
     health: "stale",
@@ -208,31 +208,31 @@ const activeFilters = [
 ]
 
 const languageStats = [
-  { label: "Python", count: 254, color: "bg-domain-backend" },
-  { label: "TypeScript", count: 125, color: "bg-domain-frontend" },
-  { label: "JavaScript", count: 45, color: "bg-domain-frontend" },
-  { label: "Rust", count: 21, color: "bg-domain-tools" },
+  { label: "Python 生态", count: 254, color: "bg-domain-backend" },
+  { label: "TypeScript 生态", count: 125, color: "bg-domain-frontend" },
+  { label: "JavaScript 生态", count: 45, color: "bg-domain-frontend" },
+  { label: "Rust 工具", count: 21, color: "bg-domain-tools" },
 ]
 
 const topicClusters = [
-  { label: "AI / LLM", count: 143, topics: ["ai", "llm", "openai", "chatgpt"] },
-  { label: "Agent / MCP", count: 61, topics: ["mcp", "agent", "claude-code"] },
-  { label: "RAG / 文档", count: 40, topics: ["rag", "pdf", "markdown"] },
-  { label: "CLI / 工具链", count: 55, topics: ["cli", "python", "windows"] },
+  { label: "智能应用 / 大模型", count: 143, topics: ["人工智能", "大模型", "OpenAI", "聊天机器人"] },
+  { label: "智能体 / MCP", count: 61, topics: ["MCP", "智能体", "Claude Code"] },
+  { label: "检索增强 / 文档", count: 40, topics: ["RAG", "PDF", "Markdown"] },
+  { label: "命令行 / 工具链", count: 55, topics: ["命令行", "Python", "Windows"] },
 ]
 
 const classificationSources = [
-  { label: "GitHub topics", count: 512, confidence: "0.95", detail: "强匹配，作为自动标签主来源" },
-  { label: "repo name", count: 96, confidence: "0.85", detail: "用于识别 mcp、rag、cli 等显式关键词" },
-  { label: "description", count: 71, confidence: "0.80", detail: "补足 topics 缺失的项目语义" },
-  { label: "manual", count: 12, confidence: "1.00", detail: "保留给用户后续确认的标签" },
+  { label: "GitHub 主题", count: 512, confidence: "0.95", detail: "强匹配，作为自动标签主来源" },
+  { label: "仓库名称", count: 96, confidence: "0.85", detail: "用于识别 MCP、RAG、命令行等显式关键词" },
+  { label: "仓库描述", count: 71, confidence: "0.80", detail: "补足主题缺失的项目语义" },
+  { label: "人工确认", count: 12, confidence: "1.00", detail: "保留给用户后续确认的标签" },
 ]
 
 const starTimeline = [
   { period: "2026 Q2", count: 173, focus: "MCP、Agent、文档 AI" },
-  { period: "2026 Q1", count: 148, focus: "RAG、OpenAI-compatible、CLI" },
+  { period: "2026 Q1", count: 148, focus: "RAG、兼容 OpenAI 接口、命令行" },
   { period: "2025 Q4", count: 126, focus: "Python 工具链、Windows 自动化" },
-  { period: "2025 Q3", count: 94, focus: "前端框架、Dashboard、编辑器" },
+  { period: "2025 Q3", count: 94, focus: "前端框架、仪表盘、编辑器" },
 ]
 
 const licenseStats = [
@@ -245,7 +245,7 @@ const licenseStats = [
 const exportFormats = [
   { label: "CSV", detail: "表格分析", status: "当前筛选" },
   { label: "JSON", detail: "二次处理", status: "当前筛选" },
-  { label: "Markdown", detail: "Obsidian / README", status: "当前筛选" },
+  { label: "Markdown", detail: "笔记 / 说明文档", status: "当前筛选" },
   { label: "HTML", detail: "静态分享", status: "后续报告" },
 ]
 
@@ -273,7 +273,7 @@ export default function StarExplorer() {
   const [sortKey, setSortKey] = useState("starred_at")
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState("Markdown")
-  const [analysisStatus, setAnalysisStatus] = useState("已加载指定开发者 @patdelphi 的 Star 仓库 Demo 分析。")
+  const [analysisStatus, setAnalysisStatus] = useState("已加载指定开发者 @patdelphi 的星标仓库演示分析。")
 
   const filteredRepos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -311,11 +311,11 @@ export default function StarExplorer() {
   const handleExport = (format: string) => {
     setExportFormat(format)
     setExportOpen(true)
-    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}，真实导出后续接本地 Exporter。`)
+    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}，真实导出后续接本地导出模块。`)
   }
 
   const handleBatchAnalyze = () => {
-    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、Hidden Gems / 隐藏宝石、Sleep Stars / 沉睡星标、协议风险均已刷新。")
+    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、隐藏宝石、沉睡星标、协议风险均已刷新。")
   }
 
   const handleRemoveFilter = (filterKey: string) => {
@@ -351,7 +351,7 @@ export default function StarExplorer() {
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">星标仓库</h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              开发者 Star 全局分析：围绕指定开发者的全部 starred repositories 做组合画像、筛选排序、规则分类和风险识别。
+              开发者星标全局分析：围绕指定开发者的全部星标仓库做组合画像、筛选排序、规则分类和风险识别。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -363,14 +363,14 @@ export default function StarExplorer() {
         </section>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Star} label="Star 仓库概览" value={developerProfile.totalStars.toString()} detail="本地 Demo 数据总量" />
+          <MetricCard icon={Star} label="星标仓库概览" value={developerProfile.totalStars.toString()} detail="本地演示数据总量" />
           <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
-          <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="topics / name / description 规则命中" />
-          <MetricCard icon={Flame} label="Hidden Gems / 隐藏宝石" value="27" detail="低 Star 高价值候选" />
-          <MetricCard icon={AlertTriangle} label="Sleep Stars / 沉睡星标" value="34" detail="长期未更新或需复核项目" />
+          <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="主题 / 名称 / 描述规则命中" />
+          <MetricCard icon={Flame} label="隐藏宝石" value="27" detail="低星高价值候选" />
+          <MetricCard icon={AlertTriangle} label="沉睡星标" value="34" detail="长期未更新或需复核项目" />
           <MetricCard icon={Activity} label="活跃仓库" value="512" detail="最近 90 天有更新" />
-          <MetricCard icon={LineChart} label="Removed Stars" value="18" detail="疑似取消 Star 但不删除" />
-          <MetricCard icon={AlertTriangle} label="License 风险" value="31" detail="GPL 或未知协议需复核" />
+          <MetricCard icon={LineChart} label="已取消星标" value="18" detail="疑似取消星标但不删除" />
+          <MetricCard icon={AlertTriangle} label="协议风险" value="31" detail="GPL 或未知协议需复核" />
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -403,7 +403,7 @@ export default function StarExplorer() {
                 <Layers3 className="h-5 w-5 text-primary" />
                 主题聚类
               </CardTitle>
-              <CardDescription>把 Star 仓库从散列表整理成兴趣地图</CardDescription>
+              <CardDescription>把星标仓库从散列表整理成兴趣地图</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {topicClusters.map((cluster) => (
@@ -432,7 +432,7 @@ export default function StarExplorer() {
                 <Tags className="h-5 w-5 text-primary" />
                 规则分类覆盖
               </CardTitle>
-              <CardDescription>对应设计文档中的 topics、repo name、description 分类策略</CardDescription>
+              <CardDescription>对应设计文档中的主题、仓库名称、仓库描述分类策略</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {classificationSources.map((source) => (
@@ -441,7 +441,7 @@ export default function StarExplorer() {
                     <span className="text-sm font-semibold text-on-surface">{source.label}</span>
                     <Badge variant="secondary" className="font-mono text-xs">{source.count}</Badge>
                   </div>
-                  <div className="mb-2 text-xs text-muted-foreground">confidence {source.confidence}</div>
+                  <div className="mb-2 text-xs text-muted-foreground">置信度 {source.confidence}</div>
                   <p className="text-xs leading-5 text-muted-foreground">{source.detail}</p>
                 </div>
               ))}
@@ -475,7 +475,7 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-5 w-5 text-primary" />
-                License 分布
+                协议分布
               </CardTitle>
               <CardDescription>只做工程提醒，不作为法律意见</CardDescription>
             </CardHeader>
@@ -512,9 +512,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-primary" />
-                Removed Stars
+                已取消星标
               </CardTitle>
-              <CardDescription>增量同步不直接删除已取消 Star 的记录</CardDescription>
+              <CardDescription>增量同步不直接删除已取消星标的记录</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {removedStarSignals.map((signal) => (
@@ -533,7 +533,7 @@ export default function StarExplorer() {
         <section className="flex flex-col gap-3 border-t border-outline-variant/50 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-on-surface">全部星标仓库列表</h2>
-            <p className="mt-1 text-sm text-muted-foreground">浏览、筛选和排序当前开发者的全部 Star 仓库。</p>
+            <p className="mt-1 text-sm text-muted-foreground">浏览、筛选和排序当前开发者的全部星标仓库。</p>
           </div>
           <Button className="gap-2" onClick={() => handleExport("Markdown")}>
             <Download className="h-4 w-4" />
@@ -576,10 +576,10 @@ export default function StarExplorer() {
                   <SelectOption value="gpl">GPL-3.0</SelectOption>
                 </Select>
                 <Select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
-                  <SelectOption value="starred_at">排序：starred_at</SelectOption>
-                  <SelectOption value="stars">排序：stars</SelectOption>
-                  <SelectOption value="forks">排序：forks</SelectOption>
-                  <SelectOption value="updated_at">排序：updated_at</SelectOption>
+                  <SelectOption value="starred_at">排序：标星时间</SelectOption>
+                  <SelectOption value="stars">排序：星数</SelectOption>
+                  <SelectOption value="forks">排序：分叉数</SelectOption>
+                  <SelectOption value="updated_at">排序：更新时间</SelectOption>
                 </Select>
               </div>
             </div>
@@ -695,7 +695,7 @@ export default function StarExplorer() {
         <Card className="border-status-warning/40 bg-surface-container-low">
           <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>GitHub API 限流、用户不存在、网络失败等状态会在真实同步时显示在这里。</span>
-            <Badge variant="outline" className="w-fit">Demo error state</Badge>
+            <Badge variant="outline" className="w-fit">演示错误状态</Badge>
           </CardContent>
         </Card>
 

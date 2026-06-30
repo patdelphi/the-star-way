@@ -51,7 +51,7 @@ const systemRadar = [
 const relatedRepos = [
   {
     fullName: "JupyterLab/jupyterlab",
-    description: "JupyterLab computational environment",
+    description: "JupyterLab 交互式计算环境。",
     stars: "14.2k",
     forks: "2.8k",
     language: "TypeScript",
@@ -59,7 +59,7 @@ const relatedRepos = [
   },
   {
     fullName: "pandoc/pandoc",
-    description: "Universal markup converter",
+    description: "通用标记格式转换工具。",
     stars: "35.6k",
     forks: "3.2k",
     language: "Haskell",
@@ -67,7 +67,7 @@ const relatedRepos = [
   },
   {
     fullName: "mozilla/pdf.js",
-    description: "PDF Reader in JavaScript",
+    description: "使用 JavaScript 实现的 PDF 阅读器。",
     stars: "48.1k",
     forks: "9.5k",
     language: "JavaScript",
@@ -105,7 +105,7 @@ const RepoDetail: React.FC = () => {
             microsoft/markitdown
           </h1>
           <p className="max-w-3xl text-base text-muted-foreground">
-            Python tool for converting files and office documents to Markdown.
+            用于把文件和办公文档转换为 Markdown 的 Python 工具。
           </p>
           <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">

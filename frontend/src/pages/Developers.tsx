@@ -55,25 +55,25 @@ const demoDevelopers = [
 
 // 技术人格数据（详情面板用）
 const personalityData = [
-  { name: "Python", count: 254, color: "bg-domain-backend" },
-  { name: "TypeScript", count: 125, color: "bg-domain-frontend" },
-  { name: "Rust", count: 89, color: "bg-domain-tools" },
-  { name: "Jupyter", count: 42, color: "bg-domain-ai" },
+  { name: "Python 生态", count: 254, color: "bg-domain-backend" },
+  { name: "TypeScript 生态", count: 125, color: "bg-domain-frontend" },
+  { name: "Rust 工具", count: 89, color: "bg-domain-tools" },
+  { name: "Jupyter 笔记", count: 42, color: "bg-domain-ai" },
 ]
 
 const hotTopics = [
-  "machine-learning",
-  "web-framework",
-  "cli-tools",
-  "data-science",
-  "open-source",
-  "developer-tools",
+  "机器学习",
+  "网页框架",
+  "命令行工具",
+  "数据科学",
+  "开源项目",
+  "开发者工具",
 ]
 
 const gemRepos = [
   {
     fullName: "karpathy/micrograd",
-    description: "A tiny scalar-valued autograd engine and a neural net library on top of it with PyTorch-like API",
+    description: "微型标量自动求导引擎，以及基于它实现的神经网络库。",
     stars: "10.2k",
     forks: "1.1k",
     language: "Python",
@@ -81,7 +81,7 @@ const gemRepos = [
   },
   {
     fullName: "tiangolo/fastapi",
-    description: "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+    description: "高性能、易学习、编码快、可用于生产环境的 FastAPI 框架。",
     stars: "78.5k",
     forks: "6.6k",
     language: "Python",
@@ -89,7 +89,7 @@ const gemRepos = [
   },
   {
     fullName: "charmbracelet/bubbletea",
-    description: "A powerful little TUI framework",
+    description: "轻量但能力完整的终端界面框架。",
     stars: "29.8k",
     forks: "800",
     language: "Go",
@@ -100,7 +100,7 @@ const gemRepos = [
 const radarData = [
   { label: "前端", value: 75, color: "#0284c7" },
   { label: "后端", value: 90, color: "#059669" },
-  { label: "AI/ML", value: 65, color: "#7c3aed" },
+  { label: "智能应用", value: 65, color: "#7c3aed" },
   { label: "工具链", value: 80, color: "#475569" },
   { label: "基础设施", value: 55, color: "#006b5c" },
   { label: "数据", value: 70, color: "#9b4420" },
@@ -496,7 +496,7 @@ export default function Developers() {
                   }}
                 >
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
-                    <span className="text-lg font-bold text-primary">Tech</span>
+                    <span className="text-lg font-bold text-primary">技术</span>
                   </div>
                 </div>
 

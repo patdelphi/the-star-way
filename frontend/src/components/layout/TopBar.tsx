@@ -30,7 +30,7 @@ function useTheme() {
 // 支持的语言列表
 const languages = [
   { code: "zh", label: "中文" },
-  { code: "en", label: "English" },
+  { code: "en", label: "英文" },
 ]
 
 export function TopBar() {

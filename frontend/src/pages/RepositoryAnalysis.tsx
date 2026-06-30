@@ -63,7 +63,7 @@ const barClass: Record<SignalTone, string> = {
 const repoAnalyses: RepoAnalysis[] = [
   {
     fullName: "microsoft/markitdown",
-    description: "Python tool for converting files and office documents to Markdown.",
+    description: "用于把文件和办公文档转换为 Markdown 的 Python 工具。",
     language: "Python",
     stars: "40.2k",
     forks: "1.8k",
@@ -72,8 +72,8 @@ const repoAnalyses: RepoAnalysis[] = [
     category: "文档处理 / RAG 前置",
     summary:
       "适合作为文档解析流水线入口，把 Office、PDF、网页等内容转换为 Markdown，方便进入知识库、RAG 或自动化审阅流程。",
-    stack: ["Python", "Markdown", "Office Parser", "PDF", "CLI"],
-    tags: ["rag", "document-ai", "markdown", "automation"],
+    stack: ["Python 生态", "Markdown 转换", "Office 解析", "PDF 解析", "命令行工具"],
+    tags: ["RAG 前置", "文档智能", "Markdown 转换", "自动化"],
     maintainSignals: [
       { label: "最近更新", value: "2 天前", tone: "safe" },
       { label: "Issue 压力", value: "中等", tone: "warning" },
@@ -99,7 +99,7 @@ const repoAnalyses: RepoAnalysis[] = [
   },
   {
     fullName: "modelcontextprotocol/servers",
-    description: "Reference implementations and community servers for Model Context Protocol.",
+    description: "Model Context Protocol 的参考实现和社区服务器集合。",
     language: "TypeScript",
     stars: "18.7k",
     forks: "2.3k",
@@ -108,8 +108,8 @@ const repoAnalyses: RepoAnalysis[] = [
     category: "Agent / MCP 生态",
     summary:
       "用于理解 MCP Server 的能力边界、工具暴露方式和集成模式，适合做本地 Agent 工具生态调研。",
-    stack: ["TypeScript", "Node.js", "MCP", "JSON-RPC", "CLI"],
-    tags: ["mcp", "agent", "tool-use", "developer-tools"],
+    stack: ["TypeScript 生态", "Node.js 服务", "MCP 协议", "JSON-RPC 通信", "命令行工具"],
+    tags: ["MCP", "智能体", "工具调用", "开发者工具"],
     maintainSignals: [
       { label: "最近更新", value: "1 天前", tone: "safe" },
       { label: "Issue 压力", value: "偏高", tone: "warning" },
@@ -135,7 +135,7 @@ const repoAnalyses: RepoAnalysis[] = [
   },
   {
     fullName: "astral-sh/uv",
-    description: "An extremely fast Python package and project manager, written in Rust.",
+    description: "用 Rust 编写的高速 Python 包管理和项目管理工具。",
     language: "Rust",
     stars: "58.1k",
     forks: "1.6k",
@@ -144,8 +144,8 @@ const repoAnalyses: RepoAnalysis[] = [
     category: "工具链 / Python 基建",
     summary:
       "可替代多段 Python 依赖管理流程，适合本地工具、CI 和数据处理项目降低环境初始化成本。",
-    stack: ["Rust", "Python", "Package Manager", "Virtualenv", "CLI"],
-    tags: ["python", "cli", "packaging", "developer-tools"],
+    stack: ["Rust 工具", "Python 生态", "包管理", "虚拟环境", "命令行工具"],
+    tags: ["Python", "命令行", "包管理", "开发者工具"],
     maintainSignals: [
       { label: "最近更新", value: "今天", tone: "safe" },
       { label: "Issue 压力", value: "高", tone: "warning" },
@@ -173,7 +173,7 @@ const repoAnalyses: RepoAnalysis[] = [
 
 export default function RepositoryAnalysis() {
   const [selectedRepo, setSelectedRepo] = useState(repoAnalyses[0].fullName)
-  const [status, setStatus] = useState("本页仍为静态 Demo，分析结果来自内置样例。")
+  const [status, setStatus] = useState("本页仍为静态演示，分析结果来自内置样例。")
 
   useEffect(() => {
     const storedRepo = localStorage.getItem("selected-star-repo")
@@ -199,17 +199,17 @@ export default function RepositoryAnalysis() {
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
-                Repository Intelligence
+                仓库智能分析
               </Badge>
               <Badge variant="secondary" className="font-mono text-xs">
-                Demo Only
+                静态演示
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
               单个仓库
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              面向单个 Star 项目的静态分析工作台，补齐 README 摘要、技术栈解析、维护信号、协议风险、学习价值和相似项目推荐。
+              面向单个星标项目的静态分析工作台，补齐 README 摘要、技术栈解析、维护信号、协议风险、学习价值和相似项目推荐。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -325,7 +325,7 @@ export default function RepositoryAnalysis() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniFact icon={FileText} label="适合场景" value={activeRepo.category} />
                 <MiniFact icon={Layers3} label="主语言" value={activeRepo.language} />
-                <MiniFact icon={CheckCircle2} label="Demo 结论" value="值得继续追踪" />
+                <MiniFact icon={CheckCircle2} label="演示结论" value="值得继续追踪" />
               </div>
             </CardContent>
           </Card>
@@ -343,7 +343,7 @@ export default function RepositoryAnalysis() {
                 <div key={item} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
                   <span className="text-sm font-medium text-on-surface">{item}</span>
                   <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
-                    detected
+                    已识别
                   </Badge>
                 </div>
               ))}

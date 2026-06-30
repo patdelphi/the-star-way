@@ -34,37 +34,37 @@ import {
 const sampleRepos = [
   {
     fullName: "vercel/next.js",
-    description: "The React Framework for the Web",
+    description: "面向 Web 的 React 应用框架。",
     stars: "127.5k",
     forks: "27.1k",
     language: "TypeScript",
     langColor: "bg-domain-frontend",
-    aiTags: ["web-framework", "react"],
+    aiTags: ["网页框架", "React"],
   },
   {
     fullName: "hwchase17/langchain",
-    description: "Building applications with LLMs through composability",
+    description: "通过可组合组件构建大模型应用。",
     stars: "95.3k",
     forks: "15.2k",
     language: "Python",
     langColor: "bg-domain-backend",
-    aiTags: ["ai", "llm", "framework"],
+    aiTags: ["人工智能", "大模型", "应用框架"],
   },
   {
     fullName: "neovim/neovim",
-    description: "Vim-fork focused on extensibility and usability",
+    description: "专注可扩展性和可用性的 Vim 分支编辑器。",
     stars: "82.1k",
     forks: "5.6k",
     language: "C",
     langColor: "bg-domain-tools",
-    aiTags: ["editor", "cli-tools"],
+    aiTags: ["编辑器", "命令行工具"],
   },
 ]
 
 // 活跃筛选标签
 const activeFilters = [
   { key: "lang", label: "TypeScript", value: "typescript" },
-  { key: "topic", label: "AI", value: "ai" },
+  { key: "topic", label: "人工智能", value: "ai" },
 ]
 
 const StarCatalog: React.FC = () => {
@@ -136,10 +136,10 @@ const StarCatalog: React.FC = () => {
                   <div className="w-32">
                     <Select defaultValue="">
                       <SelectOption value="">主题</SelectOption>
-                      <SelectOption value="ai">AI</SelectOption>
-                      <SelectOption value="web">Web</SelectOption>
-                      <SelectOption value="cli">CLI</SelectOption>
-                      <SelectOption value="data">Data</SelectOption>
+                      <SelectOption value="ai">人工智能</SelectOption>
+                      <SelectOption value="web">网页应用</SelectOption>
+                      <SelectOption value="cli">命令行</SelectOption>
+                      <SelectOption value="data">数据</SelectOption>
                     </Select>
                   </div>
                   <div className="w-32">
