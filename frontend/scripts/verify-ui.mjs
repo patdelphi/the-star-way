@@ -1,6 +1,6 @@
 /**
  * verify-ui.mjs
- * 前端静态功能校验脚本，用于确认 Demo 页面包含项目文档要求的关键入口和仓库分析模块。
+ * 前端静态功能校验脚本，用于确认 Demo 页面包含项目文档要求的关键入口和单个仓库分析模块。
  */
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
@@ -9,33 +9,50 @@ const root = resolve(import.meta.dirname, "..")
 
 const files = {
   app: readFileSync(resolve(root, "src/App.tsx"), "utf8"),
+  topbar: readFileSync(resolve(root, "src/components/layout/TopBar.tsx"), "utf8"),
   sidebar: readFileSync(resolve(root, "src/components/layout/Sidebar.tsx"), "utf8"),
   analysis: readFileSync(resolve(root, "src/pages/RepositoryAnalysis.tsx"), "utf8"),
   explorer: readFileSync(resolve(root, "src/pages/StarExplorer.tsx"), "utf8"),
 }
 
 const checks = [
-  ["仓库分析路由", files.app.includes('path="/analysis"')],
-  ["仓库分析导航", files.sidebar.includes("仓库分析") && files.sidebar.includes("/analysis")],
+  ["顶部无二级导航", !files.topbar.includes("探索者") && !files.topbar.includes("单个仓库")],
+  ["顶部搜索仓库占位", files.topbar.includes('placeholder="搜索仓库"')],
+  ["单个仓库路由", files.app.includes('path="/analysis"')],
+  [
+    "单个仓库导航",
+    files.sidebar.includes("单个仓库") &&
+      files.sidebar.includes("/analysis") &&
+      !files.sidebar.includes("仓库分析"),
+  ],
   ["星标仓库导航", files.sidebar.includes("星标仓库") && !files.sidebar.includes("星系探索")],
   ["指定开发者上下文", files.explorer.includes("指定开发者") && files.explorer.includes("@patdelphi")],
   ["开发者全局分析定位", files.explorer.includes("开发者 Star 全局分析") && files.explorer.includes("组合画像")],
-  ["仓库分析概览", files.explorer.includes("Star 仓库概览")],
+  ["Star 仓库概览", files.explorer.includes("Star 仓库概览")],
   ["语言分布模块", files.explorer.includes("语言分布")],
   ["主题聚类模块", files.explorer.includes("主题聚类")],
+  ["最近同步模块", files.explorer.includes("最近同步")],
+  ["规则分类覆盖模块", files.explorer.includes("规则分类覆盖")],
+  ["兴趣时间线模块", files.explorer.includes("兴趣时间线")],
+  ["License 分布模块", files.explorer.includes("License 分布")],
+  ["导出一致性模块", files.explorer.includes("导出一致性")],
+  ["Removed Stars 模块", files.explorer.includes("Removed Stars")],
   ["Hidden Gems 模块", files.explorer.includes("Hidden Gems")],
   ["Dead Stars 模块", files.explorer.includes("Dead Stars")],
-  ["批量分析入口", files.explorer.includes("批量分析")],
+  ["更新星标仓库分析入口", files.explorer.includes("更新星标仓库分析") && !files.explorer.includes("批量分析")],
+  ["全部星标仓库列表标题", files.explorer.includes("全部星标仓库列表")],
+  ["列表上方导出报告", files.explorer.includes("全部星标仓库列表") && files.explorer.includes("导出报告")],
   ["排序控件", files.explorer.includes("排序") && files.explorer.includes("starred_at")],
   [
     "星标仓库页不含单仓库分析面板",
-    files.explorer.includes("查看仓库分析") &&
+    files.explorer.includes("查看单个仓库") &&
       !files.explorer.includes("仓库价值分析") &&
       !files.explorer.includes("选中仓库速览") &&
       !files.explorer.includes("协议与维护") &&
       !files.explorer.includes("系统雷达"),
   ],
   ["README 摘要模块", files.analysis.includes("README 摘要")],
+  ["单个仓库页面标题", files.analysis.includes("单个仓库") && !files.analysis.includes("仓库分析")],
   ["活跃度分析模块", files.analysis.includes("活跃度分析")],
   ["协议风险模块", files.analysis.includes("协议风险")],
   ["技术栈解析模块", files.analysis.includes("技术栈解析")],

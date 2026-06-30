@@ -222,6 +222,40 @@ const topicClusters = [
   { label: "CLI / 工具链", count: 55, topics: ["cli", "python", "windows"] },
 ]
 
+const classificationSources = [
+  { label: "GitHub topics", count: 512, confidence: "0.95", detail: "强匹配，作为自动标签主来源" },
+  { label: "repo name", count: 96, confidence: "0.85", detail: "用于识别 mcp、rag、cli 等显式关键词" },
+  { label: "description", count: 71, confidence: "0.80", detail: "补足 topics 缺失的项目语义" },
+  { label: "manual", count: 12, confidence: "1.00", detail: "保留给用户后续确认的标签" },
+]
+
+const starTimeline = [
+  { period: "2026 Q2", count: 173, focus: "MCP、Agent、文档 AI" },
+  { period: "2026 Q1", count: 148, focus: "RAG、OpenAI-compatible、CLI" },
+  { period: "2025 Q4", count: 126, focus: "Python 工具链、Windows 自动化" },
+  { period: "2025 Q3", count: 94, focus: "前端框架、Dashboard、编辑器" },
+]
+
+const licenseStats = [
+  { label: "MIT", count: 286, tone: "text-status-safe" },
+  { label: "Apache-2.0", count: 142, tone: "text-status-safe" },
+  { label: "GPL 系", count: 31, tone: "text-status-warning" },
+  { label: "未知", count: 58, tone: "text-status-danger" },
+]
+
+const exportFormats = [
+  { label: "CSV", detail: "表格分析", status: "当前筛选" },
+  { label: "JSON", detail: "二次处理", status: "当前筛选" },
+  { label: "Markdown", detail: "Obsidian / README", status: "当前筛选" },
+  { label: "HTML", detail: "静态分享", status: "后续报告" },
+]
+
+const removedStarSignals = [
+  { label: "疑似取消 Star", count: 18, detail: "本次同步未返回，但不直接删除" },
+  { label: "长期未更新", count: 34, detail: "超过 12 个月未更新" },
+  { label: "协议需复核", count: 31, detail: "GPL 或未知协议" },
+]
+
 const ITEMS_PER_PAGE = 5
 
 const healthMeta: Record<RepoHealth, { label: string; className: string }> = {
@@ -257,7 +291,7 @@ export default function StarExplorer() {
   }
 
   const handleBatchAnalyze = () => {
-    setAnalysisStatus("已模拟批量分析：规则分类、Hidden Gems、Dead Stars、协议风险均已刷新。")
+    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、Hidden Gems、Dead Stars、协议风险均已刷新。")
   }
 
   const handleRemoveFilter = (filterKey: string) => {
@@ -265,7 +299,7 @@ export default function StarExplorer() {
   }
 
   const openRepoAnalysis = (fullName: string) => {
-    setAnalysisStatus(`已选择 ${fullName}，请进入“仓库分析”页查看单仓库深度分析。`)
+    setAnalysisStatus(`已选择 ${fullName}，请进入“单个仓库”页查看深度分析。`)
   }
 
   return (
@@ -290,17 +324,14 @@ export default function StarExplorer() {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={handleBatchAnalyze}>
               <Sparkles className="h-4 w-4" />
-              批量分析
-            </Button>
-            <Button className="gap-2" onClick={() => handleExport("Markdown")}>
-              <Download className="h-4 w-4" />
-              导出报告
+              更新星标仓库分析
             </Button>
           </div>
         </section>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={Star} label="Star 仓库概览" value={developerProfile.totalStars.toString()} detail="本地 Demo 数据总量" />
+          <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
           <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="topics / name / description 规则命中" />
           <MetricCard icon={Flame} label="Hidden Gems" value="27" detail="低 Star 高价值候选" />
           <MetricCard icon={AlertTriangle} label="Dead Stars" value="34" detail="长期未更新或协议需关注" />
@@ -356,6 +387,122 @@ export default function StarExplorer() {
               ))}
             </CardContent>
           </Card>
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <Card className="xl:col-span-7">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Tags className="h-5 w-5 text-primary" />
+                规则分类覆盖
+              </CardTitle>
+              <CardDescription>对应设计文档中的 topics、repo name、description 分类策略</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {classificationSources.map((source) => (
+                <div key={source.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-on-surface">{source.label}</span>
+                    <Badge variant="secondary" className="font-mono text-xs">{source.count}</Badge>
+                  </div>
+                  <div className="mb-2 text-xs text-muted-foreground">confidence {source.confidence}</div>
+                  <p className="text-xs leading-5 text-muted-foreground">{source.detail}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Clock className="h-5 w-5 text-primary" />
+                兴趣时间线
+              </CardTitle>
+              <CardDescription>按 starred_at 聚合开发者关注变化</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {starTimeline.map((item) => (
+                <div key={item.period} className="rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-sm font-semibold text-on-surface">{item.period}</span>
+                    <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.focus}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <Card className="xl:col-span-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <AlertTriangle className="h-5 w-5 text-primary" />
+                License 分布
+              </CardTitle>
+              <CardDescription>只做工程提醒，不作为法律意见</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {licenseStats.map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+                  <span className={`text-sm font-medium ${item.tone}`}>{item.label}</span>
+                  <span className="font-mono text-sm text-on-surface">{item.count}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Download className="h-5 w-5 text-primary" />
+                导出一致性
+              </CardTitle>
+              <CardDescription>导出内容应与当前筛选结果一致</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3">
+              {exportFormats.map((format) => (
+                <div key={format.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3">
+                  <div className="text-sm font-semibold text-on-surface">{format.label}</div>
+                  <div className="text-xs text-muted-foreground">{format.detail}</div>
+                  <Badge variant="outline" className="mt-2 text-[10px]">{format.status}</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <LineChart className="h-5 w-5 text-primary" />
+                Removed Stars
+              </CardTitle>
+              <CardDescription>增量同步不直接删除已取消 Star 的记录</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {removedStarSignals.map((signal) => (
+                <div key={signal.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-on-surface">{signal.label}</span>
+                    <span className="font-mono text-sm text-muted-foreground">{signal.count}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{signal.detail}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="flex flex-col gap-3 border-t border-outline-variant/50 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-on-surface">全部星标仓库列表</h2>
+            <p className="mt-1 text-sm text-muted-foreground">浏览、筛选和排序当前开发者的全部 Star 仓库。</p>
+          </div>
+          <Button className="gap-2" onClick={() => handleExport("Markdown")}>
+            <Download className="h-4 w-4" />
+            导出报告
+          </Button>
         </section>
 
         <Card className="glass-panel">
@@ -483,7 +630,7 @@ export default function StarExplorer() {
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
                         <LineChart className="h-4 w-4" />
-                        查看仓库分析
+                        查看单个仓库
                       </Button>
                     </TableCell>
                   </TableRow>

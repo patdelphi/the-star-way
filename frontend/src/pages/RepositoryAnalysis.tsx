@@ -1,6 +1,6 @@
 /**
  * RepositoryAnalysis.tsx
- * 仓库分析页静态 Demo，用模拟数据展示 README 摘要、技术栈、活跃度、协议风险和相似项目。
+ * 单个仓库页静态 Demo，用模拟数据展示 README 摘要、技术栈、活跃度、协议风险和相似项目。
  */
 import { useMemo, useState } from "react"
 import {
@@ -198,7 +198,7 @@ export default function RepositoryAnalysis() {
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-              仓库分析
+              单个仓库
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               面向单个 Star 项目的静态分析工作台，补齐 README 摘要、技术栈解析、维护信号、协议风险、学习价值和相似项目推荐。

@@ -3,7 +3,6 @@
  * 玻璃态效果，包含搜索、导航和右侧开发者信息/主题切换/语言下拉框
  */
 import { useState, useEffect } from "react"
-import { Link } from "react-router-dom"
 import { Search, Sun, Moon, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,26 +52,10 @@ export function TopBar() {
         <div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <Input
-            placeholder="搜索星标..."
+            placeholder="搜索仓库"
             className="pl-10 w-64 bg-surface-container-lowest border-outline-variant text-sm font-sans"
           />
         </div>
-
-        {/* Nav Links */}
-        <nav className="hidden lg:flex gap-6">
-          <Link
-            to="/developers"
-            className="text-primary border-b-2 border-primary pb-1 text-sm font-medium font-sans"
-          >
-            探索者
-          </Link>
-          <Link
-            to="/analysis"
-            className="text-on-surface-variant hover:text-primary transition-colors text-sm font-medium font-sans"
-          >
-            仓库分析
-          </Link>
-        </nav>
       </div>
 
       {/* Right side: Developer name + Theme toggle + Language dropdown */}

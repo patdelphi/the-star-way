@@ -25,7 +25,7 @@ import {
 const navItems = [
   { path: "/developers", label: "开发者", icon: Users },
   { path: "/explorer", label: "星标仓库", icon: Compass },
-  { path: "/analysis", label: "仓库分析", icon: LineChart },
+  { path: "/analysis", label: "单个仓库", icon: LineChart },
   { path: "#", label: "设置", icon: Settings },
 ]
 
