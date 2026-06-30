@@ -1,0 +1,58 @@
+/**
+ * verify-ui.mjs
+ * 前端静态功能校验脚本，用于确认 Demo 页面包含项目文档要求的关键入口和仓库分析模块。
+ */
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+
+const root = resolve(import.meta.dirname, "..")
+
+const files = {
+  app: readFileSync(resolve(root, "src/App.tsx"), "utf8"),
+  sidebar: readFileSync(resolve(root, "src/components/layout/Sidebar.tsx"), "utf8"),
+  analysis: readFileSync(resolve(root, "src/pages/RepositoryAnalysis.tsx"), "utf8"),
+  explorer: readFileSync(resolve(root, "src/pages/StarExplorer.tsx"), "utf8"),
+}
+
+const checks = [
+  ["仓库分析路由", files.app.includes('path="/analysis"')],
+  ["仓库分析导航", files.sidebar.includes("仓库分析") && files.sidebar.includes("/analysis")],
+  ["星标仓库导航", files.sidebar.includes("星标仓库") && !files.sidebar.includes("星系探索")],
+  ["指定开发者上下文", files.explorer.includes("指定开发者") && files.explorer.includes("@patdelphi")],
+  ["开发者全局分析定位", files.explorer.includes("开发者 Star 全局分析") && files.explorer.includes("组合画像")],
+  ["仓库分析概览", files.explorer.includes("Star 仓库概览")],
+  ["语言分布模块", files.explorer.includes("语言分布")],
+  ["主题聚类模块", files.explorer.includes("主题聚类")],
+  ["Hidden Gems 模块", files.explorer.includes("Hidden Gems")],
+  ["Dead Stars 模块", files.explorer.includes("Dead Stars")],
+  ["批量分析入口", files.explorer.includes("批量分析")],
+  ["排序控件", files.explorer.includes("排序") && files.explorer.includes("starred_at")],
+  [
+    "星标仓库页不含单仓库分析面板",
+    files.explorer.includes("查看仓库分析") &&
+      !files.explorer.includes("仓库价值分析") &&
+      !files.explorer.includes("选中仓库速览") &&
+      !files.explorer.includes("协议与维护") &&
+      !files.explorer.includes("系统雷达"),
+  ],
+  ["README 摘要模块", files.analysis.includes("README 摘要")],
+  ["活跃度分析模块", files.analysis.includes("活跃度分析")],
+  ["协议风险模块", files.analysis.includes("协议风险")],
+  ["技术栈解析模块", files.analysis.includes("技术栈解析")],
+  ["维护信号模块", files.analysis.includes("维护信号")],
+  ["相似项目模块", files.analysis.includes("相似项目")],
+  ["AI 关闭提示", files.analysis.includes("本页仍为静态 Demo")],
+  ["列表页只保留全局分析", files.explorer.includes("开发者 Star 全局分析")],
+]
+
+const failed = checks.filter(([, passed]) => !passed)
+
+if (failed.length > 0) {
+  console.error("UI 校验失败：")
+  for (const [name] of failed) {
+    console.error(`- ${name}`)
+  }
+  process.exit(1)
+}
+
+console.log(`UI 校验通过：${checks.length} 项`)

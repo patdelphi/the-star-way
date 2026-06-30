@@ -3,6 +3,7 @@ import { Sidebar } from "./components/layout/Sidebar"
 import { TopBar } from "./components/layout/TopBar"
 import Developers from "./pages/Developers"
 import StarExplorer from "./pages/StarExplorer"
+import RepositoryAnalysis from "./pages/RepositoryAnalysis"
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Routes>
             <Route path="/developers" element={<Developers />} />
             <Route path="/explorer" element={<StarExplorer />} />
+            <Route path="/analysis" element={<RepositoryAnalysis />} />
             <Route path="/" element={<Navigate to="/developers" replace />} />
             <Route path="*" element={<Navigate to="/developers" replace />} />
           </Routes>

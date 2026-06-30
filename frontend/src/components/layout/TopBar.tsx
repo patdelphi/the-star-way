@@ -61,16 +61,16 @@ export function TopBar() {
         {/* Nav Links */}
         <nav className="hidden lg:flex gap-6">
           <Link
-            to="/"
+            to="/developers"
             className="text-primary border-b-2 border-primary pb-1 text-sm font-medium font-sans"
           >
             探索者
           </Link>
           <Link
-            to="/catalog"
+            to="/analysis"
             className="text-on-surface-variant hover:text-primary transition-colors text-sm font-medium font-sans"
           >
-            合集
+            仓库分析
           </Link>
         </nav>
       </div>

@@ -1,13 +1,31 @@
 /**
  * StarExplorer.tsx
- * 星系探索页面
- * 展示当前选中开发者的星项目列表，支持搜索筛选、导出、分页
- * 选中星项目后在下方展开 RepoDetail 详情面板
+ * 星标仓库页面，用静态 Demo 展示指定开发者的 Star 仓库列表、筛选排序和聚合分析。
  */
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useMemo, useState } from "react"
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownUp,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  Filter,
+  Flame,
+  GitFork,
+  Layers3,
+  LineChart,
+  Radar,
+  Search,
+  Sparkles,
+  Star,
+  Tags,
+  X,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
 import {
@@ -18,247 +36,455 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Search,
-  Filter,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  GitFork,
-  Clock,
-  ExternalLink,
-  Copy,
-  Cpu,
-  School,
-  Puzzle,
-  Gavel,
-  ShieldCheck,
-  Network,
-} from "lucide-react"
 
-// ===== 星项目列表数据 =====
-const sampleRepos = [
-  { fullName: "vercel/next.js", description: "The React Framework for the Web", stars: "127.5k", forks: "27.1k", language: "TypeScript", langColor: "bg-domain-frontend", aiTags: ["web-framework", "react"], updatedAt: "2026-06-28" },
-  { fullName: "hwchase17/langchain", description: "Building applications with LLMs through composability", stars: "95.3k", forks: "15.2k", language: "Python", langColor: "bg-domain-backend", aiTags: ["ai", "llm", "framework"], updatedAt: "2026-06-29" },
-  { fullName: "neovim/neovim", description: "Vim-fork focused on extensibility and usability", stars: "82.1k", forks: "5.6k", language: "C", langColor: "bg-domain-tools", aiTags: ["editor", "cli-tools"], updatedAt: "2026-06-30" },
-  { fullName: "facebook/react", description: "A declarative, efficient, and flexible JavaScript library", stars: "228k", forks: "46.8k", language: "JavaScript", langColor: "bg-domain-frontend", aiTags: ["ui", "web"], updatedAt: "2026-06-27" },
-  { fullName: "microsoft/vscode", description: "Visual Studio Code", stars: "162k", forks: "29.1k", language: "TypeScript", langColor: "bg-domain-frontend", aiTags: ["editor", "ide"], updatedAt: "2026-06-30" },
-  { fullName: "torvalds/linux", description: "Linux kernel source tree", stars: "180k", forks: "53.2k", language: "C", langColor: "bg-domain-tools", aiTags: ["kernel", "os"], updatedAt: "2026-06-26" },
-  { fullName: "golang/go", description: "The Go programming language", stars: "125k", forks: "17.8k", language: "Go", langColor: "bg-domain-backend", aiTags: ["language", "compiler"], updatedAt: "2026-06-29" },
-  { fullName: "rust-lang/rust", description: "Empowering everyone to build reliable software", stars: "98k", forks: "12.5k", language: "Rust", langColor: "bg-domain-tools", aiTags: ["language", "systems"], updatedAt: "2026-06-28" },
-  { fullName: "tensorflow/tensorflow", description: "An Open Source Machine Learning Framework", stars: "185k", forks: "74.2k", language: "Python", langColor: "bg-domain-ai", aiTags: ["ml", "deep-learning"], updatedAt: "2026-06-25" },
-  { fullName: "kubernetes/kubernetes", description: "Production-Grade Container Orchestration", stars: "111k", forks: "39.5k", language: "Go", langColor: "bg-domain-backend", aiTags: ["containers", "devops"], updatedAt: "2026-06-30" },
-  { fullName: "nodejs/node", description: "Node.js JavaScript runtime", stars: "107k", forks: "29.3k", language: "JavaScript", langColor: "bg-domain-backend", aiTags: ["runtime", "server"], updatedAt: "2026-06-29" },
-  { fullName: "apache/spark", description: "Apache Spark - A unified analytics engine", stars: "40k", forks: "28.1k", language: "Scala", langColor: "bg-domain-backend", aiTags: ["big-data", "analytics"], updatedAt: "2026-06-24" },
+type RepoHealth = "active" | "watch" | "stale"
+
+type StarRepo = {
+  fullName: string
+  description: string
+  stars: string
+  forks: string
+  language: string
+  langColor: string
+  license: string
+  starredAt: string
+  updatedAt: string
+  topics: string[]
+  autoTags: string[]
+  category: string
+  score: number
+  health: RepoHealth
+  whyStarred: string
+  learningValue: string[]
+  reuseAdvice: string
+}
+
+const developerProfile = {
+  login: "patdelphi",
+  totalStars: 691,
+  syncedAt: "2026-06-30 22:40",
+  demoMode: "Demo 数据：691 条 GitHub starred repositories",
+}
+
+const sampleRepos: StarRepo[] = [
+  {
+    fullName: "microsoft/markitdown",
+    description: "Python tool for converting files and office documents to Markdown.",
+    stars: "40.2k",
+    forks: "1.8k",
+    language: "Python",
+    langColor: "bg-domain-backend",
+    license: "MIT",
+    starredAt: "2026-06-18",
+    updatedAt: "2026-06-28",
+    topics: ["rag", "markdown", "document-ai"],
+    autoTags: ["RAG 前置", "文档处理", "AI 工具"],
+    category: "文档处理",
+    score: 92,
+    health: "active",
+    whyStarred: "适合把 Office、PDF、网页内容转成 Markdown，作为知识库和 RAG 的入口。",
+    learningValue: ["文档解析", "Markdown 生成", "自动化流水线"],
+    reuseAdvice: "可作为本地文档处理工具链的前置转换模块。",
+  },
+  {
+    fullName: "modelcontextprotocol/servers",
+    description: "Reference implementations and community servers for Model Context Protocol.",
+    stars: "18.7k",
+    forks: "2.3k",
+    language: "TypeScript",
+    langColor: "bg-domain-frontend",
+    license: "MIT",
+    starredAt: "2026-06-11",
+    updatedAt: "2026-06-29",
+    topics: ["mcp", "agent", "tool-use"],
+    autoTags: ["MCP", "Agent", "工具调用"],
+    category: "Agent 生态",
+    score: 95,
+    health: "active",
+    whyStarred: "用于理解 MCP Server 的能力边界、工具暴露方式和本地 Agent 集成模式。",
+    learningValue: ["MCP 协议", "工具调用", "Agent 基础设施"],
+    reuseAdvice: "适合作为自定义 MCP 工具服务器的实现参考。",
+  },
+  {
+    fullName: "astral-sh/uv",
+    description: "An extremely fast Python package and project manager, written in Rust.",
+    stars: "58.1k",
+    forks: "1.6k",
+    language: "Rust",
+    langColor: "bg-domain-tools",
+    license: "MIT / Apache-2.0",
+    starredAt: "2026-05-21",
+    updatedAt: "2026-06-30",
+    topics: ["python", "cli", "packaging"],
+    autoTags: ["工具链", "Python 基建", "CLI"],
+    category: "开发工具",
+    score: 90,
+    health: "active",
+    whyStarred: "能显著降低 Python 项目的依赖安装和环境管理成本。",
+    learningValue: ["包管理", "Rust 工具链", "CI 加速"],
+    reuseAdvice: "可替代部分 pip/venv/poetry 工作流，先在新项目中试点。",
+  },
+  {
+    fullName: "langchain-ai/langgraph",
+    description: "Build resilient language agents as graphs.",
+    stars: "15.9k",
+    forks: "2.7k",
+    language: "Python",
+    langColor: "bg-domain-ai",
+    license: "MIT",
+    starredAt: "2026-04-14",
+    updatedAt: "2026-06-27",
+    topics: ["llm", "agent", "workflow"],
+    autoTags: ["LLM", "Agent", "编排"],
+    category: "AI 应用框架",
+    score: 87,
+    health: "active",
+    whyStarred: "适合学习多步骤 Agent、状态图和可恢复执行的产品化设计。",
+    learningValue: ["状态图", "Agent 编排", "LLM 应用"],
+    reuseAdvice: "适合复杂 Agent 流程，简单问答场景不必引入。",
+  },
+  {
+    fullName: "neovim/neovim",
+    description: "Vim-fork focused on extensibility and usability.",
+    stars: "82.1k",
+    forks: "5.6k",
+    language: "C",
+    langColor: "bg-domain-tools",
+    license: "Apache-2.0",
+    starredAt: "2025-12-02",
+    updatedAt: "2026-06-30",
+    topics: ["editor", "cli", "developer-tools"],
+    autoTags: ["编辑器", "CLI", "开发效率"],
+    category: "开发工具",
+    score: 78,
+    health: "active",
+    whyStarred: "代表高可扩展编辑器生态，适合研究插件系统和开发者工具体验。",
+    learningValue: ["插件生态", "CLI UX", "编辑器架构"],
+    reuseAdvice: "可借鉴其配置和插件生态设计，不建议直接嵌入业务系统。",
+  },
+  {
+    fullName: "jina-ai/reader",
+    description: "Convert any URL to an LLM-friendly input.",
+    stars: "8.4k",
+    forks: "620",
+    language: "TypeScript",
+    langColor: "bg-domain-frontend",
+    license: "Apache-2.0",
+    starredAt: "2026-03-09",
+    updatedAt: "2026-05-14",
+    topics: ["llm", "reader", "web"],
+    autoTags: ["网页解析", "LLM 输入", "RAG"],
+    category: "数据摄取",
+    score: 81,
+    health: "watch",
+    whyStarred: "可把网页转换为更适合 LLM 的上下文输入，适合内容采集和总结。",
+    learningValue: ["网页抽取", "LLM 上下文", "内容清洗"],
+    reuseAdvice: "适合做网页转 Markdown 的补充能力，需关注调用稳定性。",
+  },
+  {
+    fullName: "oldtools/archive-ui",
+    description: "A once-popular admin template with limited recent maintenance.",
+    stars: "6.2k",
+    forks: "1.1k",
+    language: "JavaScript",
+    langColor: "bg-domain-frontend",
+    license: "GPL-3.0",
+    starredAt: "2024-01-22",
+    updatedAt: "2024-08-03",
+    topics: ["admin", "template", "dashboard"],
+    autoTags: ["Dead Stars", "前端模板", "协议关注"],
+    category: "前端模板",
+    score: 41,
+    health: "stale",
+    whyStarred: "历史上可能用于后台界面参考，但维护和协议风险都需要重新评估。",
+    learningValue: ["后台布局", "旧技术债识别"],
+    reuseAdvice: "只作为视觉参考，不建议直接复用代码。",
+  },
 ]
 
 const activeFilters = [
-  { key: "lang", label: "TypeScript", value: "typescript" },
-  { key: "topic", label: "AI", value: "ai" },
+  { key: "lang", label: "Python" },
+  { key: "topic", label: "agent" },
+  { key: "tag", label: "RAG 前置" },
 ]
 
-const ITEMS_PER_PAGE = 10
+const languageStats = [
+  { label: "Python", count: 254, color: "bg-domain-backend" },
+  { label: "TypeScript", count: 125, color: "bg-domain-frontend" },
+  { label: "JavaScript", count: 45, color: "bg-domain-frontend" },
+  { label: "Rust", count: 21, color: "bg-domain-tools" },
+]
 
-// AI 分析数据（详情面板用）
-const aiAnalysis = {
-  reason: "你为何星标该项目",
-  reasonText: "该项目提供了将各类文档（PDF、Word、PPT 等）转换为 Markdown 的简洁方案，与你关注的文档处理与 AI 工具链方向高度契合。",
-  learningValues: ["文档解析", "Markdown 生成", "Python 工具链"],
-  reuseAdvice: "可直接集成到文档处理流水线中，或作为 RAG 系统的前置解析模块复用。",
+const topicClusters = [
+  { label: "AI / LLM", count: 143, topics: ["ai", "llm", "openai", "chatgpt"] },
+  { label: "Agent / MCP", count: 61, topics: ["mcp", "agent", "claude-code"] },
+  { label: "RAG / 文档", count: 40, topics: ["rag", "pdf", "markdown"] },
+  { label: "CLI / 工具链", count: 55, topics: ["cli", "python", "windows"] },
+]
+
+const ITEMS_PER_PAGE = 5
+
+const healthMeta: Record<RepoHealth, { label: string; className: string }> = {
+  active: { label: "活跃", className: "text-status-safe" },
+  watch: { label: "观察", className: "text-status-warning" },
+  stale: { label: "低活跃", className: "text-status-danger" },
 }
-
-const licenseHealth = {
-  license: "MIT",
-  riskLevel: "低风险",
-  riskColor: "text-status-safe",
-}
-
-const systemRadar = [
-  { label: "活跃度", value: 85, color: "bg-primary" },
-  { label: "社区", value: 72, color: "bg-domain-frontend" },
-  { label: "文档", value: 90, color: "bg-domain-backend" },
-  { label: "稳定性", value: 78, color: "bg-domain-ai" },
-]
-
-const relatedRepos = [
-  { fullName: "JupyterLab/jupyterlab", description: "JupyterLab computational environment", stars: "14.2k", forks: "2.8k", language: "TypeScript", langColor: "bg-domain-frontend" },
-  { fullName: "pandoc/pandoc", description: "Universal markup converter", stars: "35.6k", forks: "3.2k", language: "Haskell", langColor: "bg-domain-tools" },
-  { fullName: "mozilla/pdf.js", description: "PDF Reader in JavaScript", stars: "48.1k", forks: "9.5k", language: "JavaScript", langColor: "bg-domain-frontend" },
-]
 
 export default function StarExplorer() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
-  const totalPages = Math.ceil(sampleRepos.length / ITEMS_PER_PAGE)
+  const [analysisStatus, setAnalysisStatus] = useState("已加载指定开发者 @patdelphi 的 Star 仓库 Demo 分析。")
 
+  const filteredRepos = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return sampleRepos
+    return sampleRepos.filter((repo) =>
+      [repo.fullName, repo.description, repo.language, repo.category, ...repo.topics, ...repo.autoTags]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    )
+  }, [searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRepos.length / ITEMS_PER_PAGE))
   const paginatedRepos = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return sampleRepos.slice(start, start + ITEMS_PER_PAGE)
-  }, [currentPage])
-
-  const activeRepo = sampleRepos.find((r) => r.fullName === selectedRepo)
+    return filteredRepos.slice(start, start + ITEMS_PER_PAGE)
+  }, [currentPage, filteredRepos])
 
   const handleExport = (format: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`导出格式: ${format}`)
+    setAnalysisStatus(`已模拟导出当前筛选结果为 ${format}，真实导出后续接本地 Exporter。`)
+  }
+
+  const handleBatchAnalyze = () => {
+    setAnalysisStatus("已模拟批量分析：规则分类、Hidden Gems、Dead Stars、协议风险均已刷新。")
   }
 
   const handleRemoveFilter = (filterKey: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`移除筛选: ${filterKey}`)
+    setAnalysisStatus(`已模拟移除筛选条件：${filterKey}。`)
   }
 
-  const handleCopyClone = () => {
-    if (!activeRepo) return
-    navigator.clipboard.writeText(`git clone https://github.com/${activeRepo.fullName}.git`)
-      .catch(() => {})
+  const openRepoAnalysis = (fullName: string) => {
+    setAnalysisStatus(`已选择 ${fullName}，请进入“仓库分析”页查看单仓库深度分析。`)
   }
 
   return (
     <div className="min-h-[calc(100vh-8rem)] bg-grid-pattern">
       <div className="space-y-6">
-        {/* 页面标题与导出 */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-              星系探索
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              正在浏览 <span className="font-medium text-primary">{sampleRepos.length}</span> 个同步的星项目
+        <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
+                指定开发者
+              </Badge>
+              <Badge className="font-mono text-xs">@{developerProfile.login}</Badge>
+              <Badge variant="secondary" className="font-mono text-xs">
+                {developerProfile.demoMode}
+              </Badge>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">星标仓库</h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              开发者 Star 全局分析：围绕指定开发者的全部 starred repositories 做组合画像、筛选排序、规则分类和风险识别。
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport("CSV")}>CSV</Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("JSON")}>JSON</Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("MD")}>MD</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleBatchAnalyze}>
+              <Sparkles className="h-4 w-4" />
+              批量分析
+            </Button>
+            <Button className="gap-2" onClick={() => handleExport("Markdown")}>
+              <Download className="h-4 w-4" />
+              导出报告
+            </Button>
           </div>
-        </div>
+        </section>
 
-        {/* 高级筛选栏 */}
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard icon={Star} label="Star 仓库概览" value={developerProfile.totalStars.toString()} detail="本地 Demo 数据总量" />
+          <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="topics / name / description 规则命中" />
+          <MetricCard icon={Flame} label="Hidden Gems" value="27" detail="低 Star 高价值候选" />
+          <MetricCard icon={AlertTriangle} label="Dead Stars" value="34" detail="长期未更新或协议需关注" />
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <Card className="xl:col-span-5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Radar className="h-5 w-5 text-primary" />
+                语言分布
+              </CardTitle>
+              <CardDescription>用于判断开发者长期技术关注方向</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {languageStats.map((item) => (
+                <div key={item.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-on-surface">{item.label}</span>
+                    <span className="font-mono text-muted-foreground">{item.count}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-surface-container-high">
+                    <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${Math.min(100, item.count / 3)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-7">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Layers3 className="h-5 w-5 text-primary" />
+                主题聚类
+              </CardTitle>
+              <CardDescription>把 Star 仓库从散列表整理成兴趣地图</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {topicClusters.map((cluster) => (
+                <div key={cluster.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-on-surface">{cluster.label}</h3>
+                    <Badge variant="secondary" className="font-mono text-xs">{cluster.count}</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cluster.topics.map((topic) => (
+                      <Badge key={topic} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
         <Card className="glass-panel">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="搜索仓库、描述或标签..."
-                    className="pl-9"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">语言</SelectOption>
-                      <SelectOption value="typescript">TypeScript</SelectOption>
-                      <SelectOption value="python">Python</SelectOption>
-                      <SelectOption value="rust">Rust</SelectOption>
-                      <SelectOption value="go">Go</SelectOption>
-                    </Select>
-                  </div>
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">主题</SelectOption>
-                      <SelectOption value="ai">AI</SelectOption>
-                      <SelectOption value="web">Web</SelectOption>
-                      <SelectOption value="cli">CLI</SelectOption>
-                      <SelectOption value="data">Data</SelectOption>
-                    </Select>
-                  </div>
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">协议</SelectOption>
-                      <SelectOption value="mit">MIT</SelectOption>
-                      <SelectOption value="apache">Apache</SelectOption>
-                      <SelectOption value="gpl">GPL</SelectOption>
-                    </Select>
-                  </div>
-                  <Button variant="outline" size="icon" className="shrink-0">
-                    <Filter className="h-4 w-4" />
-                  </Button>
-                </div>
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-col gap-3 xl:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="搜索仓库、描述、topic 或自动标签..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value)
+                    setCurrentPage(1)
+                  }}
+                />
               </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:w-[620px]">
+                <Select defaultValue="">
+                  <SelectOption value="">语言</SelectOption>
+                  <SelectOption value="python">Python</SelectOption>
+                  <SelectOption value="typescript">TypeScript</SelectOption>
+                  <SelectOption value="rust">Rust</SelectOption>
+                </Select>
+                <Select defaultValue="">
+                  <SelectOption value="">主题</SelectOption>
+                  <SelectOption value="ai">AI</SelectOption>
+                  <SelectOption value="mcp">MCP</SelectOption>
+                  <SelectOption value="rag">RAG</SelectOption>
+                </Select>
+                <Select defaultValue="">
+                  <SelectOption value="">协议</SelectOption>
+                  <SelectOption value="mit">MIT</SelectOption>
+                  <SelectOption value="apache">Apache-2.0</SelectOption>
+                  <SelectOption value="gpl">GPL-3.0</SelectOption>
+                </Select>
+                <Select defaultValue="starred_at">
+                  <SelectOption value="starred_at">排序：starred_at</SelectOption>
+                  <SelectOption value="stars">排序：stars</SelectOption>
+                  <SelectOption value="forks">排序：forks</SelectOption>
+                  <SelectOption value="updated_at">排序：updated_at</SelectOption>
+                </Select>
+              </div>
+            </div>
 
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">已筛选:</span>
-                  {activeFilters.map((filter) => (
-                    <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 font-mono text-xs">
-                      {filter.label}
-                      <button onClick={() => handleRemoveFilter(filter.key)} className="ml-1 rounded-full hover:bg-surface-container-high">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-on-surface" onClick={() => handleRemoveFilter("all")}>
-                    清除全部
-                  </Button>
-                </div>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">已筛选:</span>
+              {activeFilters.map((filter) => (
+                <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 font-mono text-xs">
+                  {filter.label}
+                  <button onClick={() => handleRemoveFilter(filter.key)} className="ml-1 rounded-full hover:bg-surface-container-high">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground" onClick={() => handleRemoveFilter("all")}>
+                <Filter className="h-3 w-3" />
+                清除全部
+              </Button>
+              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground">
+                <ArrowDownUp className="h-3 w-3" />
+                排序
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* 数据表格 */}
         <Card>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[280px]">仓库</TableHead>
-                  <TableHead className="hidden md:table-cell">简介</TableHead>
-                  <TableHead className="text-right">星数</TableHead>
+                  <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
+                  <TableHead className="text-right">分数</TableHead>
                   <TableHead className="hidden sm:table-cell">语言</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">更新时间</TableHead>
-                  <TableHead className="hidden lg:table-cell">AI 标签</TableHead>
+                  <TableHead className="hidden lg:table-cell">协议</TableHead>
+                  <TableHead className="hidden xl:table-cell">最近更新</TableHead>
+                  <TableHead className="hidden xl:table-cell">自动标签</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedRepos.map((repo) => (
                   <TableRow
                     key={repo.fullName}
-                    className={`cursor-pointer transition-colors ${
-                      selectedRepo === repo.fullName
-                        ? "bg-surface-container-high"
-                        : "hover:bg-surface-container"
-                    }`}
-                    onClick={() => setSelectedRepo(repo.fullName)}
+                    className="transition-colors hover:bg-surface-container"
                   >
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {selectedRepo === repo.fullName && (
-                          <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                        )}
-                        <span className={`font-medium ${selectedRepo === repo.fullName ? "text-primary" : "text-on-surface"}`}>
-                          {repo.fullName}
-                        </span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-on-surface">{repo.fullName}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
+                          <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      <span className="text-sm text-muted-foreground line-clamp-1">{repo.description}</span>
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
+                        <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground">
-                        <Star className="h-3.5 w-3.5 text-primary" />
-                        <span className="font-medium text-on-surface">{repo.stars}</span>
-                      </div>
+                      <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">
-                      <span className="text-xs text-muted-foreground font-mono">{repo.updatedAt}</span>
-                    </TableCell>
                     <TableCell className="hidden lg:table-cell">
+                      <span className="text-xs text-muted-foreground">{repo.license}</span>
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
                       <div className="flex flex-wrap gap-1">
-                        {repo.aiTags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{tag}</Badge>
+                        {repo.autoTags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
                         ))}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
+                        <LineChart className="h-4 w-4" />
+                        查看仓库分析
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -267,194 +493,39 @@ export default function StarExplorer() {
           </CardContent>
         </Card>
 
-        {/* 分页 */}
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            显示第 <span className="font-medium text-on-surface">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> 到{" "}
-            <span className="font-medium text-on-surface">{Math.min(currentPage * ITEMS_PER_PAGE, sampleRepos.length)}</span> 条，共{" "}
-            <span className="font-medium text-on-surface">{sampleRepos.length}</span> 条
-          </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm text-muted-foreground">{analysisStatus}</p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Button
-                  key={p}
-                  variant="outline"
-                  size="sm"
-                  className={`h-8 min-w-[2rem] ${p === currentPage ? "bg-primary text-on-primary" : ""}`}
-                  onClick={() => setCurrentPage(p)}
-                >
-                  {p}
-                </Button>
-              ))}
-            </div>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+            <span className="text-sm text-muted-foreground">
+              第 <span className="font-mono text-on-surface">{currentPage}</span> / {totalPages} 页
+            </span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
-
-        {/* ===== 选中星项目的详情面板（原 RepoDetail 内容） ===== */}
-        {activeRepo && (
-          <div className="space-y-6 pt-6 border-t border-outline-variant/50">
-            {/* 头部信息 */}
-            <section className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="default" className="font-mono text-xs uppercase tracking-wider">AI 工具</Badge>
-                <Badge variant="secondary" className="font-mono text-xs uppercase tracking-wider">{activeRepo.language}</Badge>
-              </div>
-              <h2 className="text-2xl font-semibold tracking-tight text-on-surface">{activeRepo.fullName}</h2>
-              <p className="max-w-3xl text-base text-muted-foreground">{activeRepo.description}</p>
-              <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Star className="h-4 w-4 text-primary" />
-                  <span className="font-medium text-on-surface">{activeRepo.stars}</span>
-                  <span>星标</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <GitFork className="h-4 w-4" />
-                  <span className="font-medium text-on-surface">{activeRepo.forks}</span>
-                  <span>分叉</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4" />
-                  <span>更新于 2 天前</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Button className="gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  在 GitHub 打开
-                </Button>
-                <Button variant="outline" className="gap-2" onClick={handleCopyClone}>
-                  <Copy className="h-4 w-4" />
-                  复制克隆地址
-                </Button>
-              </div>
-            </section>
-
-            {/* AI 分析 + 右侧信息 双栏 */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              <Card className="lg:col-span-8">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">AI 智能分析</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
-                      <Star className="h-4 w-4 text-primary" />
-                      <span>{aiAnalysis.reason}</span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{aiAnalysis.reasonText}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
-                      <School className="h-4 w-4 text-domain-frontend" />
-                      <span>学习价值</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {aiAnalysis.learningValues.map((tag) => (
-                        <Badge key={tag} variant="default" className="font-mono text-xs uppercase tracking-wider">{tag}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
-                      <Puzzle className="h-4 w-4 text-domain-backend" />
-                      <span>复用建议</span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{aiAnalysis.reuseAdvice}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6 lg:col-span-4">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Gavel className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">协议健康度</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="h-5 w-5 text-status-safe" />
-                        <span className="font-medium text-on-surface">{licenseHealth.license} 协议</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${licenseHealth.riskColor}`}>{licenseHealth.riskLevel}</span>
-                      <span className="text-xs text-muted-foreground">可自由商用、修改与分发</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Network className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">系统雷达</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {systemRadar.map((item) => (
-                      <div key={item.label} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{item.label}</span>
-                          <span className="font-mono font-medium text-on-surface">{item.value}</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-surface-container-high">
-                          <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* 推荐相关项目 */}
-            <section className="space-y-4">
-              <h2 className="text-xl font-semibold tracking-tight text-on-surface">推荐相关项目</h2>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {relatedRepos.map((repo) => (
-                  <Card key={repo.fullName} className="group flex flex-col transition-shadow hover:shadow-md">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <Badge className={`${repo.langColor} text-white`}>{repo.language}</Badge>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <CardTitle className="text-base font-semibold tracking-tight text-on-surface">{repo.fullName}</CardTitle>
-                      <CardDescription className="line-clamp-2">{repo.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="mt-auto pt-0">
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5" />
-                          <span>{repo.stars}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <GitFork className="h-3.5 w-3.5" />
-                          <span>{repo.forks}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          </div>
-        )}
       </div>
     </div>
   )
 }
+
+function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Star; label: string; value: string; detail: string }) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 p-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <div className="text-2xl font-semibold tracking-tight text-on-surface">{value}</div>
+          <div className="text-sm font-medium text-on-surface">{label}</div>
+          <div className="text-xs text-muted-foreground">{detail}</div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
