@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+
+<html lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>星目录 - Star Way</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Geist:wght@400;600;700;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#005045",
+                        "inverse-surface": "#213145",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "on-primary-fixed": "#00201b",
+                        "on-secondary-fixed": "#131b2e",
+                        "outline-variant": "#bacac5",
+                        "surface-variant": "#d3e4fe",
+                        "on-background": "#0b1c30",
+                        "surface-container-high": "#dce9ff",
+                        "surface": "#f8f9ff",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface-variant": "#3c4a46",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary": "#565e74",
+                        "inverse-primary": "#3eddc3",
+                        "error-container": "#ffdad6",
+                        "on-primary-container": "#004b40",
+                        "primary-fixed-dim": "#3eddc3",
+                        "primary": "#006b5c",
+                        "background": "#f8f9ff",
+                        "tertiary-fixed-dim": "#ffb59a",
+                        "outline": "#6b7a76",
+                        "primary-container": "#00c4ab",
+                        "secondary-fixed": "#dae2fd",
+                        "on-secondary-container": "#5c647a",
+                        "primary-fixed": "#63fadf",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#7c2e09",
+                        "surface-container": "#e5eeff",
+                        "on-surface": "#0b1c30",
+                        "inverse-on-surface": "#eaf1ff",
+                        "tertiary": "#9b4420",
+                        "surface-dim": "#cbdbf5",
+                        "on-tertiary-fixed": "#370d00",
+                        "on-tertiary-container": "#762905",
+                        "secondary-container": "#dae2fd",
+                        "surface-tint": "#006b5c",
+                        "tertiary-container": "#ff9166",
+                        "tertiary-fixed": "#ffdbce",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "domain-tools": "#64748b",
+                        "domain-frontend": "#3b82f6",
+                        "status-danger": "#ef4444",
+                        "status-warning": "#f59e0b",
+                        "domain-ai": "#a855f7",
+                        "domain-backend": "#10b981",
+                        "status-safe": "#22c55e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "gutter": "24px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "base": "4px",
+                        "xl": "48px",
+                        "container-max": "1280px",
+                        "sm": "8px",
+                        "xs": "4px",
+                        "container-margin": "24px",
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Geist"],
+                        "label-sm": ["JetBrains Mono"],
+                        "body-sm": ["Geist"],
+                        "headline-lg-mobile": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-md": ["Geist"],
+                        "headline-xl": ["Geist"],
+                        "code-snippet": ["JetBrains Mono"],
+                        "label-mono": ["JetBrains Mono"],
+                        "display-dna": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-xl": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "code-snippet": ["14px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "display-dna": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased overflow-x-hidden selection:bg-primary-container/30">
+<!-- Subtle Grid Background Map Metaphor -->
+<div class="fixed inset-0 z-0 pointer-events-none opacity-[0.05]" style="background-image: radial-gradient(circle at 2px 2px, black 1px, transparent 0); background-size: 32px 32px;"></div>
+<!-- SideNavBar (Shared Component) -->
+<nav class="w-[280px] h-screen fixed left-0 top-0 bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col py-stack-lg z-40">
+<!-- Header -->
+<div class="px-container-margin mb-stack-lg">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container border border-outline-variant/30 flex items-center justify-center overflow-hidden shrink-0">
+<img alt="Brand Logo" class="w-full h-full object-cover p-1" src="https://lh3.googleusercontent.com/aida/AP1WRLtLv9VJKUhovlLtNlNO5zP97d63eow6zfYyHqL1mi4-90kDuCl3H9uLw_jyagIJnWIz7fH2nhZFmaN_vKpKXIK1bHAhaTQnkdCliIgMR0ufUP8ksalrs-gZZeZ-eg-UuKcymt2lazSLKBgHnGPXfiSiJ4PolPCE70HWlip9mqQeTOAlxpJWDFTrt4WOFgLdp8FTFTwSX_OmConuDFUskssTA3K3lRYUHfW38xDkPBc05dBGn7U7EsmH"/>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">Star Way</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Interstellar Navigator</p>
+</div>
+</div>
+</div>
+<!-- Main Nav -->
+<div class="flex-1 flex flex-col gap-1 px-container-margin">
+<!-- Dashboard -->
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span>仪表盘</span>
+</a>
+<!-- Star List (Active) -->
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-primary font-bold border-r-2 border-primary bg-primary-container/10 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="star" data-weight="fill">star</span>
+<span>星目录</span>
+</a>
+<!-- Repo Detail -->
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="analytics">analytics</span>
+<span>详情</span>
+</a>
+<!-- Map -->
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="map">map</span>
+<span>趋势地图</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span>设置</span>
+</a>
+</div>
+<!-- CTA & Footer -->
+<div class="px-container-margin mt-auto flex flex-col gap-4">
+<button class="w-full bg-primary-container text-on-primary-container font-bold py-2 rounded-lg hover:bg-primary-container/90 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+                同步项目
+            </button>
+<div class="h-px bg-outline-variant/30 w-full my-2"></div>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+<span class="font-label-mono text-label-mono">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="terminal">terminal</span>
+<span class="font-label-mono text-label-mono">GitHub</span>
+</a>
+</div>
+</nav>
+<!-- TopAppBar (Shared Component) -->
+<header class="flex justify-between items-center w-full px-container-margin h-16 ml-[280px] max-w-[calc(100%-280px)] docked full-width top-0 sticky z-50 bg-surface-container-lowest/80 border-b border-outline-variant/30 backdrop-blur-xl transition-all">
+<div class="flex items-center gap-6">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary hover:bg-on-surface/5 px-3 py-1.5 rounded-lg transition-colors" href="#">探索</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary hover:bg-on-surface/5 px-3 py-1.5 rounded-lg transition-colors" href="#">收藏</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="font-body-sm text-body-sm text-primary border border-outline-variant bg-transparent hover:border-primary hover:bg-primary-container/10 px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                导出
+            </button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-full hover:bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-full hover:bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="settings_system_daydream">settings_system_daydream</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container border border-outline-variant/30 overflow-hidden cursor-pointer hover:border-primary transition-colors ml-2">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close up of a stylized holographic avatar head floating in void space. Soft neon rim lighting against a pitch black background. Cyberpunk minimal aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_eUQA31F1FFKlRD4cVgMk151PK3kKakpa5K9xmDX-gCsXjKxPm2iLvXrNGjUV_XT5nQc_kQ89Oatd93uZe7pL217ynSSyGl-mK9OvG3EMpZTrQjr82pnHuv5xIZsrezioea0jkfjp4wXwYZbhPcwYLM1rC7MtUmN0HXfBZUCaA84pgIFKygoj00EKG236XfLzAH5uEN3zUxUdEhROcLcL3veukqDyr00Diz8RdLIATri1bBsAdIV8mJ8ME4PLFbGx8UpM-83fZQ"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-[280px] min-h-screen pt-8 pb-16 px-container-margin relative z-10">
+<!-- Page Header & Batch Actions -->
+<div class="flex items-end justify-between mb-stack-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2 tracking-tight">星目录</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">正在浏览 1,492 个同步的仓库。</p>
+</div>
+<div class="flex gap-3">
+<div class="flex bg-surface-container-lowest border border-outline-variant rounded-lg p-1">
+<button class="px-3 py-1.5 font-label-mono text-label-mono text-on-surface-variant hover:text-primary hover:bg-on-surface/5 rounded transition-colors">CSV</button>
+<button class="px-3 py-1.5 font-label-mono text-label-mono text-on-surface-variant hover:text-primary hover:bg-on-surface/5 rounded transition-colors border-l border-r border-outline-variant">JSON</button>
+<button class="px-3 py-1.5 font-label-mono text-label-mono text-on-surface-variant hover:text-primary hover:bg-on-surface/5 rounded transition-colors">MD</button>
+</div>
+</div>
+</div>
+<!-- Advanced Filters & Search (Glassmorphism Card) -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-xl border border-outline-variant/50 rounded-xl p-6 mb-stack-lg shadow-sm">
+<div class="flex flex-col md:flex-row gap-4 items-end">
+<!-- Search -->
+<div class="flex-1 w-full">
+<label class="block font-label-mono text-[11px] text-on-surface-variant uppercase tracking-wider mb-2">搜索</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 pl-10 pr-4 font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all" placeholder="Search by name, owner, or description..." type="text"/>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex flex-wrap md:flex-nowrap gap-4 w-full md:w-auto">
+<div class="w-full md:w-40">
+<label class="block font-label-mono text-[11px] text-on-surface-variant uppercase tracking-wider mb-2">语言</label>
+<select class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 font-body-sm text-on-surface focus:outline-none focus:border-primary-container appearance-none cursor-pointer">
+<option>全部语言</option>
+<option>TypeScript</option>
+<option>Python</option>
+<option>Rust</option>
+</select>
+</div>
+<div class="w-full md:w-40">
+<label class="block font-label-mono text-[11px] text-on-surface-variant uppercase tracking-wider mb-2">主题</label>
+<select class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 font-body-sm text-on-surface focus:outline-none focus:border-primary-container appearance-none cursor-pointer">
+<option>全部主题</option>
+<option>Machine Learning</option>
+<option>Web Framework</option>
+</select>
+</div>
+<div class="w-full md:w-40">
+<label class="block font-label-mono text-[11px] text-on-surface-variant uppercase tracking-wider mb-2">协议</label>
+<select class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg py-2 px-3 font-body-sm text-on-surface focus:outline-none focus:border-primary-container appearance-none cursor-pointer">
+<option>全部协议</option>
+<option>MIT</option>
+<option>Apache-2.0</option>
+</select>
+</div>
+<button class="h-[38px] w-[38px] flex items-center justify-center bg-surface-container-lowest border border-outline-variant rounded-lg hover:text-primary hover:border-primary transition-colors text-outline group relative">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+<span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-container rounded-full hidden group-hover:block"></span>
+</button>
+</div>
+</div>
+<!-- Active Filter Tags -->
+<div class="mt-4 flex gap-2">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface border border-outline-variant/50 font-label-mono text-[11px] text-on-surface">
+                    Language: <span class="text-primary">TypeScript</span>
+<button class="hover:text-status-danger ml-1"><span class="material-symbols-outlined text-[14px]">close</span></button>
+</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface border border-outline-variant/50 font-label-mono text-[11px] text-on-surface">
+                    Stars: <span class="text-primary">&gt; 1000</span>
+<button class="hover:text-status-danger ml-1"><span class="material-symbols-outlined text-[14px]">close</span></button>
+</span>
+<button class="font-label-mono text-[11px] text-outline hover:text-primary ml-2 transition-colors">清空</button>
+</div>
+</div>
+<!-- Data Table (Dense Tabular Model) -->
+<div class="w-full overflow-x-auto border border-outline-variant/50 rounded-xl bg-surface-container-lowest/80 backdrop-blur-sm">
+<table class="w-full text-left border-collapse min-w-[1000px]">
+<thead>
+<tr class="border-b border-outline-variant/50 bg-surface-container-low">
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[30%]">仓库</th>
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[30%]">简介</th>
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[10%]">星数</th>
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[10%]">语言</th>
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[15%]">AI 标签</th>
+<th class="py-3 px-4 font-label-mono text-label-mono text-on-surface-variant font-medium w-[5%] text-right">操作</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-on-surface">
+<!-- Row 1 (Frontend) -->
+<tr class="border-b border-outline-variant/30 hover:bg-primary-container/5 transition-colors group bg-surface-container-lowest">
+<td class="py-3 px-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded bg-surface border border-outline-variant/50 flex items-center justify-center shrink-0">
+<img alt="owner avatar" class="w-4 h-4" data-alt="A microscopic, hyper-detailed glowing blue geometric icon resembling a cube inside a dark glass casing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBiptI1N5TjRFW9Q5YPEjxtwcz9yjN-BMto6VmEteanxG3Wn2aSl9bzbC_iDshRXHbuNQCLLbRsrarO6Ze7Z6rrCcIli80KFcsh-7naHwEO9AN4_FMhc_rA93E8cl1jWhf5B3HT8UCNrW3Ljxe7_X2K_HBSJ3PzCudQnJK1434END7_ZXLEAuwvq3Ylfd5u5LM2nkmzpC6dbSPFQjXgxsLBTrLxDWOxzdpgsNe7bay6ykkNu7FMSDwPg4JVjT0M7WGHL6tC1egPg"/>
+</div>
+<div>
+<a class="font-semibold text-primary hover:underline decoration-primary/50 underline-offset-4" href="#">vercel / next.js</a>
+<div class="font-label-mono text-[10px] text-outline mt-0.5">更新于 2h 前</div>
+</div>
+</div>
+</td>
+<td class="py-3 px-4 relative group/desc">
+<p class="text-on-surface line-clamp-2 pr-8">The React Framework for the Web. Build blazing fast static and dynamic sites.</p>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/desc:opacity-100 transition-opacity bg-surface-container-lowest border border-outline-variant rounded p-1 text-outline hover:text-primary hover:border-primary" title="Translate description">
+<span class="material-symbols-outlined text-[16px]">translate</span>
+</button>
+</td>
+<td class="py-3 px-4 font-label-mono text-on-surface flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-[14px] text-status-warning">star</span>
+                            117k
+                        </td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#3178c6]"></span>
+<span class="font-label-mono text-[12px] text-on-surface">TypeScript</span>
+</div>
+</td>
+<td class="py-3 px-4">
+<div class="flex flex-wrap gap-1.5">
+<span class="bg-domain-frontend/10 text-domain-frontend border border-domain-frontend/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">React</span>
+<span class="bg-domain-frontend/10 text-domain-frontend border border-domain-frontend/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">SSR</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-outline hover:text-primary transition-colors p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 2 (AI/Backend) -->
+<tr class="border-b border-outline-variant/30 bg-surface-container-low hover:bg-primary-container/5 transition-colors group">
+<td class="py-3 px-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded bg-surface border border-outline-variant/50 flex items-center justify-center shrink-0">
+<img alt="owner avatar" class="w-4 h-4" data-alt="A microscopic, hyper-detailed glowing green spherical icon resembling an atom core inside a dark glass casing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAF1EgetRpH83cEgQHuigrTEWmyRMU-GgpxK4mibbQrXsLMoozYFTgwgj21_Op_abdCn2jz5RSpwFyjJ6Df5yW0TajIIbOYXabVFqJkeDG3dKzKoAIdKusP1K1efgxq8DQ3F-SjnhPPqphj0pEouwxbbuQKqR5A8gsASNFGo-msi8EUg8iMSPjRdEDZLw4_gJf47XrxLnddgpdssJ2x3MCDXOf-mT3N6AEpme96udQYWSsa-nyIN0XSU3RooqYr_kFGSYYxRQDQdg"/>
+</div>
+<div>
+<a class="font-semibold text-primary hover:underline decoration-primary/50 underline-offset-4" href="#">hwchase17 / langchain</a>
+<div class="font-label-mono text-[10px] text-outline mt-0.5">更新于 5m 前</div>
+</div>
+</div>
+</td>
+<td class="py-3 px-4 relative group/desc">
+<p class="text-on-surface line-clamp-2 pr-8">Building applications with LLMs through composability. Provides standard interface for chains.</p>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/desc:opacity-100 transition-opacity bg-surface-container-lowest border border-outline-variant rounded p-1 text-outline hover:text-primary hover:border-primary" title="Translate description">
+<span class="material-symbols-outlined text-[16px]">translate</span>
+</button>
+</td>
+<td class="py-3 px-4 font-label-mono text-on-surface flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-[14px] text-status-warning">star</span>
+                            75.2k
+                        </td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#3572A5]"></span>
+<span class="font-label-mono text-[12px] text-on-surface">Python</span>
+</div>
+</td>
+<td class="py-3 px-4">
+<div class="flex flex-wrap gap-1.5">
+<span class="bg-domain-ai/10 text-domain-ai border border-domain-ai/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">LLMs</span>
+<span class="bg-domain-ai/10 text-domain-ai border border-domain-ai/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">Orchestration</span>
+<span class="bg-domain-ai/5 text-domain-ai border border-domain-ai/20 border-dashed opacity-70 font-label-mono text-[10px] px-2 py-0.5 rounded-sm" title="Low confidence prediction">Agents (0.82)</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-outline hover:text-primary transition-colors p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 3 (Tools) -->
+<tr class="border-b border-outline-variant/30 hover:bg-primary-container/5 transition-colors group bg-surface-container-lowest">
+<td class="py-3 px-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded bg-surface border border-outline-variant/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px] text-outline">build</span>
+</div>
+<div>
+<a class="font-semibold text-primary hover:underline decoration-primary/50 underline-offset-4" href="#">neovim / neovim</a>
+<div class="font-label-mono text-[10px] text-outline mt-0.5">更新于 1d 前</div>
+</div>
+</div>
+</td>
+<td class="py-3 px-4 relative group/desc">
+<p class="text-on-surface line-clamp-2 pr-8">Vim-fork focused on extensibility and usability. El texto está en un idioma diferente para probar.</p>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/desc:opacity-100 transition-opacity bg-surface-container-lowest border border-outline-variant rounded p-1 text-primary border-primary" title="Translate description">
+<span class="material-symbols-outlined text-[16px]">g_translate</span>
+</button>
+</td>
+<td class="py-3 px-4 font-label-mono text-on-surface flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-[14px] text-status-warning">star</span>
+                            68.9k
+                        </td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#199f4b]"></span>
+<span class="font-label-mono text-[12px] text-on-surface">Vim Script</span>
+</div>
+</td>
+<td class="py-3 px-4">
+<div class="flex flex-wrap gap-1.5">
+<span class="bg-domain-tools/10 text-domain-tools border border-domain-tools/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">Editor</span>
+<span class="bg-domain-tools/10 text-domain-tools border border-domain-tools/20 font-label-mono text-[10px] px-2 py-0.5 rounded-sm">Terminal</span>
+</div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-outline hover:text-primary transition-colors p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination Footer -->
+<div class="flex justify-between items-center py-3 px-4 border-t border-outline-variant/50 bg-surface-container-low/50">
+<span class="font-label-mono text-[12px] text-outline">显示第 1-3 条，共 1,492 个星标</span>
+<div class="flex gap-1">
+<button class="px-2 py-1 bg-surface-container border border-outline-variant/50 rounded text-outline cursor-not-allowed"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+<button class="px-3 py-1 bg-primary-container text-on-primary-container rounded font-label-mono text-[12px] font-bold">1</button>
+<button class="px-3 py-1 bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container rounded text-on-surface font-label-mono text-[12px] transition-colors">2</button>
+<button class="px-3 py-1 bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container rounded text-on-surface font-label-mono text-[12px] transition-colors">3</button>
+<span class="px-2 py-1 text-outline">...</span>
+<button class="px-2 py-1 bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container rounded text-on-surface transition-colors"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

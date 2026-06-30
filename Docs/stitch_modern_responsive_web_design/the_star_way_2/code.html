@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>控制台 - 星图引擎</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-secondary": "#ffffff",
+                "on-primary-fixed-variant": "#005045",
+                "inverse-surface": "#213145",
+                "secondary-fixed-dim": "#bec6e0",
+                "on-error": "#ffffff",
+                "on-secondary-fixed-variant": "#3f465c",
+                "on-primary-fixed": "#00201b",
+                "on-secondary-fixed": "#131b2e",
+                "outline-variant": "#bacac5",
+                "surface-variant": "#d3e4fe",
+                "on-background": "#0b1c30",
+                "surface-container-high": "#dce9ff",
+                "surface": "#f8f9ff",
+                "surface-container-low": "#eff4ff",
+                "on-surface-variant": "#3c4a46",
+                "on-tertiary": "#ffffff",
+                "on-error-container": "#93000a",
+                "on-primary": "#ffffff",
+                "surface-container-highest": "#d3e4fe",
+                "secondary": "#565e74",
+                "inverse-primary": "#3eddc3",
+                "error-container": "#ffdad6",
+                "on-primary-container": "#004b40",
+                "primary-fixed-dim": "#3eddc3",
+                "primary": "#006b5c",
+                "background": "#f8f9ff",
+                "tertiary-fixed-dim": "#ffb59a",
+                "outline": "#6b7a76",
+                "primary-container": "#00c4ab",
+                "secondary-fixed": "#dae2fd",
+                "on-secondary-container": "#5c647a",
+                "primary-fixed": "#63fadf",
+                "error": "#ba1a1a",
+                "on-tertiary-fixed-variant": "#7c2e09",
+                "surface-container": "#e5eeff",
+                "on-surface": "#0b1c30",
+                "inverse-on-surface": "#eaf1ff",
+                "tertiary": "#9b4420",
+                "surface-dim": "#cbdbf5",
+                "on-tertiary-fixed": "#370d00",
+                "on-tertiary-container": "#762905",
+                "secondary-container": "#dae2fd",
+                "surface-tint": "#006b5c",
+                "tertiary-container": "#ff9166",
+                "tertiary-fixed": "#ffdbce",
+                "surface-container-lowest": "#ffffff",
+                "surface-bright": "#f8f9ff",
+                "domain-frontend": "#0284c7",
+                "domain-backend": "#059669",
+                "domain-tools": "#475569",
+                "domain-ai": "#7c3aed",
+                "status-safe": "#16a34a",
+                "status-warning": "#d97706",
+                "status-danger": "#dc2626"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "md": "16px",
+                "gutter": "24px",
+                "margin-mobile": "16px",
+                "lg": "24px",
+                "base": "4px",
+                "xl": "48px",
+                "container-max": "1280px",
+                "sm": "8px",
+                "xs": "4px"
+        },
+        "fontFamily": {
+                "body-md": [
+                        "Geist"
+                ],
+                "label-sm": [
+                        "JetBrains Mono"
+                ],
+                "body-sm": [
+                        "Geist"
+                ],
+                "headline-lg-mobile": [
+                        "Geist"
+                ],
+                "body-lg": [
+                        "Geist"
+                ],
+                "headline-lg": [
+                        "Geist"
+                ],
+                "label-md": [
+                        "JetBrains Mono"
+                ],
+                "headline-md": [
+                        "Geist"
+                ],
+                "headline-xl": [
+                        "Geist"
+                ]
+        },
+        "fontSize": {
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.02em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .grid-bg {
+            background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .radar-chart-bg {
+            background: conic-gradient(from 0deg at 50% 50%, rgba(2, 132, 199, 0.1) 0deg, rgba(124, 58, 237, 0.1) 120deg, rgba(5, 150, 105, 0.1) 240deg, rgba(2, 132, 199, 0.1) 360deg);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md text-body-md antialiased grid-bg min-h-screen">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col w-[280px] h-screen fixed left-0 top-0 bg-surface border-r border-outline-variant/30 py-xl z-50">
+<div class="px-6 mb-xl flex items-center gap-3">
+<img alt="the-star-way Logo" class="w-10 h-10 rounded-lg" src="https://lh3.googleusercontent.com/aida/AP1WRLtLv9VJKUhovlLtNlNO5zP97d63eow6zfYyHqL1mi4-90kDuCl3H9uLw_jyagIJnWIz7fH2nhZFmaN_vKpKXIK1bHAhaTQnkdCliIgMR0ufUP8ksalrs-gZZeZ-eg-UuKcymt2lazSLKBgHnGPXfiSiJ4PolPCE70HWlip9mqQeTOAlxpJWDFTrt4WOFgLdp8FTFTwSX_OmConuDFUskssTA3K3lRYUHfW38xDkPBc05dBGn7U7EsmH"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">星图引擎</h1>
+<h2 class="font-body-sm text-body-sm text-on-surface-variant">星际导航仪</h2>
+</div>
+</div>
+<div class="px-4 flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold border-r-2 border-primary bg-surface-container-high hover:bg-surface-container-highest transition-colors duration-200 opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>控制台</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">star</span>
+<span>星标列表</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span>仓库详情</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">map</span>
+<span>星图</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container-high hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>设置</span>
+</a>
+</div>
+<div class="px-6 mt-auto">
+<button class="w-full bg-primary text-on-primary font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors">同步星标</button>
+<div class="mt-6 flex flex-col gap-2">
+<a class="flex items-center gap-3 text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">
+<span class="material-symbols-outlined text-sm">description</span> 帮助文档
+                </a>
+<a class="flex items-center gap-3 text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#">
+<span class="material-symbols-outlined text-sm">terminal</span> GitHub
+                </a>
+</div>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-gutter h-16 ml-0 md:ml-[280px] md:max-w-[calc(100%-280px)] bg-surface/80 backdrop-blur-xl docked full-width top-0 sticky z-40 border-b border-outline-variant/30">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="bg-surface border border-outline-variant text-on-surface text-body-sm rounded-lg pl-10 pr-4 py-1.5 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all w-64" placeholder="搜索星标..." type="text"/>
+</div>
+<nav class="hidden lg:flex gap-6">
+<a class="text-primary border-b-2 border-primary pb-1 font-body-sm text-body-sm" href="#">探索者</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">合集</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-4 py-1.5 rounded-lg border border-outline-variant text-on-surface hover:text-primary hover:border-primary transition-colors font-body-sm text-body-sm">导出</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">settings_system_daydream</span>
+</button>
+<img class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A small, stylized profile avatar for a developer dashboard. It features a geometric, abstract representation of a face or constellation in shades of deep indigo and soft purple against a dark navy background. The style is modern, minimalist, and tech-focused, suitable for an open-source software navigator theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAagvAywpD1O9K4bKZeWz36P_Kgj2CK29_Du389nyAFLX97eaTmc-cs5g_sR7imUidj59XNqw3bAPKptvtGTEwH0JpQFutifGseTFAVVh6cFeBFOYNbKkU_C1ivydKyrEV-v3axs-d9NsYpOByAb0jscwoKl0Rtigi9fhZhTMC-AQG5GY4twXGRNxvfEjJ7kRh7c4h0xq_N6HrNzhWxBg4mwXTK5p4Au8q6Zd47vD9h2cF4PJ-KfkDMP2EQUdfqcL3hr1AbtJDCvg"/>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-0 md:ml-[280px] p-gutter pt-xl max-w-[1440px] mx-auto pb-24">
+<!-- Hero Section -->
+<section class="relative rounded-xl overflow-hidden mb-xl border border-outline-variant/30 bg-surface-container-high">
+<div class="absolute inset-0 bg-cover bg-center opacity-10 mix-blend-multiply" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC1y_Opqumzs8IoI4IwfzSnTd3QArw-wj1mp97IBJ-gUhDyEspnRCO-lI7za2YCl4ojOOkhDJLuaTqJoNAiUMuE7yFdTln6NT27faKY0CUoA6pR9sEtvMeSjbSjkZXzvsMqYgWh2H1r9sMVsyNP2ihR7OalP5tj_fS3Hx1NCHCB8GW3sGonLPx9yfsmPY24dlP31WntrgDiA8M9LM7GiqaM5pMWV2DSeoxLYVMjrQ-Piekj2EN6r4gLEf3SpjGGL2ceac9L3E8tNA');"></div>
+<div class="absolute inset-0 bg-gradient-to-r from-surface-container-high via-surface-container-high/80 to-transparent"></div>
+<div class="relative p-8 md:p-12 z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-2">@ewaldhaag18</h2>
+<p class="font-body-lg text-body-lg text-primary max-w-2xl">开源宇宙的探索者。您的 Star DNA 显著倾向于数据科学和后端系统。</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface/80 backdrop-blur-md px-6 py-4 rounded-lg border border-outline-variant/30 text-center shadow-sm">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1 uppercase">总星标数</p>
+<p class="font-headline-lg text-headline-lg text-primary">691</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md mb-xl">
+<!-- Star DNA / Top Languages (Col span 8) -->
+<div class="md:col-span-8 bg-surface-container-low rounded-xl p-6 border border-outline-variant/30 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">技术人格</h3>
+<span class="material-symbols-outlined text-primary">psychology</span>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="bg-surface p-4 rounded-lg border border-outline-variant/30 border-l-4 border-l-domain-backend shadow-sm">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Python</p>
+<p class="font-headline-md text-headline-md text-on-surface">254</p>
+</div>
+<div class="bg-surface p-4 rounded-lg border border-outline-variant/30 border-l-4 border-l-domain-frontend shadow-sm">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">TypeScript</p>
+<p class="font-headline-md text-headline-md text-on-surface">125</p>
+</div>
+<div class="bg-surface p-4 rounded-lg border border-outline-variant/30 border-l-4 border-l-domain-tools shadow-sm">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Rust</p>
+<p class="font-headline-md text-headline-md text-on-surface">89</p>
+</div>
+<div class="bg-surface p-4 rounded-lg border border-outline-variant/30 border-l-4 border-l-domain-ai shadow-sm">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Jupyter Notebook</p>
+<p class="font-headline-md text-headline-md text-on-surface">42</p>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant uppercase">热门主题</h4>
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1 rounded-full bg-domain-backend/10 border border-domain-backend/30 text-domain-backend font-label-sm text-label-sm">机器学习 (112)</span>
+<span class="px-3 py-1 rounded-full bg-domain-frontend/10 border border-domain-frontend/30 text-domain-frontend font-label-sm text-label-sm">react (85)</span>
+<span class="px-3 py-1 rounded-full bg-domain-tools/10 border border-domain-tools/30 text-domain-tools font-label-sm text-label-sm">cli (64)</span>
+<span class="px-3 py-1 rounded-full bg-domain-ai/10 border border-domain-ai/30 text-domain-ai font-label-sm text-label-sm">llm (55)</span>
+<span class="px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant/50 text-on-surface font-label-sm text-label-sm">数据可视化 (38)</span>
+</div>
+</div>
+</div>
+<!-- Tech Radar Visual (Col span 4) -->
+<div class="md:col-span-4 bg-surface-container-low rounded-xl p-6 border border-outline-variant/30 relative overflow-hidden flex flex-col">
+<div class="flex justify-between items-center mb-4 z-10 relative">
+<h3 class="font-headline-md text-headline-md text-on-surface">技术雷达</h3>
+<span class="material-symbols-outlined text-primary">radar</span>
+</div>
+<div class="flex-1 relative min-h-[250px] radar-chart-bg rounded-full border border-outline-variant/30 mx-auto w-full max-w-[250px] aspect-square flex items-center justify-center bg-surface">
+<!-- Concentric circles for radar -->
+<div class="absolute inset-4 rounded-full border border-outline-variant/30"></div>
+<div class="absolute inset-12 rounded-full border border-outline-variant/30"></div>
+<div class="absolute inset-20 rounded-full border border-outline-variant/50"></div>
+<!-- Radar points (mockup) -->
+<div class="absolute w-3 h-3 bg-domain-backend rounded-full top-[30%] left-[40%] shadow-[0_0_8px_rgba(5,150,105,0.6)] border border-white"></div>
+<div class="absolute w-3 h-3 bg-domain-frontend rounded-full top-[60%] left-[70%] shadow-[0_0_8px_rgba(2,132,199,0.6)] border border-white"></div>
+<div class="absolute w-3 h-3 bg-domain-ai rounded-full top-[70%] left-[25%] shadow-[0_0_8px_rgba(124,58,237,0.6)] border border-white"></div>
+<div class="absolute w-3 h-3 bg-domain-tools rounded-full top-[20%] left-[60%] shadow-[0_0_8px_rgba(71,85,105,0.6)] border border-white"></div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-4 z-10 relative">
+<div class="text-xs text-center p-2 bg-surface rounded border border-outline-variant/30 shadow-sm"><span class="text-status-safe font-bold">采用:</span> 45</div>
+<div class="text-xs text-center p-2 bg-surface rounded border border-outline-variant/30 shadow-sm"><span class="text-secondary font-bold">试用:</span> 128</div>
+<div class="text-xs text-center p-2 bg-surface rounded border border-outline-variant/30 shadow-sm"><span class="text-status-warning font-bold">评估:</span> 312</div>
+<div class="text-xs text-center p-2 bg-surface rounded border border-outline-variant/30 shadow-sm"><span class="text-on-surface-variant font-bold">观望:</span> 206</div>
+</div>
+</div>
+</div>
+<!-- Hidden Gems Section -->
+<section>
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary">diamond</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">宝藏项目</h3>
+<span class="text-on-surface-variant font-body-sm text-body-sm ml-2">高学习价值，低主流采用率</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+<!-- Gem 1 -->
+<div class="bg-surface rounded-xl p-5 border border-outline-variant/50 hover:border-primary transition-colors group cursor-pointer relative overflow-hidden shadow-sm hover:shadow-md">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 group-hover:bg-primary/10 transition-colors"></div>
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-lg text-body-lg font-bold text-primary">karpathy/micrograd</h4>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">open_in_new</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4 line-clamp-2">一个微型的标量值自动求导引擎，并在其之上提供类似 PyTorch API 的神经网络库。</p>
+<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/30">
+<div class="flex gap-3">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">star</span> 28k</span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">fork_right</span> 2.5k</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-domain-ai/10 text-domain-ai font-label-sm text-label-sm text-xs border border-domain-ai/20">AI 教育</span>
+</div>
+</div>
+<!-- Gem 2 -->
+<div class="bg-surface rounded-xl p-5 border border-outline-variant/50 hover:border-primary transition-colors group cursor-pointer relative overflow-hidden shadow-sm hover:shadow-md">
+<div class="absolute top-0 right-0 w-32 h-32 bg-domain-backend/5 rounded-bl-full -z-10 group-hover:bg-domain-backend/10 transition-colors"></div>
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-lg text-body-lg font-bold text-primary">tiangolo/fastapi</h4>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">open_in_new</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4 line-clamp-2">FastAPI 框架，高性能，易学，编码快，可用于生产环境。</p>
+<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/30">
+<div class="flex gap-3">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">star</span> 65k</span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">fork_right</span> 5.1k</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-domain-backend/10 text-domain-backend font-label-sm text-label-sm text-xs border border-domain-backend/20">Python API</span>
+</div>
+</div>
+<!-- Gem 3 -->
+<div class="bg-surface rounded-xl p-5 border border-outline-variant/50 hover:border-primary transition-colors group cursor-pointer relative overflow-hidden hidden lg:block shadow-sm hover:shadow-md">
+<div class="absolute top-0 right-0 w-32 h-32 bg-domain-tools/5 rounded-bl-full -z-10 group-hover:bg-domain-tools/10 transition-colors"></div>
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-lg text-body-lg font-bold text-primary">charmbracelet/bubbletea</h4>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">open_in_new</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4 line-clamp-2">一个强大的 Go 语言小型 TUI 框架，基于 The Elm Architecture。</p>
+<div class="flex justify-between items-end mt-auto pt-4 border-t border-outline-variant/30">
+<div class="flex gap-3">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">star</span> 22k</span>
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]">fork_right</span> 1.2k</span>
+</div>
+<span class="px-2 py-0.5 rounded bg-domain-tools/10 text-domain-tools font-label-sm text-label-sm text-xs border border-domain-tools/20">Go TUI</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>
