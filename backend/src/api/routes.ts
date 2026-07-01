@@ -75,6 +75,17 @@ export function resolveGitHubToken(payloadToken?: string): string | undefined {
   return payloadToken || process.env.STARWAY_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || undefined
 }
 
+/**
+ * 获取当前后端 GitHub Token 的来源
+ * @returns 来源标识：'STARWAY_GITHUB_TOKEN' | 'GITHUB_TOKEN' | 'GH_TOKEN' | null
+ */
+export function getGitHubTokenSource(): string | null {
+  if (process.env.STARWAY_GITHUB_TOKEN) return 'STARWAY_GITHUB_TOKEN'
+  if (process.env.GITHUB_TOKEN) return 'GITHUB_TOKEN'
+  if (process.env.GH_TOKEN) return 'GH_TOKEN'
+  return null
+}
+
 /** 从 URL 路径中提取动态参数（支持 :login, :fullName 等） */
 function matchRoute(pattern: string, pathname: string): Record<string, string> | null {
   const patternParts = pattern.split('/')
@@ -281,6 +292,19 @@ export function createRouter(db: Database.Database) {
         `).all(login)
 
         json(res, { data: runs })
+        return
+      }
+
+      // ===== GET /api/token-source =====
+      if (method === 'GET' && url === '/api/token-source') {
+        const source = getGitHubTokenSource()
+        json(res, {
+          data: {
+            source,
+            hasToken: !!source,
+            envVar: source,
+          },
+        })
         return
       }
 

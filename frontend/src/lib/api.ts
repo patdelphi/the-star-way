@@ -305,6 +305,24 @@ export async function getSyncRuns(login: string): Promise<{
 }
 
 /**
+ * 获取后端 GitHub Token 来源
+ */
+export async function getTokenSource(): Promise<{
+  source: string | null
+  hasToken: boolean
+  envVar: string | null
+} | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/token-source`)
+      const data = await res.json()
+      return data.data
+    }
+  } catch { /* 忽略错误 */ }
+  return null
+}
+
+/**
  * 导出数据
  * @param format 导出格式：csv | json | markdown
  * @param login 用户名

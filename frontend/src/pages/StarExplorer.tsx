@@ -241,8 +241,6 @@ const fallbackLicenseStats = [
   { label: "未知", count: 58, tone: "text-status-danger" },
 ]
 
-const ITEMS_PER_PAGE = 5
-
 /**
  * 根据语言返回对应的 UI 颜色类名
  */
@@ -361,6 +359,7 @@ export default function StarExplorer() {
   // === 原有筛选/分页/弹窗状态 ===
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [selectedLanguage, setSelectedLanguage] = useState("")
   const [selectedTopic, setSelectedTopic] = useState("")
   const [selectedLicense, setSelectedLicense] = useState("")
@@ -481,11 +480,11 @@ export default function StarExplorer() {
   }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos, quickFilter])
 
   // === 分页 ===
-  const totalPages = Math.max(1, Math.ceil(filteredRepos.length / ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(filteredRepos.length / pageSize))
   const paginatedRepos = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filteredRepos.slice(start, start + ITEMS_PER_PAGE)
-  }, [currentPage, filteredRepos])
+    const start = (currentPage - 1) * pageSize
+    return filteredRepos.slice(start, start + pageSize)
+  }, [currentPage, pageSize, filteredRepos])
 
   // === 从 stats 动态生成展示数据（无 stats 时用 fallback）===
   const languageStats = useMemo(() => {
@@ -1150,16 +1149,32 @@ export default function StarExplorer() {
         {/* 分页 */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">{analysisStatus}</p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {t("starExplorer.pageInfo", { current: currentPage, total: totalPages })}
-            </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{t("starExplorer.pageSize")}</span>
+              {[20, 50, 100].map((size) => (
+                <Button
+                  key={size}
+                  variant={pageSize === size ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => { setPageSize(size); setCurrentPage(1) }}
+                >
+                  {size}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {t("starExplorer.pageInfo", { current: currentPage, total: totalPages })}
+              </span>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 

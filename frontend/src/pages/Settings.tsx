@@ -20,7 +20,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react"
-import { getGitHubToken, setGitHubToken, clearGitHubToken } from "@/lib/api"
+import { getGitHubToken, setGitHubToken, clearGitHubToken, getTokenSource } from "@/lib/api"
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3210"
 
@@ -30,6 +30,7 @@ export default function Settings() {
   const [backendInfo, setBackendInfo] = useState<string>("")
   const [token, setToken] = useState(getGitHubToken() || "")
   const [showToken, setShowToken] = useState(false)
+  const [tokenSource, setTokenSource] = useState<{ source: string | null; hasToken: boolean; envVar: string | null } | null>(null)
 
   const checkBackend = async () => {
     setBackendStatus("checking")
@@ -50,7 +51,12 @@ export default function Settings() {
     }
   }
 
-  useEffect(() => { checkBackend() }, [])
+  const loadTokenSource = async () => {
+    const source = await getTokenSource()
+    setTokenSource(source)
+  }
+
+  useEffect(() => { checkBackend(); loadTokenSource() }, [])
 
   return (
     <div className="space-y-6">
@@ -156,6 +162,25 @@ export default function Settings() {
                 {token ? t("settings.tokenConfigured") : t("settings.tokenNotConfigured")}
               </Badge>
             </div>
+            {tokenSource && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{t("settings.tokenSource")}</span>
+                <div className="flex items-center gap-1.5">
+                  {token ? (
+                    <>
+                      <Badge variant="secondary" className="text-[10px]">{t("settings.sourceBrowser")}</Badge>
+                      {tokenSource.hasToken && (
+                        <span className="text-[10px] text-muted-foreground">+ {tokenSource.envVar}</span>
+                      )}
+                    </>
+                  ) : tokenSource.hasToken ? (
+                    <Badge variant="secondary" className="text-[10px]">{tokenSource.envVar}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">{t("settings.sourceAnonymous")}</Badge>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="relative">
               <Input
                 type={showToken ? "text" : "password"}
