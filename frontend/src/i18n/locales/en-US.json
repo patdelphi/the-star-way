@@ -383,7 +383,8 @@
     "quickAccess": "Quick Access",
     "exploreDesc": "Search, filter and analyze your starred repos",
     "catalogDesc": "Browse all starred projects by tag",
-    "analysisDesc": "Deep analysis of individual repositories"
+    "analysisDesc": "Deep analysis of individual repositories",
+    "languageDistribution": "Language Distribution"
   },
   "starCatalog": {
     "title": "Star Catalog",

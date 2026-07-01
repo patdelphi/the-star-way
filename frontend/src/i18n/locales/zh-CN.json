@@ -383,7 +383,8 @@
     "quickAccess": "快速入口",
     "exploreDesc": "检索、筛选和分析你的星标仓库",
     "catalogDesc": "按标签分类浏览所有星标项目",
-    "analysisDesc": "对单个仓库进行深度分析"
+    "analysisDesc": "对单个仓库进行深度分析",
+    "languageDistribution": "语言分布"
   },
   "starCatalog": {
     "title": "星项目目录",

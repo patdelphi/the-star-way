@@ -22,8 +22,10 @@ import {
   FileText,
   LineChart,
   BookOpen,
+  PieChart as PieChartIcon,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
+import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
 import type { RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -128,6 +130,11 @@ const CATEGORY_MAP: Record<string, { key: string; color: string }> = {
   'PHP': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
   'Dart': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
 }
+
+const LANGUAGE_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#6366f1',
+]
 
 interface PersonalityItem {
   nameKey: string
@@ -263,6 +270,7 @@ const Dashboard: React.FC = () => {
   const [gemRepos, setGemRepos] = useState<GemRepo[]>(demoGemRepos)
   const [repoCount, setRepoCount] = useState(691)
   const [learningPath, setLearningPath] = useState<string | null>(null)
+  const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -284,8 +292,10 @@ const Dashboard: React.FC = () => {
         if (stats && stats.languages && stats.languages.length > 0) {
           setPersonalityData(categorizeLanguages(stats.languages))
           setRepoCount(stats.repoCount)
+          setLanguageStats(stats.languages)
         } else {
           setPersonalityData(demoPersonalityData)
+          setLanguageStats([])
         }
 
         // 技术雷达：从 tags 计算
@@ -466,6 +476,38 @@ const Dashboard: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* 语言分布饼图 */}
+        {languageStats.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{t("dashboard.languageDistribution")}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 items-center">
+                <PieChart
+                  data={languageStats.slice(0, 8).map((l, i) => ({
+                    label: l.language || "Unknown",
+                    value: l.count,
+                    color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+                  }))}
+                  size={180}
+                  donut
+                />
+                <PieChartLegend
+                  data={languageStats.slice(0, 8).map((l, i) => ({
+                    label: l.language || "Unknown",
+                    value: l.count,
+                    color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+                  }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 宝藏项目网格 */}
         <section className="space-y-4">
