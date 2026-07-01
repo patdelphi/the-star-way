@@ -72,12 +72,12 @@ try {
 
   Write-Host "Starting..."
 
-  # Check & rebuild native modules using pnpm's Node.js
+  # Check & rebuild native modules (use system node — child process inherits same PATH)
   Write-Host "Checking native modules..."
   Push-Location $BackendDir
-  $testErr = pnpm exec node -e "require('better-sqlite3')" 2>&1
+  node -e "require('better-sqlite3')" 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "Rebuilding better-sqlite3..."
+    Write-Host "Rebuilding better-sqlite3 for Node.js v$((node -v).Trim()) ..."
     pnpm rebuild better-sqlite3 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
       throw "better-sqlite3 rebuild failed. Try manually: cd backend && pnpm rebuild better-sqlite3"
@@ -109,12 +109,12 @@ try {
   }
 
   # Wait frontend
-  if (-not (Wait-Ready "http://localhost:$actualFrontend/" -Timeout 20)) {
+  if (-not (Wait-Ready "http://localhost:$actualFrontend/" -Timeout 30)) {
     Write-Host ""
     Write-Host "--- Frontend log (last 20 lines) ---" -ForegroundColor Yellow
     Show-Log $frontendLog
     Write-Host ""
-    throw "Frontend startup timeout (20s). See log above."
+    throw "Frontend startup timeout (30s). See log above."
   }
 
   # Output
