@@ -64,7 +64,8 @@
     "syncHistory": "同步历史",
     "syncRepos": "仓库",
     "syncStars": "星标",
-    "syncPages": "页数"
+    "syncPages": "页数",
+    "starDnaTitle": "Star DNA 画像"
   },
   "starExplorer": {
     "title": "星标仓库",

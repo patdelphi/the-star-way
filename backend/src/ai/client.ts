@@ -79,3 +79,37 @@ export async function generateReadmeSummary(
     { role: 'user', content: prompt },
   ])
 }
+
+/**
+ * 生成开发者 Star DNA 画像
+ * @param login 用户登录名
+ * @param stats 用户统计信息
+ * @returns 开发者画像描述
+ */
+export async function generateStarDna(
+  login: string,
+  stats: {
+    repoCount: number
+    activeRepoCount: number
+    languages: { language: string; count: number }[]
+    tags: { tag: string; count: number }[]
+  },
+): Promise<string> {
+  const topLangs = stats.languages.slice(0, 5).map(l => `${l.language}(${l.count})`).join(', ')
+  const topTags = stats.tags.slice(0, 8).map(t => `${t.tag}(${t.count})`).join(', ')
+
+  const prompt = `基于以下 GitHub 用户的星标数据，生成一段简短的中文开发者技术画像（100-150 字），风格轻松有趣，像是一个技术标签云的个人简介。
+
+用户：${login}
+星标仓库总数：${stats.repoCount}
+活跃仓库数：${stats.activeRepoCount}
+主要关注语言：${topLangs || '无'}
+主要关注标签：${topTags || '无'}
+
+请直接输出画像描述，不要加任何前缀或格式标记。`
+
+  return chat([
+    { role: 'system', content: '你是一个开发者社区分析师，擅长根据 GitHub 星标数据描绘开发者的技术画像。' },
+    { role: 'user', content: prompt },
+  ])
+}

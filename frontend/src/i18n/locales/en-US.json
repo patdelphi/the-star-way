@@ -64,7 +64,8 @@
     "syncHistory": "Sync History",
     "syncRepos": "Repos",
     "syncStars": "Stars",
-    "syncPages": "Pages"
+    "syncPages": "Pages",
+    "starDnaTitle": "Star DNA Profile"
   },
   "starExplorer": {
     "title": "Star Explorer",

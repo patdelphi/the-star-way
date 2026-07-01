@@ -26,8 +26,9 @@ import {
   ExternalLink,
   GitFork,
   Loader2,
+  Sparkles,
 } from "lucide-react"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // ===== 类型定义 =====
@@ -160,6 +161,7 @@ export default function Developers() {
   const [syncStatus, setSyncStatus] = useState("pending")
   const [syncError, setSyncError] = useState("")
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([])
+  const [starDna, setStarDna] = useState<string | null>(null)
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -284,12 +286,20 @@ export default function Developers() {
     }
   }
 
-  // 当前选中开发者变化时，加载同步历史
+  // 加载 Star DNA 画像
+  const loadStarDna = async (login: string) => {
+    const result = await getStarDna(login)
+    if (result?.dna) setStarDna(result.dna)
+  }
+
+  // 当前选中开发者变化时，加载同步历史和 Star DNA
   useEffect(() => {
     if (activeDev) {
       loadSyncRuns(activeDev.name)
+      loadStarDna(activeDev.name)
     } else {
       setSyncRuns([])
+      setStarDna(null)
     }
   }, [activeDev])
 
@@ -304,6 +314,7 @@ export default function Developers() {
         setSyncStatus(token ? "successToken" : "successAnon")
         setSearchResult(t("developers.starUpdated", { name }))
         await loadSyncRuns(name)
+        await loadStarDna(name)
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
@@ -561,6 +572,20 @@ export default function Developers() {
                 <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}
             </div>
+            {/* Star DNA 画像卡片 */}
+            {starDna && (
+              <Card className="bg-surface-container-low/50 border-primary/20 mt-3">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {t("developers.starDnaTitle")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed text-on-surface">{starDna}</p>
+                </CardContent>
+              </Card>
+            )}
             {/* 同步历史列表 */}
             {syncRuns.length > 0 && (
               <div className="mt-4 space-y-2">

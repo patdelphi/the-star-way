@@ -19,7 +19,7 @@ import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
-import { generateReadmeSummary } from '../ai/client.js'
+import { generateReadmeSummary, generateStarDna } from '../ai/client.js'
 
 // ===== 工具函数 =====
 
@@ -275,6 +275,60 @@ export function createRouter(db: Database.Database) {
         const { login } = classifyMatch
         const result = classifyReposForUser(db, login)
         json(res, { data: result })
+        return
+      }
+
+      // ===== GET /api/users/:login/star-dna =====
+      const starDnaMatch = matchRoute('/api/users/:login/star-dna', url.split('?')[0])
+      if (method === 'GET' && starDnaMatch) {
+        const { login } = starDnaMatch
+
+        // 查缓存
+        const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'dna'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
+        if (cached?.translated_readme_summary) {
+          json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
+          return
+        }
+
+        // 收集统计
+        const languages = db.prepare(`
+          SELECT language, COUNT(*) as count FROM repos
+          WHERE full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
+          GROUP BY language ORDER BY count DESC LIMIT 5
+        `).all(login) as { language: string; count: number }[]
+
+        const tags = db.prepare(`
+          SELECT tag, COUNT(*) as count FROM repo_tags
+          WHERE repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
+          GROUP BY tag ORDER BY count DESC LIMIT 8
+        `).all(login) as { tag: string; count: number }[]
+
+        const repoCount = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
+        const activeRepoCount = queryActiveRepoCount(db, login)
+
+        try {
+          const dna = await generateStarDna(login, {
+            repoCount: repoCount.cnt,
+            activeRepoCount,
+            languages,
+            tags,
+          })
+
+          // 缓存
+          const now = new Date().toISOString()
+          db.prepare(`
+            INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+            VALUES (?, 'dna', ?, 'ai', ?)
+            ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+              translated_readme_summary = excluded.translated_readme_summary,
+              provider = excluded.provider,
+              updated_at = excluded.updated_at
+          `).run(`user:${login}`, dna, now)
+
+          json(res, { data: { dna, cached: false } })
+        } catch (err: any) {
+          error(res, 'AI_ERROR', err?.message || 'AI 生成画像失败', 500)
+        }
         return
       }
 

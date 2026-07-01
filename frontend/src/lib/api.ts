@@ -336,6 +336,23 @@ export async function getReadmeSummary(fullName: string): Promise<{
 }
 
 /**
+ * 获取开发者 Star DNA 画像
+ */
+export async function getStarDna(login: string): Promise<{
+  dna: string
+  cached: boolean
+} | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna`)
+      const data = await res.json()
+      return data.data
+    }
+  } catch { /* 忽略错误 */ }
+  return null
+}
+
+/**
  * 获取后端 GitHub Token 来源
  */
 export async function getTokenSource(): Promise<{
