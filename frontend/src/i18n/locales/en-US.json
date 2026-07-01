@@ -386,7 +386,8 @@
     "analysisDesc": "Deep analysis of individual repositories",
     "languageDistribution": "Language Distribution",
     "tagCloud": "Tag Cloud",
-    "recentStars": "Recent Stars"
+    "recentStars": "Recent Stars",
+    "starTrend": "Star Trend"
   },
   "starCatalog": {
     "title": "Star Catalog",

@@ -25,9 +25,11 @@ import {
   PieChart as PieChartIcon,
   Tags,
   Clock,
+  TrendingUp,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
 import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
+import { LineChart } from "@/components/charts/LineChart"
 import type { RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -275,6 +277,7 @@ const Dashboard: React.FC = () => {
   const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
   const [topicStats, setTopicStats] = useState<{ topic: string; count: number }[]>([])
   const [recentStars, setRecentStars] = useState<{ fullName: string; description: string; language: string; starredAt: string }[]>([])
+  const [starTrend, setStarTrend] = useState<{ label: string; value: number }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -334,6 +337,19 @@ const Dashboard: React.FC = () => {
             starredAt: r.starred_at,
           }))
         setRecentStars(recent)
+
+        // 星标时间趋势：按月聚合
+        const monthMap = new Map<string, number>()
+        for (const r of repoResult.items) {
+          if (r.starred_at) {
+            const key = r.starred_at.slice(0, 7) // YYYY-MM
+            monthMap.set(key, (monthMap.get(key) || 0) + 1)
+          }
+        }
+        const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+        // 只展示最近 12 个月
+        const last12 = sortedMonths.slice(-12)
+        setStarTrend(last12.map(([label, value]) => ({ label: label.slice(5), value })))
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : String(err))
@@ -554,6 +570,21 @@ const Dashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 星标时间趋势 */}
+        {starTrend.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{t("dashboard.starTrend")}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <LineChart data={starTrend} height={180} />
             </CardContent>
           </Card>
         )}

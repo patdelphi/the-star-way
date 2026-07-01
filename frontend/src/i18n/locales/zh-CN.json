@@ -386,7 +386,8 @@
     "analysisDesc": "对单个仓库进行深度分析",
     "languageDistribution": "语言分布",
     "tagCloud": "标签云",
-    "recentStars": "最近星标"
+    "recentStars": "最近星标",
+    "starTrend": "星标趋势"
   },
   "starCatalog": {
     "title": "星项目目录",
