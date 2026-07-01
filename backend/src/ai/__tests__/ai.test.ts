@@ -28,6 +28,28 @@ describe('AI 配置', () => {
     const config = loadAiConfig()
     expect(config.enabled).toBe(false)
   })
+
+  it('loadAiConfig 配置不完整时应保持关闭', () => {
+    const oldBaseUrl = process.env.STARWAY_AI_BASE_URL
+    const oldApiKey = process.env.STARWAY_AI_API_KEY
+    const oldModel = process.env.STARWAY_AI_MODEL
+
+    try {
+      process.env.STARWAY_AI_BASE_URL = 'https://api.example.com/v1'
+      delete process.env.STARWAY_AI_API_KEY
+      process.env.STARWAY_AI_MODEL = 'demo-model'
+
+      const config = loadAiConfig()
+      expect(config.enabled).toBe(false)
+    } finally {
+      if (oldBaseUrl === undefined) delete process.env.STARWAY_AI_BASE_URL
+      else process.env.STARWAY_AI_BASE_URL = oldBaseUrl
+      if (oldApiKey === undefined) delete process.env.STARWAY_AI_API_KEY
+      else process.env.STARWAY_AI_API_KEY = oldApiKey
+      if (oldModel === undefined) delete process.env.STARWAY_AI_MODEL
+      else process.env.STARWAY_AI_MODEL = oldModel
+    }
+  })
 })
 
 describe('AI 缓存', () => {

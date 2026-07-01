@@ -166,6 +166,20 @@ describe('CSV 导入与查询', () => {
       expect(names1.some(n => names2.includes(n))).toBe(false)
     })
 
+    it('按用户查询时不应返回其他用户的星标仓库', () => {
+      const otherCsv = `序号,项目名称,星星数量,简介,中文简介,URL,编程语言,License,Forks,Open Issues,Topics,标星时间,最近更新
+1,other/private-tool,42,Other user repo,其他用户仓库,https://github.com/other/private-tool,Go,MIT,2,0,"go, cli",2026-01-01,2026-06-01`
+      importCsvRecords(db, parseCsv(otherCsv), 'other-user')
+
+      const demoResult = queryRepos(db, { userLogin: DEMO_USER_LOGIN, limit: 20 })
+      const otherResult = queryRepos(db, { userLogin: 'other-user', limit: 20 })
+
+      expect(demoResult.total).toBe(5)
+      expect(demoResult.items.some(r => r.repo.full_name === 'other/private-tool')).toBe(false)
+      expect(otherResult.total).toBe(1)
+      expect(otherResult.items[0].repo.full_name).toBe('other/private-tool')
+    })
+
     it('按 pushed_at 排序', () => {
       const result = queryRepos(db, { sortBy: 'pushed_at', sortOrder: 'DESC' })
       for (let i = 1; i < result.items.length; i++) {

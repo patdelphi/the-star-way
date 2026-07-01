@@ -72,6 +72,7 @@ export interface AnalysisReportRow {
 
 // ===== 查询参数类型 =====
 export interface RepoQueryParams {
+  userLogin?: string
   language?: string
   tag?: string
   search?: string

@@ -13,7 +13,7 @@ export interface TagRule {
   // 一级分类（可选，用于分组显示）
   category?: string
   // 匹配模式：exact（精确匹配）或 includes（包含匹配）
-  matchMode: 'exact' | 'includes'
+  matchMode?: 'exact' | 'includes'
 }
 
 // ===== Topic 精确匹配规则 =====

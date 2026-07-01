@@ -23,7 +23,7 @@
 | 前端 | React 19 + Vite + TypeScript + Tailwind CSS 4 + Radix UI + Lucide Icons |
 | 后端 | Node.js + TypeScript + better-sqlite3（WAL 模式） |
 | API | Node.js 内置 http 模块（零依赖 HTTP 服务） |
-| 测试 | Vitest（91 个测试全部通过） |
+| 测试 | Vitest（后端 94 个测试通过） |
 
 ## 快速开始
 
@@ -128,7 +128,7 @@ the-star-way/
 
 ```bash
 cd backend
-npm test          # 运行全部测试（91 个）
+npm test          # 运行全部测试（当前 94 个通过）
 npm run test:watch # 监听模式
 ```
 
@@ -155,7 +155,7 @@ npm run test:watch # 监听模式
 
 ## 路线图
 
-- **V0.1** ✅ 本地数据层、GitHub 同步、规则分类、本地 API、前端对接、导出
+- **V0.1** 本地数据层、GitHub 同步、规则分类、本地 API、前端对接、导出仍在联调
 - **V0.2** 自动打标、AI 翻译（OpenAI/Ollama）、标签云、项目详情页完善
 - **V0.3** Star DNA、兴趣趋势、年度 Wrapped、Hidden Gems / Sleep Stars 分析
 - **V0.4** 学习路线生成、技术栈组合建议、Build Ideas from Stars

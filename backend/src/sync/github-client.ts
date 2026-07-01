@@ -58,25 +58,6 @@ export interface GitHubClientConfig {
 }
 
 /**
- * 从响应头解析 rate limit 信息
- */
-function parseRateLimit(headers: Headers): RateLimitInfo | null {
-  const limit = headers.get('x-ratelimit-limit')
-  const remaining = headers.get('x-ratelimit-remaining')
-  const reset = headers.get('x-ratelimit-reset')
-  const used = headers.get('x-ratelimit-used')
-
-  if (!limit || !remaining || !reset) return null
-
-  return {
-    limit: parseInt(limit, 10),
-    remaining: parseInt(remaining, 10),
-    reset: parseInt(reset, 10),
-    used: used ? parseInt(used, 10) : 0,
-  }
-}
-
-/**
  * GitHub API Client
  */
 export class GitHubClient {
@@ -113,7 +94,7 @@ export class GitHubClient {
       }
 
       rateLimit = parseRateLimitHeaders(response.headers)
-      const data: GitHubStarredRepo[] = await response.json()
+      const data = await response.json() as GitHubStarredRepo[]
 
       if (data.length === 0) break
 
@@ -152,7 +133,7 @@ export class GitHubClient {
       throw createSyncError(response.status, await response.text())
     }
 
-    return response.json()
+    return await response.json() as { login: string; avatar_url: string }
   }
 
   /**

@@ -14,3 +14,5 @@
 - 补充后续 UI 多语言切换方案：`react-i18next + i18next`、`localStorage` 保存语言偏好、先抽离 UI 文案。
 - 新增 `feature-list.md`，区分不需要 AI API、可选 AI API、需要 AI API 的功能边界。
 - 新增 `development-plan.md`，作为正式代码开发的阶段计划和第一轮开发入口。
+- 修正后端开发状态文档：API 路由、V0.1 完成状态、测试状态和 SQLite 实现状态与当前代码保持一致。
+- 修复后端构建错误、用户数据隔离、AI 配置启用条件，并在重编译 better-sqlite3 后通过后端 94 个测试。

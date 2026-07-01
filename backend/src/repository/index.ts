@@ -4,6 +4,7 @@
 export {
   queryRepos,
   queryRepoByName,
+  queryRepoByNameForUser,
   queryLanguageStats,
   queryTopicStats,
   queryLicenseStats,

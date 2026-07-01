@@ -92,6 +92,17 @@ describe('导出功能', () => {
       expect(data.total).toBe(1)
       expect(data.repos[0].full_name).toBe('torvalds/linux')
     })
+
+    it('应只导出指定用户的星标仓库', () => {
+      const otherCsv = `序号,项目名称,星星数量,简介,中文简介,URL,编程语言,License,Forks,Open Issues,Topics,标星时间,最近更新
+1,other/private-tool,42,Other user repo,其他用户仓库,https://github.com/other/private-tool,Go,MIT,2,0,"go, cli",2026-01-01,2026-06-01`
+      importCsvRecords(db, parseCsv(otherCsv), 'other-user')
+
+      const json = exportJson(db, DEMO_USER_LOGIN)
+      const data = JSON.parse(json)
+      expect(data.total).toBe(3)
+      expect(data.repos.some((repo: any) => repo.full_name === 'other/private-tool')).toBe(false)
+    })
   })
 
   describe('exportMarkdown', () => {

@@ -23,11 +23,16 @@ export function queryRepos(db: Database.Database, params: RepoQueryParams = {}):
   items: RepoWithStar[]
   total: number
 } {
-  const { language, tag, search, sortBy = 'stars', sortOrder = 'DESC', limit = 20, offset = 0 } = params
+  const { userLogin, language, tag, search, sortBy = 'stars', sortOrder = 'DESC', limit = 20, offset = 0 } = params
 
   // 构建 WHERE 子句
   const conditions: string[] = []
   const values: any[] = []
+
+  if (userLogin) {
+    conditions.push('s.user_login = ?')
+    values.push(userLogin)
+  }
 
   if (language) {
     conditions.push('r.language = ?')
@@ -115,7 +120,49 @@ export function queryRepoByName(db: Database.Database, fullName: string): RepoWi
       JOIN stars s ON r.full_name = s.repo_full_name
       WHERE r.full_name = ?
     `)
-    .get(fullName) as any[]
+    .get(fullName) as any
+
+  if (!row) return null
+
+  return {
+    repo: {
+      github_id: row.github_id,
+      full_name: row.full_name,
+      owner: row.owner,
+      name: row.name,
+      html_url: row.html_url,
+      description: row.description,
+      language: row.language,
+      license: row.license,
+      stars: row.stars,
+      forks: row.forks,
+      open_issues: row.open_issues,
+      topics_json: row.topics_json,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      pushed_at: row.pushed_at,
+      archived: row.archived,
+      fork: row.fork,
+      homepage: row.homepage,
+    },
+    starred_at: row.starred_at,
+    tags: row.tag_list ? row.tag_list.split(',') : [],
+  }
+}
+
+/**
+ * 查询指定用户的单个仓库详情
+ */
+export function queryRepoByNameForUser(db: Database.Database, userLogin: string, fullName: string): RepoWithStar | null {
+  const row = db
+    .prepare(`
+      SELECT r.*, s.starred_at,
+        (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
+      FROM repos r
+      JOIN stars s ON r.full_name = s.repo_full_name
+      WHERE s.user_login = ? AND r.full_name = ?
+    `)
+    .get(userLogin, fullName) as any
 
   if (!row) return null
 
@@ -150,26 +197,36 @@ export function queryRepoByName(db: Database.Database, fullName: string): RepoWi
 /**
  * 编程语言分布统计
  */
-export function queryLanguageStats(db: Database.Database): LanguageStat[] {
+export function queryLanguageStats(db: Database.Database, userLogin?: string): LanguageStat[] {
+  const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
+  const where = userLogin ? 'WHERE r.language IS NOT NULL AND s.user_login = ?' : 'WHERE r.language IS NOT NULL'
   return db
     .prepare(`
-      SELECT language, COUNT(*) as count
-      FROM repos
-      WHERE language IS NOT NULL
-      GROUP BY language
+      SELECT r.language, COUNT(*) as count
+      FROM repos r
+      ${join}
+      ${where}
+      GROUP BY r.language
       ORDER BY count DESC
     `)
-    .all() as LanguageStat[]
+    .all(...(userLogin ? [userLogin] : [])) as LanguageStat[]
 }
 
 /**
  * Topics 分布统计（从 topics_json 字段提取）
  */
-export function queryTopicStats(db: Database.Database): TopicStat[] {
+export function queryTopicStats(db: Database.Database, userLogin?: string): TopicStat[] {
   // 先从 topics_json 提取所有 topic
+  const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
+  const where = userLogin ? 'WHERE r.topics_json IS NOT NULL AND s.user_login = ?' : 'WHERE r.topics_json IS NOT NULL'
   const repos = db
-    .prepare('SELECT topics_json FROM repos WHERE topics_json IS NOT NULL')
-    .all() as { topics_json: string }[]
+    .prepare(`
+      SELECT r.topics_json
+      FROM repos r
+      ${join}
+      ${where}
+    `)
+    .all(...(userLogin ? [userLogin] : [])) as { topics_json: string }[]
 
   const topicCount = new Map<string, number>()
   for (const repo of repos) {
@@ -191,32 +248,46 @@ export function queryTopicStats(db: Database.Database): TopicStat[] {
 /**
  * License 分布统计
  */
-export function queryLicenseStats(db: Database.Database): LicenseStat[] {
+export function queryLicenseStats(db: Database.Database, userLogin?: string): LicenseStat[] {
+  const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
+  const where = userLogin ? 'WHERE s.user_login = ?' : ''
   return db
     .prepare(`
-      SELECT COALESCE(license, 'Unknown') as license, COUNT(*) as count
-      FROM repos
-      GROUP BY COALESCE(license, 'Unknown')
+      SELECT COALESCE(r.license, 'Unknown') as license, COUNT(*) as count
+      FROM repos r
+      ${join}
+      ${where}
+      GROUP BY COALESCE(r.license, 'Unknown')
       ORDER BY count DESC
     `)
-    .all() as LicenseStat[]
+    .all(...(userLogin ? [userLogin] : [])) as LicenseStat[]
 }
 
 /**
  * 仓库总数统计
  */
-export function queryRepoCount(db: Database.Database): number {
-  const row = db.prepare('SELECT COUNT(*) as cnt FROM repos').get() as { cnt: number }
+export function queryRepoCount(db: Database.Database, userLogin?: string): number {
+  const row = userLogin
+    ? db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(userLogin) as { cnt: number }
+    : db.prepare('SELECT COUNT(*) as cnt FROM repos').get() as { cnt: number }
   return row.cnt
 }
 
 /**
  * 活跃仓库统计（最近 90 天有 pushed_at 更新的仓库）
  */
-export function queryActiveRepoCount(db: Database.Database): number {
+export function queryActiveRepoCount(db: Database.Database, userLogin?: string): number {
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
+  const userWhere = userLogin ? 'AND s.user_login = ?' : ''
   const row = db
-    .prepare('SELECT COUNT(*) as cnt FROM repos WHERE pushed_at >= ?')
-    .get(ninetyDaysAgo) as { cnt: number }
+    .prepare(`
+      SELECT COUNT(*) as cnt
+      FROM repos r
+      ${join}
+      WHERE r.pushed_at >= ?
+      ${userWhere}
+    `)
+    .get(...(userLogin ? [ninetyDaysAgo, userLogin] : [ninetyDaysAgo])) as { cnt: number }
   return row.cnt
 }

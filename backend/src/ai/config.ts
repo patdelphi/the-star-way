@@ -36,8 +36,8 @@ export function loadAiConfig(): AiProviderConfig {
   const api_key = process.env.STARWAY_AI_API_KEY || ''
   const model = process.env.STARWAY_AI_MODEL || ''
 
-  // 有任一配置项即视为启用
-  const enabled = !!(base_url || api_key || model)
+  // 三项配置齐全才启用，避免半配置状态被误判为可用
+  const enabled = !!(base_url && api_key && model)
 
   return {
     enabled,

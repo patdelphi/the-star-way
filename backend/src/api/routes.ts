@@ -7,7 +7,7 @@ import type Database from 'better-sqlite3'
 import { URL } from 'node:url'
 import {
   queryRepos,
-  queryRepoByName,
+  queryRepoByNameForUser,
   queryLanguageStats,
   queryTopicStats,
   queryLicenseStats,
@@ -149,6 +149,7 @@ export function createRouter(db: Database.Database) {
         }
 
         const result = queryRepos(db, {
+          userLogin: login,
           language: query.language,
           tag: query.tag,
           search: query.q || query.search,
@@ -175,7 +176,8 @@ export function createRouter(db: Database.Database) {
       const repoMatch = matchRoute('/api/users/:login/repos/*', url.split('?')[0])
       if (method === 'GET' && repoMatch) {
         const fullName = decodeURIComponent(repoMatch['*'] || '')
-        const repo = queryRepoByName(db, fullName)
+        const { login } = repoMatch
+        const repo = queryRepoByNameForUser(db, login, fullName)
         if (!repo) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
           return
@@ -202,11 +204,11 @@ export function createRouter(db: Database.Database) {
 
         json(res, {
           data: {
-            languages: queryLanguageStats(db),
-            topics: queryTopicStats(db),
-            licenses: queryLicenseStats(db),
-            repoCount: queryRepoCount(db),
-            activeRepoCount: queryActiveRepoCount(db),
+            languages: queryLanguageStats(db, login),
+            topics: queryTopicStats(db, login),
+            licenses: queryLicenseStats(db, login),
+            repoCount: queryRepoCount(db, login),
+            activeRepoCount: queryActiveRepoCount(db, login),
             aiEnabled: aiConfig.enabled,
           },
         })

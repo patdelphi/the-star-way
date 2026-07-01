@@ -23,7 +23,7 @@ export interface ExportParams extends RepoQueryParams {
  */
 export function exportCsv(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
   // 导出时取消分页限制，导出全部筛选结果
-  const result = queryRepos(db, { ...params, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
 
   const BOM = '\uFEFF'
   const header = [
@@ -70,7 +70,7 @@ export function exportCsv(db: Database.Database, login: string, params: Omit<Rep
  * @returns JSON 字符串
  */
 export function exportJson(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
-  const result = queryRepos(db, { ...params, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
 
   const data = {
     login,
@@ -104,7 +104,7 @@ export function exportJson(db: Database.Database, login: string, params: Omit<Re
  * @returns Markdown 文本（CRLF 换行）
  */
 export function exportMarkdown(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
-  const result = queryRepos(db, { ...params, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
 
   const lines: string[] = []
 

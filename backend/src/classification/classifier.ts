@@ -78,7 +78,8 @@ export function classifyRepo(
 
   // 1. Topic 精确匹配（置信度 0.95）
   for (const rule of TOPIC_TAG_RULES) {
-    if (rule.matchMode === 'exact') {
+    const matchMode = rule.matchMode ?? 'exact'
+    if (matchMode === 'exact') {
       const matched = topics.some(t => rule.keywords.includes(t.toLowerCase()))
       if (matched && !seenTags.has(rule.label)) {
         results.push({ tag: rule.label, source: 'topic', confidence: 0.95 })

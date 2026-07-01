@@ -27,13 +27,13 @@ the-star-way translate <username> --to zh-CN
 
 ```text
 GET /api/users
-GET /api/users/:login/summary
+GET /api/users/:login/stats
 GET /api/users/:login/repos
 GET /api/users/:login/repos/:fullName
 GET /api/users/:login/tags
-GET /api/users/:login/export?format=markdown
+POST /api/users/:login/classify
 POST /api/sync
-POST /api/tag
+GET /api/export?format=markdown&login=:login
 ```
 
 后续多语言 UI 可以增加本地配置接口，但当前 Demo 先用前端 `localStorage` 保存语言偏好，不依赖后端：
@@ -53,7 +53,7 @@ language      编程语言
 topic         GitHub topic
 tag           自动标签
 license       协议
-sort          stars|forks|updated_at|starred_at|open_issues|activity
+sort          stars|forks|pushed_at|starred_at|open_issues
 direction     asc|desc
 page          页码
 pageSize      每页数量
