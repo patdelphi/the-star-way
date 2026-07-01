@@ -33,6 +33,8 @@
     "totalDevs": "共 {{count}} 位开发者",
     "current": "当前",
     "syncBtn": "同步星标",
+    "syncingBtn": "同步中...",
+    "syncingHint": "同步可能需要数分钟，请勿关闭页面",
     "syncReady": "星图引擎已就绪",
     "syncStatus": "同步状态",
     "syncStates": {

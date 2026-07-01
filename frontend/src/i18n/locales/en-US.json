@@ -33,6 +33,8 @@
     "totalDevs": "{{count}} developers",
     "current": "Current",
     "syncBtn": "Sync Stars",
+    "syncingBtn": "Syncing...",
+    "syncingHint": "Sync may take several minutes, please keep the page open",
     "syncReady": "Star engine ready",
     "syncStatus": "Sync Status",
     "syncStates": {

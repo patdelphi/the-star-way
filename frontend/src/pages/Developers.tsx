@@ -542,18 +542,22 @@ export default function Developers() {
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
                 onClick={() => runSync(activeDev.name)}
+                disabled={syncStatus === "syncing"}
               >
-                <RotateCw className="w-4 h-4" />
-                {t("developers.syncBtn")}
+                <RotateCw className={`w-4 h-4 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+                {syncStatus === "syncing" ? t("developers.syncingBtn") : t("developers.syncBtn")}
               </Button>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">{t("developers.syncStatus")}</span>
-              <Badge variant={syncStatus.startsWith("success") ? "default" : "outline"}>
+              <Badge variant={syncStatus.startsWith("success") ? "default" : syncStatus === "syncing" ? "secondary" : "outline"}>
                 {getSyncStatusText(syncStatus)}
               </Badge>
+              {syncStatus === "syncing" && (
+                <span className="text-xs text-status-warning">{t("developers.syncingHint")}</span>
+              )}
               {syncError && <span className="text-xs text-status-danger">{syncError}</span>}
-              {!isApiMode && (
+              {!isApiMode && syncStatus !== "syncing" && (
                 <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}
             </div>
