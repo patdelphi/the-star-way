@@ -20,7 +20,7 @@ function Find-AvailablePort {
     if ($inUse.Count -eq 0) { return $p }
     $p++
   }
-  throw "未找到可用端口（从 $Start 开始）"
+  throw "No available port starting from $Start"
 }
 
 function Cleanup-Previous {
@@ -46,73 +46,89 @@ function Wait-Ready {
   return $false
 }
 
-# ===== 主流程 =====
+function Show-Log {
+  param([string]$Path)
+  if (Test-Path $Path) {
+    Get-Content $Path -Tail 20
+  }
+}
+
+# ===== Main =====
 try {
-  # 清理上次残留
   Cleanup-Previous
 
-  # 端口顺延
   $actualBackend = Find-AvailablePort $BackendPort
   $actualFrontend = Find-AvailablePort $FrontendPort
 
-  # 依赖检查
-  if (-not (Test-Path $BackendDir)) { throw "缺少后端目录: $BackendDir" }
-  if (-not (Test-Path $FrontendDir)) { throw "缺少前端目录: $FrontendDir" }
-  if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "未找到 pnpm，请先安装 pnpm" }
-  if (-not (Test-Path (Join-Path $BackendDir "node_modules"))) { throw "后端依赖未安装，请先执行: cd backend && pnpm install" }
-  if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) { throw "前端依赖未安装，请先执行: cd frontend && pnpm install" }
+  if (-not (Test-Path $BackendDir)) { throw "Missing backend dir: $BackendDir" }
+  if (-not (Test-Path $FrontendDir)) { throw "Missing frontend dir: $FrontendDir" }
+  if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "pnpm not found" }
+  if (-not (Test-Path (Join-Path $BackendDir "node_modules"))) { throw "Backend deps missing: cd backend && pnpm install" }
+  if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) { throw "Frontend deps missing: cd frontend && pnpm install" }
 
-  Write-Host "启动中..."
-
-  # 启动后端
-  $backendCmd = "`$env:PORT='$actualBackend'; pnpm exec tsx 'src/api/start.ts'"
-  $backendProc = Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command $backendCmd" -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
-  Write-Host "后端 PID: $($backendProc.Id)"
-
-  # 启动前端
-  $frontendCmd = "`$env:VITE_API_BASE='http://localhost:$actualBackend'; pnpm exec vite --host 127.0.0.1 --port $actualFrontend"
-  $frontendProc = Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command $frontendCmd" -WorkingDirectory $FrontendDir -WindowStyle Hidden -PassThru
-  Write-Host "前端 PID: $($frontendProc.Id)"
-
-  # 保存 PID
   if (-not (Test-Path $RuntimeDir)) { New-Item -ItemType Directory -Path $RuntimeDir | Out-Null }
+  $backendLog = Join-Path $RuntimeDir "backend.log"
+  $backendErr = Join-Path $RuntimeDir "backend.err.log"
+  $frontendLog = Join-Path $RuntimeDir "frontend.log"
+  $frontendErr = Join-Path $RuntimeDir "frontend.err.log"
+
+  Write-Host "Starting..."
+
+  # Launch backend
+  $backendCmd = "`$env:PORT='$actualBackend'; pnpm exec tsx 'src/api/start.ts' 2>&1 | Tee-Object -FilePath '$backendLog'"
+  $backendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$backendCmd) -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
+  Write-Host "Backend PID: $($backendProc.Id)"
+
+  # Launch frontend
+  $frontendCmd = "`$env:VITE_API_BASE='http://localhost:$actualBackend'; pnpm exec vite --host 127.0.0.1 --port $actualFrontend 2>&1 | Tee-Object -FilePath '$frontendLog'"
+  $frontendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$frontendCmd) -WorkingDirectory $FrontendDir -WindowStyle Hidden -PassThru
+  Write-Host "Frontend PID: $($frontendProc.Id)"
+
+  # Save PID
   @{ backend = $backendProc.Id; frontend = $frontendProc.Id } | ConvertTo-Json | Set-Content $PidFile
 
-  # 等待就绪
+  # Wait backend
   if (-not (Wait-Ready "http://localhost:$actualBackend/api/users" -Timeout 30)) {
-    Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue
-    throw "后端启动超时（30s），请检查 .runtime 目录下的日志"
+    Write-Host ""
+    Write-Host "--- Backend log (last 20 lines) ---" -ForegroundColor Yellow
+    Show-Log $backendLog
+    Write-Host ""
+    throw "Backend startup timeout (30s). See log above."
   }
 
+  # Wait frontend
   if (-not (Wait-Ready "http://localhost:$actualFrontend/" -Timeout 20)) {
-    Stop-Process -Id $frontendProc.Id -Force -ErrorAction SilentlyContinue
-    throw "前端启动超时（20s），请检查 .runtime 目录下的日志"
+    Write-Host ""
+    Write-Host "--- Frontend log (last 20 lines) ---" -ForegroundColor Yellow
+    Show-Log $frontendLog
+    Write-Host ""
+    throw "Frontend startup timeout (20s). See log above."
   }
 
-  # 输出结果
+  # Output
   Write-Host ""
   if ($actualBackend -ne $BackendPort) {
-    Write-Host "后端端口 $BackendPort 被占用，已顺延至 $actualBackend" -ForegroundColor Yellow
+    Write-Host "Backend port $BackendPort in use, using $actualBackend" -ForegroundColor Yellow
   }
   if ($actualFrontend -ne $FrontendPort) {
-    Write-Host "前端端口 $FrontendPort 被占用，已顺延至 $actualFrontend" -ForegroundColor Yellow
+    Write-Host "Frontend port $FrontendPort in use, using $actualFrontend" -ForegroundColor Yellow
   }
-  Write-Host "后端: http://localhost:$actualBackend/" -ForegroundColor Green
-  Write-Host "前端: http://localhost:$actualFrontend/" -ForegroundColor Green
+  Write-Host "Backend:  http://localhost:$actualBackend/" -ForegroundColor Green
+  Write-Host "Frontend: http://localhost:$actualFrontend/" -ForegroundColor Green
   Write-Host ""
-  Write-Host "按 Ctrl+C 或关闭窗口停止服务"
+  Write-Host "Press Ctrl+C or close window to stop."
 
   if ($OpenBrowser) { Start-Process "http://localhost:$actualFrontend/" }
 
-  # 保持运行
+  # Keep running
   try {
     while ($true) {
       Start-Sleep -Seconds 2
-      if ($backendProc.HasExited) { Write-Host "后端进程已退出"; break }
-      if ($frontendProc.HasExited) { Write-Host "前端进程已退出"; break }
+      if ($backendProc.HasExited) { Write-Host "Backend exited"; break }
+      if ($frontendProc.HasExited) { Write-Host "Frontend exited"; break }
     }
   } finally {
-    Write-Host "正在停止..."
+    Write-Host "Stopping..."
     if (-not $backendProc.HasExited) { Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue }
     if (-not $frontendProc.HasExited) { Stop-Process -Id $frontendProc.Id -Force -ErrorAction SilentlyContinue }
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
@@ -120,8 +136,8 @@ try {
 
 } catch {
   Write-Host ""
-  Write-Host "启动失败: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "STARTUP FAILED: $($_.Exception.Message)" -ForegroundColor Red
   Write-Host ""
-  Write-Host "按任意键退出..."
+  Write-Host "Press any key to exit..."
   $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
