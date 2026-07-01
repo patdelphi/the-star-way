@@ -383,6 +383,20 @@ export async function getLearningPath(login: string): Promise<{
 }
 
 /**
+ * 批量获取仓库中文摘要
+ */
+export async function getCnSummaries(login: string): Promise<Record<string, string>> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/cn-summaries`)
+      const data = await res.json()
+      return data.data ?? {}
+    }
+  } catch { /* 忽略错误 */ }
+  return {}
+}
+
+/**
  * 获取后端 GitHub Token 来源
  */
 export async function getTokenSource(): Promise<{

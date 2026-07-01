@@ -332,6 +332,29 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/users/:login/cn-summaries =====
+      const cnSumMatch = matchRoute('/api/users/:login/cn-summaries', url.split('?')[0])
+      if (method === 'GET' && cnSumMatch) {
+        const { login } = cnSumMatch
+        const rows = db.prepare(`
+          SELECT t.repo_full_name, t.translated_readme_summary
+          FROM translations t
+          WHERE t.target_lang = 'zh'
+            AND t.translated_readme_summary IS NOT NULL
+            AND t.translated_readme_summary != ''
+            AND t.repo_full_name IN (
+              SELECT repo_full_name FROM stars WHERE user_login = ?
+            )
+        `).all(login) as Array<{ repo_full_name: string; translated_readme_summary: string }>
+
+        const map: Record<string, string> = {}
+        for (const r of rows) {
+          map[r.repo_full_name] = r.translated_readme_summary
+        }
+        json(res, { data: map })
+        return
+      }
+
       // ===== GET /api/users/:login/learning-path =====
       const learningMatch = matchRoute('/api/users/:login/learning-path', url.split('?')[0])
       if (method === 'GET' && learningMatch) {

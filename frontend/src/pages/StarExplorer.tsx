@@ -29,7 +29,7 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport } from "@/lib/api"
+import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport, getCnSummaries } from "@/lib/api"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Badge } from "@/components/ui/badge"
@@ -409,6 +409,7 @@ export default function StarExplorer() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usingFallback, setUsingFallback] = useState(false)
+  const [cnSummaries, setCnSummaries] = useState<Record<string, string>>({})
 
   // === 首次加载：拉取真实数据 ===
   useEffect(() => {
@@ -444,6 +445,14 @@ export default function StarExplorer() {
           setSummary(summaryResult)
         }
         setTags(tagsResult)
+
+        // 加载中文摘要（非阻塞，失败不影响主流程）
+        try {
+          const summaries = await getCnSummaries(currentLogin)
+          if (!cancelled) setCnSummaries(summaries)
+        } catch {
+          // 忽略摘要加载失败
+        }
       } catch (err) {
         if (cancelled) return
         const msg = err instanceof Error ? err.message : t("starExplorer.loadingHint")
@@ -1270,6 +1279,9 @@ export default function StarExplorer() {
                               <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
                               <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
                             </div>
+                            {cnSummaries[repo.fullName] && (
+                              <p className="text-xs text-primary mt-0.5 line-clamp-2">{cnSummaries[repo.fullName]}</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
