@@ -67,7 +67,8 @@ export interface ApiError {
 // ===== 配置 =====
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3210'
-const API_TIMEOUT = 8000 // 8 秒超时
+const API_TIMEOUT = 8000 // 普通 API 8 秒超时
+const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
 const TOKEN_KEY = 'starway-github-token'
 
 // ===== Token 管理 =====
@@ -91,9 +92,9 @@ export function clearGitHubToken(): void {
  * @param url 请求 URL
  * @param options fetch 选项
  */
-async function fetchWithTimeout(url: string, options?: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = API_TIMEOUT): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), API_TIMEOUT)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(url, {
@@ -139,7 +140,7 @@ export async function getUsers(): Promise<UserInfo[]> {
     }
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底
-  return [{ login: 'demo-user', avatar_url: null, profile_url: null, synced_at: null }]
+  return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null }]
 }
 
 /**
@@ -241,7 +242,34 @@ export async function syncStars(username: string, token?: string): Promise<any |
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      })
+      }, SYNC_TIMEOUT)
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error?.message || '同步失败')
+      }
+      return data.data
+    }
+  } catch (err) {
+    if (err instanceof Error) throw err
+  }
+  return null
+}
+
+/**
+ * 获取用户级统一摘要统计
+ */
+export async function getUserSummary(login: string): Promise<{
+  repoCount: number
+  activeRepoCount: number
+  tagCount: number
+  hiddenGemsCount: number
+  sleepStarsCount: number
+  licenseRiskCount: number
+  lastSyncedAt: string | null
+} | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/summary`)
       const data = await res.json()
       return data.data
     }

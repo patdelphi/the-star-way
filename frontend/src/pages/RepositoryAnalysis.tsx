@@ -32,10 +32,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
 import { getRepos, getStats, getTags } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
 /* ========== 常量 ========== */
-const DEFAULT_LOGIN = "demo-user"
-
 type SignalTone = "safe" | "warning" | "danger"
 
 type RepoAnalysis = {
@@ -192,6 +191,7 @@ function formatStars(n: number): string {
 /* ========== 主组件 ========== */
 export default function RepositoryAnalysis() {
   const { t } = useTranslation()
+  const { currentLogin } = useDeveloper()
   const [selectedRepo, setSelectedRepo] = useState(repoAnalyses[0].fullName)
   const [status, setStatus] = useState(t("repoAnalysis.initializing"))
   const [loading, setLoading] = useState(true)
@@ -262,9 +262,9 @@ export default function RepositoryAnalysis() {
       setLoading(true)
       try {
         const [reposResult, statsResult, tagsResult] = await Promise.all([
-          getRepos(DEFAULT_LOGIN, { pageSize: 100 }),
-          getStats(DEFAULT_LOGIN),
-          getTags(DEFAULT_LOGIN),
+          getRepos(currentLogin, { pageSize: 100 }),
+          getStats(currentLogin),
+          getTags(currentLogin),
         ])
 
         if (cancelled) return
@@ -298,7 +298,7 @@ export default function RepositoryAnalysis() {
     return () => {
       cancelled = true
     }
-  }, [t])
+  }, [t, currentLogin])
 
   /** 下拉选择器的数据源：优先 API，回退 Demo */
   const selectorOptions = useMemo(() => {

@@ -9,6 +9,7 @@ import { classifyAllRepos } from '../classification/classifier.js'
 import { join } from 'node:path'
 
 const CSV_PATH = join(import.meta.dirname, '..', '..', '..', 'Docs', 'github_starred_projects_691_COMPLETE.csv')
+const DEMO_LOGIN = 'patdelphi'
 
 async function main() {
   console.log('初始化数据库...')
@@ -16,7 +17,7 @@ async function main() {
   initDatabase(db)
 
   console.log('导入种子数据：', CSV_PATH)
-  const count = await importFromCsvFile(db, CSV_PATH)
+  const count = await importFromCsvFile(db, CSV_PATH, DEMO_LOGIN)
   console.log(`导入完成：${count} 条仓库数据`)
 
   console.log('执行规则分类...')

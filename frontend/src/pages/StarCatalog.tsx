@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Search, Star, GitFork, ChevronDown, ChevronRight } from "lucide-react"
 import { getRepos, getTags } from "@/lib/api"
 import type { Repo } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // Demo 数据：标签列表
 const DEMO_TAGS: { tag: string; count: number }[] = [
@@ -86,7 +87,7 @@ function formatStars(n: number): string {
 
 const StarCatalog: React.FC = () => {
   const { t } = useTranslation()
-  const defaultUser = "demo-user"
+  const { currentLogin } = useDeveloper()
 
   // 数据状态
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
@@ -106,8 +107,8 @@ const StarCatalog: React.FC = () => {
       setLoading(true)
       try {
         const [tagsRes, reposRes] = await Promise.all([
-          getTags(defaultUser),
-          getRepos(defaultUser, { pageSize: 10000 }),
+          getTags(currentLogin),
+          getRepos(currentLogin, { pageSize: 10000 }),
         ])
 
         if (cancelled) return
@@ -140,7 +141,7 @@ const StarCatalog: React.FC = () => {
 
     fetchData()
     return () => { cancelled = true }
-  }, [])
+  }, [currentLogin])
 
   // 默认展开前 3 个标签（按 count 降序）
   useEffect(() => {

@@ -39,6 +39,10 @@ cd backend
 npm install
 ```
 
+### 1.1 环境变量
+
+根目录提供 `sample.env`。需要 GitHub Token 或 AI Provider 时，复制为 `.env` 后按需填写；基础本地功能不依赖 AI。
+
 ### 2. 初始化数据库（导入 Demo 数据）
 
 ```bash

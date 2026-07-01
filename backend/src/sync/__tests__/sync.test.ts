@@ -105,6 +105,11 @@ let callCount = 0
 vi.mock('../../sync/github-client.js', () => {
   return {
     GitHubClient: vi.fn().mockImplementation(() => ({
+      getUserProfile: vi.fn().mockImplementation((username: string) => Promise.resolve({
+        login: username,
+        avatar_url: `https://github.com/${username}-profile.png`,
+        html_url: `https://github.com/${username}`,
+      })),
       listStarredRepos: vi.fn().mockImplementation(() => {
         callCount++
         // callCount > 10 时返回 2 个仓库（用于 removed_at 测试）
@@ -165,6 +170,14 @@ describe('GitHub 同步', () => {
     expect(star).toBeDefined()
     expect((star as any).starred_at).toBe('2025-06-01T00:00:00Z')
     expect((star as any).removed_at).toBeNull()
+  })
+
+  it('同步用户头像应来自用户资料而不是仓库 owner', async () => {
+    await syncStars(db, 'testuser')
+
+    const user = db.prepare('SELECT avatar_url, profile_url FROM users WHERE login = ?').get('testuser') as any
+    expect(user.avatar_url).toBe('https://github.com/testuser-profile.png')
+    expect(user.profile_url).toBe('https://github.com/testuser')
   })
 
   it('重复同步不应产生重复数据', async () => {

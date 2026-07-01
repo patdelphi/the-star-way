@@ -14,13 +14,6 @@ import {
   queryActiveRepoCount,
 } from '../repository/repo-queries.js'
 import type Database from 'better-sqlite3'
-import { rmSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-
-const TEST_DB_DIR = join(tmpdir(), 'starway-test-csv-' + process.pid)
-function getTestDbPath() { return join(TEST_DB_DIR, 'test.db') }
-function cleanup() { if (existsSync(TEST_DB_DIR)) rmSync(TEST_DB_DIR, { recursive: true, force: true }) }
 
 // 模拟 CSV 数据
 const MOCK_CSV = `序号,项目名称,星星数量,简介,中文简介,URL,编程语言,License,Forks,Open Issues,Topics,标星时间,最近更新
@@ -34,14 +27,12 @@ let db: Database.Database
 
 describe('CSV 导入与查询', () => {
   beforeEach(() => {
-    cleanup()
-    db = createConnection(getTestDbPath())
+    db = createConnection(':memory:')
     initDatabase(db)
   })
 
   afterEach(() => {
     db.close()
-    cleanup()
   })
 
   // ===== CSV 解析测试 =====

@@ -28,6 +28,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { getUsers, syncStars, getGitHubToken } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // ===== 类型定义 =====
 interface Developer {
@@ -125,6 +126,7 @@ const ITEMS_PER_PAGE = 12
 
 export default function Developers() {
   const { t } = useTranslation()
+  const { currentLogin, setCurrentLogin } = useDeveloper()
 
   // 开发者列表状态（初始为空，由 useEffect 加载）
   const [developers, setDevelopers] = useState<Developer[]>([])
@@ -140,6 +142,7 @@ export default function Developers() {
   const [currentPage, setCurrentPage] = useState(1)
   // 同步状态以 key 形式存储，便于翻译
   const [syncStatus, setSyncStatus] = useState("pending")
+  const [syncError, setSyncError] = useState("")
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -157,15 +160,14 @@ export default function Developers() {
     getUsers()
       .then((users) => {
         if (cancelled) return
-        // 判断 API 是否返回了有效数据（非空且不是兜底 demo-user）
-        const isValidApiData =
-          users.length > 0 && !(users.length === 1 && users[0].login === "demo-user")
+        // 判断 API 是否返回了有效数据；本地 fallback 没有 synced_at
+        const isValidApiData = users.some((user) => Boolean(user.synced_at))
         if (isValidApiData) {
           const mapped: Developer[] = users.map((u, i) => ({
             id: String(i + 1),
             name: u.login,
             stars: 0, // API 未直接提供 stars 数量
-            isActive: i === 0,
+            isActive: u.login === currentLogin || (i === 0 && !users.some((user) => user.login === currentLogin)),
             avatar_url: u.avatar_url,
             profile_url: u.profile_url,
             synced_at: u.synced_at,
@@ -191,7 +193,7 @@ export default function Developers() {
     return () => {
       cancelled = true
     }
-  }, [t])
+  }, [t, currentLogin])
 
   // 分页数据
   const totalPages = Math.ceil(developers.length / ITEMS_PER_PAGE)
@@ -205,6 +207,10 @@ export default function Developers() {
 
   // 选中某个开发者
   const selectDeveloper = (id: string) => {
+    const target = developers.find((dev) => dev.id === id)
+    if (target) {
+      setCurrentLogin(target.name)
+    }
     setDevelopers((prev) =>
       prev.map((dev) => ({
         ...dev,
@@ -254,6 +260,7 @@ export default function Developers() {
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {
     setSyncStatus("syncing")
+    setSyncError("")
     try {
       const token = getGitHubToken()
       const result = await syncStars(name, token || undefined)
@@ -262,9 +269,11 @@ export default function Developers() {
         setSearchResult(t("developers.starUpdated", { name }))
       } else {
         setSyncStatus("networkFail")
+        setSyncError(t("developers.syncUnknownError"))
       }
-    } catch {
+    } catch (err) {
       setSyncStatus("networkFail")
+      setSyncError(err instanceof Error ? err.message : t("developers.syncUnknownError"))
     }
   }
 
@@ -506,6 +515,7 @@ export default function Developers() {
               <Badge variant={syncStatus.startsWith("success") ? "default" : "outline"}>
                 {getSyncStatusText(syncStatus)}
               </Badge>
+              {syncError && <span className="text-xs text-status-danger">{syncError}</span>}
               {!isApiMode && (
                 <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}

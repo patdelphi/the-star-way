@@ -25,6 +25,7 @@ import {
   Network,
 } from "lucide-react"
 import { getRepo, type Repo } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // ===== 类型定义 =====
 
@@ -102,6 +103,7 @@ function formatCount(num: number): string {
 
 const RepoDetail: React.FC = () => {
   const { t } = useTranslation()
+  const { currentLogin } = useDeveloper()
 
   // 从路由参数中获取仓库 owner 和 name
   const { owner, name } = useParams<{ owner: string; name: string }>()
@@ -157,8 +159,7 @@ const RepoDetail: React.FC = () => {
       setError(null)
 
       try {
-        // 默认用户 'demo-user'
-        const data = await getRepo("demo-user", `${owner}/${name}`)
+        const data = await getRepo(currentLogin, `${owner}/${name}`)
         if (cancelled) return
 
         if (data) {
@@ -185,7 +186,7 @@ const RepoDetail: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [owner, name, t])
+  }, [owner, name, t, currentLogin])
 
   // 决定实际展示的数据（API 数据优先，否则用 Demo 数据）
   const displayRepo = repoData

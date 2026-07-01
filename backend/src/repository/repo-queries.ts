@@ -291,3 +291,77 @@ export function queryActiveRepoCount(db: Database.Database, userLogin?: string):
     .get(...(userLogin ? [ninetyDaysAgo, userLogin] : [ninetyDaysAgo])) as { cnt: number }
   return row.cnt
 }
+
+/**
+ * 用户级统一摘要统计
+ * 返回：仓库总数、活跃数、标签数、隐藏宝石数、沉睡星标数、协议风险数、最后同步时间
+ */
+export function queryUserSummary(db: Database.Database, userLogin: string): {
+  repoCount: number
+  activeRepoCount: number
+  tagCount: number
+  hiddenGemsCount: number
+  sleepStarsCount: number
+  licenseRiskCount: number
+  lastSyncedAt: string | null
+} {
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+  // 仓库总数
+  const repoCount = queryRepoCount(db, userLogin)
+
+  // 活跃仓库数
+  const activeRepoCount = queryActiveRepoCount(db, userLogin)
+
+  // 唯一标签数（该用户星标仓库上的标签）
+  const tagRow = db.prepare(`
+    SELECT COUNT(DISTINCT tag) as cnt
+    FROM repo_tags
+    WHERE repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
+  `).get(userLogin) as { cnt: number }
+  const tagCount = tagRow.cnt
+
+  // 隐藏宝石：stars <= 1000 且最近 90 天有更新
+  const gemRow = db.prepare(`
+    SELECT COUNT(*) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ? AND r.stars <= 1000 AND r.pushed_at >= ?
+  `).get(userLogin, ninetyDaysAgo) as { cnt: number }
+  const hiddenGemsCount = gemRow.cnt
+
+  // 沉睡星标：超过 90 天未更新
+  const sleepRow = db.prepare(`
+    SELECT COUNT(*) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ? AND r.pushed_at < ?
+  `).get(userLogin, ninetyDaysAgo) as { cnt: number }
+  const sleepStarsCount = sleepRow.cnt
+
+  // 协议风险：GPL 或未知协议
+  const riskRow = db.prepare(`
+    SELECT COUNT(*) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ?
+      AND (LOWER(COALESCE(r.license, '')) LIKE '%gpl%'
+           OR COALESCE(r.license, '') = ''
+           OR LOWER(COALESCE(r.license, '')) = 'other')
+  `).get(userLogin) as { cnt: number }
+  const licenseRiskCount = riskRow.cnt
+
+  // 最后同步时间
+  const userRow = db.prepare('SELECT synced_at FROM users WHERE login = ?').get(userLogin) as { synced_at: string | null } | undefined
+  const lastSyncedAt = userRow?.synced_at ?? null
+
+  return {
+    repoCount,
+    activeRepoCount,
+    tagCount,
+    hiddenGemsCount,
+    sleepStarsCount,
+    licenseRiskCount,
+    lastSyncedAt,
+  }
+}

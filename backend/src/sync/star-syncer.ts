@@ -37,6 +37,7 @@ export async function syncStars(
 ): Promise<StarSyncResult> {
   const client = new GitHubClient(config)
   const now = new Date().toISOString()
+  const profile = await client.getUserProfile(username)
 
   // 用于收集分页信息
   let totalPages = 0
@@ -62,9 +63,7 @@ export async function syncStars(
         synced_at = excluded.synced_at
     `)
 
-    // 获取第一个 repo 的 avatar（如果有的话）
-    const avatarUrl = repos.length > 0 ? repos[0].repo.owner.avatar_url : null
-    upsertUser.run(username, avatarUrl, `https://github.com/${username}`, now)
+    upsertUser.run(profile.login, profile.avatar_url, profile.html_url, now)
 
     // upsert 仓库
     const upsertRepo = db.prepare(`

@@ -29,6 +29,12 @@ export interface GitHubStarredRepo {
   }
 }
 
+export interface GitHubUserProfile {
+  login: string
+  avatar_url: string | null
+  html_url: string
+}
+
 // GitHub rate limit 响应头
 export interface RateLimitInfo {
   limit: number
@@ -118,6 +124,20 @@ export class GitHubClient {
     }
 
     return { repos: allRepos, rateLimit }
+  }
+
+  /**
+   * 获取指定 GitHub 用户公开资料
+   */
+  async getUserProfile(username: string): Promise<GitHubUserProfile> {
+    const url = `${this.baseUrl}/users/${encodeURIComponent(username)}`
+    const response = await this.fetchWithAuth(url)
+
+    if (!response.ok) {
+      throw createSyncError(response.status, await response.text())
+    }
+
+    return await response.json() as GitHubUserProfile
   }
 
   /**

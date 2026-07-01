@@ -26,8 +26,9 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, getTags, exportData, classifyRepos } from "@/lib/api"
+import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos } from "@/lib/api"
 import type { UserStats, RepoListResult } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,10 +65,7 @@ type StarRepo = {
   reuseAdvice: string
 }
 
-const LOGIN = "demo-user"
-
 const developerProfile = {
-  login: "patdelphi",
   totalStars: 691,
   syncedAt: "2026-06-30 22:40",
   demoMode: "演示数据：691 条 GitHub 星标仓库",
@@ -319,6 +317,7 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
 export default function StarExplorer() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { currentLogin } = useDeveloper()
 
   // === 移到组件内部的 i18n 静态数据 ===
   const classificationSources = useMemo(
@@ -374,6 +373,15 @@ export default function StarExplorer() {
   // === API 相关状态 ===
   const [allRepos, setAllRepos] = useState<StarRepo[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [summary, setSummary] = useState<{
+    repoCount: number
+    activeRepoCount: number
+    tagCount: number
+    hiddenGemsCount: number
+    sleepStarsCount: number
+    licenseRiskCount: number
+    lastSyncedAt: string | null
+  } | null>(null)
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -387,10 +395,11 @@ export default function StarExplorer() {
       setLoading(true)
       setError(null)
       try {
-        const [repoResult, statsResult, tagsResult] = await Promise.all([
-          getRepos(LOGIN, { pageSize: 10000 }),
-          getStats(LOGIN),
-          getTags(LOGIN),
+        const [repoResult, statsResult, tagsResult, summaryResult] = await Promise.all([
+          getRepos(currentLogin, { pageSize: 10000 }),
+          getStats(currentLogin),
+          getTags(currentLogin),
+          getUserSummary(currentLogin),
         ])
         if (cancelled) return
 
@@ -402,11 +411,14 @@ export default function StarExplorer() {
         } else {
           setAllRepos(repoResult.items.map(adaptApiRepo))
           setUsingFallback(false)
-          setAnalysisStatus(t("starExplorer.loadedAnalysis", { login: LOGIN }))
+          setAnalysisStatus(t("starExplorer.loadedAnalysis", { login: currentLogin }))
         }
 
         if (statsResult) {
           setStats(statsResult)
+        }
+        if (summaryResult) {
+          setSummary(summaryResult)
         }
         setTags(tagsResult)
       } catch (err) {
@@ -425,7 +437,7 @@ export default function StarExplorer() {
     return () => {
       cancelled = true
     }
-  }, [t])
+  }, [t, currentLogin])
 
   // === 筛选与排序（基于 allRepos）===
   const filteredRepos = useMemo(() => {
@@ -569,14 +581,14 @@ export default function StarExplorer() {
     }
 
     try {
-      const content = await exportData(fmt, LOGIN, params)
+      const content = await exportData(fmt, currentLogin, params)
       if (content) {
         // 触发浏览器下载
         const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `star-repos-${LOGIN}.${fmt === "markdown" ? "md" : fmt}`
+        a.download = `star-repos-${currentLogin}.${fmt === "markdown" ? "md" : fmt}`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -595,7 +607,7 @@ export default function StarExplorer() {
   const handleBatchAnalyze = async () => {
     setAnalysisStatus(t("starExplorer.triggeringClassify"))
     try {
-      const result = await classifyRepos(LOGIN)
+      const result = await classifyRepos(currentLogin)
       if (result) {
         setAnalysisStatus(t("starExplorer.classifyComplete", { classified: result.classified, errors: result.errors }))
       } else {
@@ -639,7 +651,7 @@ export default function StarExplorer() {
               <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
                 {t("starExplorer.designatedDev")}
               </Badge>
-              <Badge className="font-mono text-xs">@{developerProfile.login}</Badge>
+              <Badge className="font-mono text-xs">@{currentLogin}</Badge>
               <Badge variant="secondary" className="font-mono text-xs">
                 {usingFallback ? developerProfile.demoMode : t("starExplorer.realDataCount", { count: stats?.repoCount ?? allRepos.length })}
               </Badge>
@@ -662,37 +674,37 @@ export default function StarExplorer() {
           <MetricCard
             icon={Star}
             label={t("starExplorer.starCount")}
-            value={String(stats?.repoCount ?? developerProfile.totalStars)}
+            value={String(summary?.repoCount ?? stats?.repoCount ?? developerProfile.totalStars)}
             detail={usingFallback ? t("starExplorer.starCountDetail") : t("starExplorer.starCountDetailApi")}
           />
           <MetricCard
             icon={Activity}
             label={t("starExplorer.lastSync")}
-            value={developerProfile.syncedAt}
+            value={summary?.lastSyncedAt ? new Date(summary.lastSyncedAt).toLocaleDateString() : developerProfile.syncedAt}
             detail={t("starExplorer.lastSyncDetail")}
           />
           <MetricCard
             icon={Tags}
             label={t("starExplorer.tagCoverage")}
-            value={tagCoveragePercent}
-            detail={t("starExplorer.tagCoverageDetailCount", { count: tags.length, total: stats?.repoCount ?? allRepos.length })}
+            value={summary ? `${Math.round((summary.tagCount / summary.repoCount) * 100)}%` : tagCoveragePercent}
+            detail={t("starExplorer.tagCoverageDetailCount", { count: summary?.tagCount ?? tags.length, total: summary?.repoCount ?? stats?.repoCount ?? allRepos.length })}
           />
           <MetricCard
             icon={Flame}
             label={t("starExplorer.hiddenGems")}
-            value={String(hiddenGemsCount)}
+            value={String(summary?.hiddenGemsCount ?? hiddenGemsCount)}
             detail={t("starExplorer.hiddenGemsDetail")}
           />
           <MetricCard
             icon={AlertTriangle}
             label={t("starExplorer.sleepingStars")}
-            value={String(sleepStarsCount)}
+            value={String(summary?.sleepStarsCount ?? sleepStarsCount)}
             detail={t("starExplorer.sleepingStarsDetail")}
           />
           <MetricCard
             icon={Activity}
             label={t("starExplorer.activeRepos")}
-            value={String(stats?.activeRepoCount ?? 512)}
+            value={String(summary?.activeRepoCount ?? stats?.activeRepoCount ?? 512)}
             detail={t("starExplorer.activeReposDetail")}
           />
           <MetricCard
@@ -704,7 +716,7 @@ export default function StarExplorer() {
           <MetricCard
             icon={AlertTriangle}
             label={t("starExplorer.licenseRisk")}
-            value={String(licenseRiskCount)}
+            value={String(summary?.licenseRiskCount ?? licenseRiskCount)}
             detail={t("starExplorer.licenseRiskDetail")}
           />
         </section>

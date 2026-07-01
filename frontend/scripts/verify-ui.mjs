@@ -2,21 +2,29 @@
  * verify-ui.mjs
  * 前端静态功能校验脚本，检查页面能力入口和中英文 i18n 文案是否覆盖核心 Demo 功能。
  */
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "..")
 
-const readText = (path) => readFileSync(resolve(root, path), "utf8")
+const readText = (path) => {
+  const fullPath = resolve(root, path)
+  return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : ""
+}
 const readJson = (path) => JSON.parse(readText(path))
 
 const files = {
   app: readText("src/App.tsx"),
   topbar: readText("src/components/layout/TopBar.tsx"),
   sidebar: readText("src/components/layout/Sidebar.tsx"),
+  api: readText("src/lib/api.ts"),
+  developerContext: readText("src/contexts/DeveloperContext.tsx"),
   analysis: readText("src/pages/RepositoryAnalysis.tsx"),
   explorer: readText("src/pages/StarExplorer.tsx"),
   developers: readText("src/pages/Developers.tsx"),
+  repoDetail: readText("src/pages/RepoDetail.tsx"),
+  dashboard: readText("src/pages/Dashboard.tsx"),
+  catalog: readText("src/pages/StarCatalog.tsx"),
 }
 
 const locales = {
@@ -125,6 +133,13 @@ const checks = [
   ["中文文案覆盖核心功能", requiredChineseTexts.every((text) => zhText.includes(text))],
   ["顶部搜索使用 i18n", files.topbar.includes("topBar.searchPlaceholder") && files.topbar.includes("topBar.searchResults")],
   ["侧边栏导航使用 i18n", files.sidebar.includes("nav.starExplorer") && files.sidebar.includes("nav.repoAnalysis")],
+  ["开发者上下文 Provider", files.app.includes("DeveloperProvider") && files.developerContext.includes("useDeveloper")],
+  ["开发者选择可跨页面共享", files.developers.includes("setCurrentLogin") && files.explorer.includes("currentLogin") && files.analysis.includes("currentLogin") && files.repoDetail.includes("currentLogin")],
+  ["核心页面不写死 demo-user", ![files.explorer, files.analysis, files.repoDetail].some((content) => content.includes('"demo-user"') || content.includes("'demo-user'"))],
+  ["星标仓库标题显示当前开发者", files.explorer.includes("@{currentLogin}") && !files.explorer.includes("developerProfile.login")],
+  ["概览和分类目录跟随当前开发者", files.dashboard.includes("currentLogin") && files.catalog.includes("currentLogin")],
+  ["概览和分类目录不写死 demo-user", ![files.dashboard, files.catalog].some((content) => content.includes('"demo-user"') || content.includes("'demo-user'"))],
+  ["默认测试开发者为 patdelphi", files.developerContext.includes('DEFAULT_LOGIN = "patdelphi"') && files.api.includes("login: 'patdelphi'")],
   ["顶部无旧二级导航", !getByPath(locales.zh, "nav.starExplorer").includes("探索者") && !getByPath(locales.zh, "nav.repoAnalysis").includes("仓库分析")],
   ["单个仓库路由", files.app.includes('path="/analysis"')],
   ["星标仓库导航命名", getByPath(locales.zh, "nav.starExplorer") === "星标仓库"],
@@ -149,6 +164,7 @@ const checks = [
   ["单个仓库保留本地选择", files.analysis.includes("selected-star-repo")],
   ["开发者页接入同步 API", files.developers.includes("getUsers") && files.developers.includes("syncStars")],
   ["开发者同步状态", files.developers.includes("syncStatus") && getByPath(locales.zh, "developers.syncStates.rateLimit") === "GitHub API 限流"],
+  ["GitHub 同步长超时和错误透出", files.api.includes("SYNC_TIMEOUT") && files.developers.includes("syncError") && getByPath(locales.zh, "developers.syncUnknownError")],
   ["纯英文演示标签已清理", forbiddenTexts.every((text) => !allPageText.includes(text) && !zhText.includes(text))],
 ]
 

@@ -55,6 +55,7 @@
     "loadError": "获取开发者列表失败，已加载本地演示数据",
     "syncSuccessToken": "同步成功（已使用 Token）",
     "syncSuccessAnon": "同步成功（匿名模式）",
+    "syncUnknownError": "同步失败，请检查 GitHub 限流、用户名或网络状态",
     "starUpdated": "{{name}} 星标已更新",
     "simulateNotice": "模拟 401/404/限流/网络失败状态，不调用 GitHub API。",
     "radarCenter": "技术"

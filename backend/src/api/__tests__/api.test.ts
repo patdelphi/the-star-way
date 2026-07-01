@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createConnection, initDatabase } from '../../db/connection.js'
 import { parseCsv, importCsvRecords, DEMO_USER_LOGIN } from '../../import/csv-importer.js'
-import { createRouter } from '../routes.js'
+import { createRouter, resolveGitHubToken } from '../routes.js'
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { rmSync, existsSync } from 'node:fs'
@@ -196,5 +196,16 @@ describe('API 路由', () => {
     await router(req, res)
     expect(getStatusCode()).toBe(204)
     expect(getHeaders()['Access-Control-Allow-Origin']).toBe('*')
+  })
+
+  it('resolveGitHubToken 应优先使用请求 token，其次使用环境变量', () => {
+    const old = process.env.STARWAY_GITHUB_TOKEN
+    process.env.STARWAY_GITHUB_TOKEN = 'env-token'
+
+    expect(resolveGitHubToken('payload-token')).toBe('payload-token')
+    expect(resolveGitHubToken()).toBe('env-token')
+
+    if (old === undefined) delete process.env.STARWAY_GITHUB_TOKEN
+    else process.env.STARWAY_GITHUB_TOKEN = old
   })
 })

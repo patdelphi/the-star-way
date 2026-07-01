@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { Search, Sun, Moon, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
 function useTheme() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -37,6 +38,7 @@ const languages = [
 export function TopBar() {
   const { theme, toggleTheme } = useTheme()
   const { t, i18n } = useTranslation()
+  const { currentLogin } = useDeveloper()
   const [langOpen, setLangOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -94,7 +96,7 @@ export function TopBar() {
       <div className="flex items-center gap-3">
         {/* Developer name */}
         <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant text-sm font-sans text-on-surface tracking-wide">
-          @patdelphi
+          @{currentLogin}
         </span>
 
         {/* Theme toggle */}

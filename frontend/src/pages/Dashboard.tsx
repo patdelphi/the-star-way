@@ -20,8 +20,8 @@ import {
 } from "lucide-react"
 import { getRepos, getStats, getTags } from "@/lib/api"
 import type { RepoListResult } from "@/lib/api"
+import { useDeveloper } from "@/contexts/DeveloperContext"
 
-const DEFAULT_USER = 'demo-user'
 
 // ===== 技术雷达六维映射规则 =====
 const RADAR_TAG_MAP: Record<string, string[]> = {
@@ -247,6 +247,7 @@ function formatNumber(n: number): string {
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation()
+  const { currentLogin } = useDeveloper()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -266,9 +267,10 @@ const Dashboard: React.FC = () => {
         setError(null)
 
         const [repoResult, stats, tags] = await Promise.all([
-          getRepos(DEFAULT_USER, { page: 1, pageSize: 100 }),
-          getStats(DEFAULT_USER),
-          getTags(DEFAULT_USER),        ])
+          getRepos(currentLogin, { page: 1, pageSize: 100 }),
+          getStats(currentLogin),
+          getTags(currentLogin),
+        ])
 
         if (cancelled) return
 
@@ -317,7 +319,7 @@ const Dashboard: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentLogin])
 
   const radarGradient = useMemo(() => {
     const total = radarData.reduce((sum, r) => sum + r.value, 0)
@@ -343,7 +345,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-                @{DEFAULT_USER}
+                @{currentLogin}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {t('dashboard.engineReady')}

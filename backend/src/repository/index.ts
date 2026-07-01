@@ -10,4 +10,5 @@ export {
   queryLicenseStats,
   queryRepoCount,
   queryActiveRepoCount,
+  queryUserSummary,
 } from './repo-queries.js'

@@ -24,18 +24,51 @@ export interface ClassificationResult {
  * @returns 分类结果统计
  */
 export function classifyAllRepos(db: Database.Database): ClassificationResult {
-  // 获取所有仓库的 full_name、topics_json、name、description
-  const repos = db.prepare(`
+  return classifyReposForUser(db)
+}
+
+/**
+ * 对指定用户的星标仓库执行规则分类
+ * @param db 数据库连接
+ * @param userLogin 用户登录名，不传则处理全部仓库
+ * @returns 分类结果统计
+ */
+export function classifyReposForUser(db: Database.Database, userLogin?: string): ClassificationResult {
+  // 构建查询：如果指定了用户，只查该用户星标的仓库
+  let sql = `
     SELECT full_name, name, topics_json, description
     FROM repos
-  `).all() as { full_name: string; name: string; topics_json: string | null; description: string | null }[]
+  `
+  if (userLogin) {
+    sql = `
+      SELECT r.full_name, r.name, r.topics_json, r.description
+      FROM repos r
+      JOIN stars s ON r.full_name = s.repo_full_name
+      WHERE s.user_login = ?
+    `
+  }
+
+  const repos = db.prepare(sql).all(...(userLogin ? [userLogin] : [])) as {
+    full_name: string
+    name: string
+    topics_json: string | null
+    description: string | null
+  }[]
 
   let tagsCreated = 0
 
   withTransaction(db, () => {
-    // 清除旧的规则标签（保留手动标签 tag_source='manual'）
-    const deleteOld = db.prepare(`DELETE FROM repo_tags WHERE tag_source != 'manual'`)
-    deleteOld.run()
+    if (userLogin) {
+      // 只清除该用户星标仓库上的旧规则标签
+      db.prepare(`
+        DELETE FROM repo_tags
+        WHERE tag_source != 'manual'
+          AND repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
+      `).run(userLogin)
+    } else {
+      // 清除全部旧规则标签
+      db.prepare(`DELETE FROM repo_tags WHERE tag_source != 'manual'`).run()
+    }
 
     // 准备插入语句
     const insertTag = db.prepare(`

@@ -13,8 +13,9 @@ import {
   queryLicenseStats,
   queryRepoCount,
   queryActiveRepoCount,
+  queryUserSummary,
 } from '../repository/repo-queries.js'
-import { classifyAllRepos } from '../classification/classifier.js'
+import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
@@ -67,6 +68,11 @@ function text(res: ServerResponse, content: string, contentType: string, status 
     'Access-Control-Allow-Origin': '*',
   })
   res.end(content)
+}
+
+/** 解析同步用 GitHub Token：请求 body 优先，其次读取环境变量 */
+export function resolveGitHubToken(payloadToken?: string): string | undefined {
+  return payloadToken || process.env.STARWAY_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || undefined
 }
 
 /** 从 URL 路径中提取动态参数（支持 :login, :fullName 等） */
@@ -215,6 +221,20 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/users/:login/summary =====
+      const summaryMatch = matchRoute('/api/users/:login/summary', url.split('?')[0])
+      if (method === 'GET' && summaryMatch) {
+        const { login } = summaryMatch
+        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        if (!user) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+
+        json(res, { data: queryUserSummary(db, login) })
+        return
+      }
+
       // ===== GET /api/users/:login/tags =====
       const tagsMatch = matchRoute('/api/users/:login/tags', url.split('?')[0])
       if (method === 'GET' && tagsMatch) {
@@ -240,7 +260,8 @@ export function createRouter(db: Database.Database) {
       // ===== POST /api/users/:login/classify =====
       const classifyMatch = matchRoute('/api/users/:login/classify', url.split('?')[0])
       if (method === 'POST' && classifyMatch) {
-        const result = classifyAllRepos(db)
+        const { login } = classifyMatch
+        const result = classifyReposForUser(db, login)
         json(res, { data: result })
         return
       }
@@ -263,7 +284,7 @@ export function createRouter(db: Database.Database) {
 
         try {
           const result = await syncStars(db, payload.username, {
-            token: payload.token,
+            token: resolveGitHubToken(payload.token),
           })
           json(res, { data: result })
         } catch (err: any) {
