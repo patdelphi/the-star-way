@@ -72,15 +72,31 @@
 
 ---
 
-## Phase 2：GitHub Star 同步（待开始）
+## Phase 2：GitHub Star 同步 ✅ 已完成
+
+### 已完成任务
+- [x] 实现 GitHub client（GitHubClient 类）
+- [x] 支持匿名模式和 token 模式（Bearer token）
+- [x] 支持分页抓取（每页 100，最多 1000 页）
+- [x] 支持 starred_at media type（application/vnd.github.star+json）
+- [x] 支持增量同步（upsert 用户/仓库/星标）
+- [x] 对本次未返回的历史仓库标记 removed_at（不删除）
+- [x] 实现 API 异常处理（401/403/404/429/5xx/网络错误，GitHubSyncError 类）
+- [x] 实现 rate limit 解析和透传
+- [x] 8 个 mock 测试全部通过（同步/查询/重复/removed_at/rate limit/错误分类）
+
+---
+
+## Phase 3：规则分类与统计（待开始）
 
 ### 待做任务
-- [ ] 实现 GitHub client
-- [ ] 支持匿名模式和 token 模式
-- [ ] 支持分页抓取
-- [ ] 支持 starred_at media type
-- [ ] 支持增量同步和 removed_at 标记
-- [ ] 实现 API 异常处理（401/403/404/429/5xx/网络错误）
+- [ ] 建立一级/二级标签字典
+- [ ] 基于 topic 打标签
+- [ ] 基于仓库名称打标签
+- [ ] 基于描述打标签
+- [ ] 保存 tag_source 和 confidence
+- [ ] 实现语言分布、主题聚类、协议分布统计
+- [ ] 实现 Hidden Gems 和 Sleep Stars 统计
 
 ---
 
