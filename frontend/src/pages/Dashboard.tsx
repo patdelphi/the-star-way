@@ -23,6 +23,7 @@ import {
   LineChart,
   BookOpen,
   PieChart as PieChartIcon,
+  Tags,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
 import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
@@ -271,6 +272,7 @@ const Dashboard: React.FC = () => {
   const [repoCount, setRepoCount] = useState(691)
   const [learningPath, setLearningPath] = useState<string | null>(null)
   const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
+  const [topicStats, setTopicStats] = useState<{ topic: string; count: number }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -304,8 +306,10 @@ const Dashboard: React.FC = () => {
         // 热门主题：从 stats.topics 取前 6 个
         if (stats && stats.topics && stats.topics.length > 0) {
           setHotTopics(stats.topics.slice(0, 6).map(t => t.topic))
+          setTopicStats(stats.topics)
         } else {
           setHotTopics(demoHotTopics)
+          setTopicStats([])
         }
 
         // 宝藏项目：从 repos 筛选
@@ -504,6 +508,42 @@ const Dashboard: React.FC = () => {
                     color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
                   }))}
                 />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 标签云 */}
+        {topicStats.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Tags className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{t("dashboard.tagCloud")}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                {topicStats.slice(0, 30).map((t, i) => {
+                  const maxCount = topicStats[0].count
+                  const minCount = topicStats[topicStats.length - 1].count
+                  const sizeScale = maxCount > minCount
+                    ? 0.75 + ((t.count - minCount) / (maxCount - minCount)) * 0.75
+                    : 1
+                  return (
+                    <span
+                      key={i}
+                      className="inline-block rounded-full px-3 py-1 font-medium transition-transform hover:scale-105 cursor-default"
+                      style={{
+                        fontSize: `${sizeScale}rem`,
+                        backgroundColor: `${LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]}20`,
+                        color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+                      }}
+                    >
+                      {t.topic}
+                    </span>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

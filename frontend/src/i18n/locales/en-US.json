@@ -384,7 +384,8 @@
     "exploreDesc": "Search, filter and analyze your starred repos",
     "catalogDesc": "Browse all starred projects by tag",
     "analysisDesc": "Deep analysis of individual repositories",
-    "languageDistribution": "Language Distribution"
+    "languageDistribution": "Language Distribution",
+    "tagCloud": "Tag Cloud"
   },
   "starCatalog": {
     "title": "Star Catalog",
