@@ -6,6 +6,7 @@
  * 改造：接入真实 API getUsers / syncStars，API 不可用时回退 Demo 数据
  */
 import { useState, useMemo, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -121,16 +122,10 @@ const radarData = [
 ]
 
 const ITEMS_PER_PAGE = 12
-const syncStates = [
-  "待同步",
-  "同步中",
-  "同步成功",
-  "GitHub API 限流",
-  "用户不存在",
-  "网络失败",
-]
 
 export default function Developers() {
+  const { t } = useTranslation()
+
   // 开发者列表状态（初始为空，由 useEffect 加载）
   const [developers, setDevelopers] = useState<Developer[]>([])
   // 加载状态
@@ -143,7 +138,15 @@ export default function Developers() {
   const [searchInput, setSearchInput] = useState("")
   const [searchResult, setSearchResult] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [syncStatus, setSyncStatus] = useState(syncStates[0])
+  // 同步状态以 key 形式存储，便于翻译
+  const [syncStatus, setSyncStatus] = useState("pending")
+
+  // 获取同步状态显示文本
+  const getSyncStatusText = (status: string) => {
+    if (status === "successToken") return t("developers.syncSuccessToken")
+    if (status === "successAnon") return t("developers.syncSuccessAnon")
+    return t(`developers.syncStates.${status}`)
+  }
 
   // 页面加载时调用真实 API 获取用户列表
   useEffect(() => {
@@ -177,7 +180,7 @@ export default function Developers() {
       })
       .catch(() => {
         if (cancelled) return
-        setError("获取开发者列表失败，已加载本地演示数据")
+        setError(t("developers.loadError"))
         setDevelopers(demoDevelopers)
         setIsApiMode(false)
       })
@@ -188,7 +191,7 @@ export default function Developers() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   // 分页数据
   const totalPages = Math.ceil(developers.length / ITEMS_PER_PAGE)
@@ -250,18 +253,18 @@ export default function Developers() {
 
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {
-    setSyncStatus("同步中")
+    setSyncStatus("syncing")
     try {
       const token = getGitHubToken()
       const result = await syncStars(name, token || undefined)
       if (result !== null) {
-        setSyncStatus(token ? "同步成功（已使用 Token）" : "同步成功（匿名模式）")
-        setSearchResult(`@${name} 星标已更新`)
+        setSyncStatus(token ? "successToken" : "successAnon")
+        setSearchResult(t("developers.starUpdated", { name }))
       } else {
-        setSyncStatus("网络失败")
+        setSyncStatus("networkFail")
       }
     } catch {
-      setSyncStatus("网络失败")
+      setSyncStatus("networkFail")
     }
   }
 
@@ -270,10 +273,10 @@ export default function Developers() {
       {/* 页面标题 */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-          开发者
+          {t("developers.title")}
         </h1>
         <p className="text-on-surface-variant mt-1">
-          管理关注的 GitHub 开发者，查看和同步星标项目
+          {t("developers.subtitle")}
         </p>
       </div>
 
@@ -282,14 +285,14 @@ export default function Developers() {
         <CardHeader>
           <CardTitle className="text-base font-semibold text-on-surface">
             <Search className="h-4 w-4 inline-block mr-2 text-primary" />
-            搜索开发者
+            {t("developers.searchTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Input
-                placeholder="输入 GitHub 用户名，如 torvalds"
+                placeholder={t("developers.searchPlaceholder")}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value)
@@ -306,7 +309,7 @@ export default function Developers() {
               onClick={handleSearch}
             >
               <Search className="w-4 h-4" />
-              搜索
+              {t("developers.searchBtn")}
             </Button>
             {searchResult && (
               <Button
@@ -314,13 +317,13 @@ export default function Developers() {
                 onClick={addDeveloper}
               >
                 <UserPlus className="w-4 h-4" />
-                添加
+                {t("developers.addBtn")}
               </Button>
             )}
           </div>
           {searchResult && (
             <div className="mt-3 flex items-center gap-2 text-sm text-on-surface-variant">
-              <span>找到：</span>
+              <span>{t("developers.found")}</span>
               <Badge variant="outline" className="font-mono text-xs">
                 {searchResult.startsWith("@") ? searchResult : `@${searchResult}`}
               </Badge>
@@ -348,7 +351,7 @@ export default function Developers() {
       {loading && (
         <div className="flex items-center justify-center py-16 text-on-surface-variant">
           <Loader2 className="w-8 h-8 animate-spin mr-2" />
-          <span>加载开发者列表...</span>
+          <span>{t("developers.loading")}</span>
         </div>
       )}
 
@@ -386,7 +389,7 @@ export default function Developers() {
                     </span>
                     {dev.isActive && (
                       <Badge className="bg-primary text-on-primary text-[10px] px-1.5 py-0 shrink-0">
-                        当前
+                        {t("developers.current")}
                       </Badge>
                     )}
                   </div>
@@ -405,7 +408,7 @@ export default function Developers() {
                     e.stopPropagation()
                     removeDeveloper(dev.id)
                   }}
-                  title="删除开发者"
+                  title={t("developers.removeTooltip")}
                 >
                   <X className="w-3.5 h-3.5" />
                 </Button>
@@ -419,8 +422,8 @@ export default function Developers() {
       {!loading && developers.length === 0 && (
         <div className="text-center py-16 text-on-surface-variant">
           <Plus className="w-12 h-12 mx-auto mb-4 opacity-30" />
-          <p className="text-lg">暂无开发者</p>
-          <p className="text-sm mt-1">使用上方搜索框添加 GitHub 开发者</p>
+          <p className="text-lg">{t("developers.noDevs")}</p>
+          <p className="text-sm mt-1">{t("developers.noDevsHint")}</p>
         </div>
       )}
 
@@ -428,7 +431,7 @@ export default function Developers() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between mb-10">
           <div className="text-sm text-muted-foreground">
-            共 <span className="font-medium text-on-surface">{developers.length}</span> 位开发者
+            {t("developers.totalDevs", { count: developers.length })}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -485,7 +488,7 @@ export default function Developers() {
                     @{activeDev.name}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    星图引擎已就绪
+                    {t("developers.syncReady")}
                   </p>
                 </div>
               </div>
@@ -495,16 +498,16 @@ export default function Developers() {
                 onClick={() => runSync(activeDev.name)}
               >
                 <RotateCw className="w-4 h-4" />
-                同步星标
+                {t("developers.syncBtn")}
               </Button>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">同步状态</span>
-              <Badge variant={syncStatus === "同步成功" ? "default" : "outline"}>
-                {syncStatus}
+              <span className="text-muted-foreground">{t("developers.syncStatus")}</span>
+              <Badge variant={syncStatus.startsWith("success") ? "default" : "outline"}>
+                {getSyncStatusText(syncStatus)}
               </Badge>
               {!isApiMode && (
-                <span className="text-xs text-muted-foreground">模拟 401/404/限流/网络失败状态，不调用 GitHub API。</span>
+                <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}
             </div>
             <div className="flex items-baseline gap-2 pt-2">
@@ -512,7 +515,7 @@ export default function Developers() {
                 {activeDev.stars}
               </span>
               <span className="text-lg text-muted-foreground">
-                个同步的星标仓库
+                {t("developers.starCount")}
               </span>
             </div>
           </section>
@@ -524,10 +527,10 @@ export default function Developers() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Diamond className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl">技术人格</CardTitle>
+                  <CardTitle className="text-xl">{t("developers.personality")}</CardTitle>
                 </div>
                 <CardDescription>
-                  基于星标仓库语言分布生成的开发者画像
+                  {t("developers.personalityDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -552,7 +555,7 @@ export default function Developers() {
                 {/* 热门主题标签 */}
                 <div className="space-y-2">
                   <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                    热门主题
+                    {t("developers.hotTopics")}
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {hotTopics.map((topic) => (
@@ -570,10 +573,10 @@ export default function Developers() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Radar className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl">技术雷达</CardTitle>
+                  <CardTitle className="text-xl">{t("developers.radar")}</CardTitle>
                 </div>
                 <CardDescription>
-                  六维技术能力分布
+                  {t("developers.radarDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -590,7 +593,7 @@ export default function Developers() {
                   }}
                 >
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
-                    <span className="text-lg font-bold text-primary">技术</span>
+                    <span className="text-lg font-bold text-primary">{t("developers.radarCenter")}</span>
                   </div>
                 </div>
 
@@ -618,7 +621,7 @@ export default function Developers() {
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-semibold tracking-tight text-on-surface">
-                宝藏项目
+                {t("developers.gemRepos")}
               </h2>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

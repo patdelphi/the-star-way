@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import {
   Activity,
   AlertTriangle,
@@ -228,13 +229,6 @@ const fallbackTopicClusters = [
   { label: "命令行 / 工具链", count: 55, topics: ["命令行", "Python", "Windows"] },
 ]
 
-const classificationSources = [
-  { label: "GitHub 主题", count: 512, confidence: "0.95", detail: "强匹配，作为自动标签主来源" },
-  { label: "仓库名称", count: 96, confidence: "0.85", detail: "用于识别 MCP、RAG、命令行等显式关键词" },
-  { label: "仓库描述", count: 71, confidence: "0.80", detail: "补足主题缺失的项目语义" },
-  { label: "人工确认", count: 12, confidence: "1.00", detail: "保留给用户后续确认的标签" },
-]
-
 const starTimeline = [
   { period: "2026 Q2", count: 173, focus: "MCP、Agent、文档 AI" },
   { period: "2026 Q1", count: 148, focus: "RAG、兼容 OpenAI 接口、命令行" },
@@ -249,26 +243,7 @@ const fallbackLicenseStats = [
   { label: "未知", count: 58, tone: "text-status-danger" },
 ]
 
-const exportFormats = [
-  { label: "CSV", detail: "表格分析", status: "当前筛选" },
-  { label: "JSON", detail: "二次处理", status: "当前筛选" },
-  { label: "Markdown", detail: "笔记 / 说明文档", status: "当前筛选" },
-  { label: "HTML", detail: "静态分享", status: "后续报告" },
-]
-
-const removedStarSignals = [
-  { label: "疑似取消 Star", count: 18, detail: "本次同步未返回，但不直接删除" },
-  { label: "长期未更新", count: 34, detail: "超过 12 个月未更新" },
-  { label: "协议需复核", count: 31, detail: "GPL 或未知协议" },
-]
-
 const ITEMS_PER_PAGE = 5
-
-const healthMeta: Record<RepoHealth, { label: string; className: string }> = {
-  active: { label: "活跃", className: "text-status-safe" },
-  watch: { label: "观察", className: "text-status-warning" },
-  stale: { label: "低活跃", className: "text-status-danger" },
-}
 
 /**
  * 根据语言返回对应的 UI 颜色类名
@@ -343,6 +318,46 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
 
 export default function StarExplorer() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+
+  // === 移到组件内部的 i18n 静态数据 ===
+  const classificationSources = useMemo(
+    () => [
+      { label: t("starExplorer.classificationSourceTopic"), count: 512, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
+      { label: t("starExplorer.classificationSourceName"), count: 96, confidence: "0.85", detail: t("starExplorer.classificationSourceNameDetail") },
+      { label: t("starExplorer.classificationSourceDesc"), count: 71, confidence: "0.80", detail: t("starExplorer.classificationSourceDescDetail") },
+      { label: t("starExplorer.classificationSourceManual"), count: 12, confidence: "1.00", detail: t("starExplorer.classificationSourceManualDetail") },
+    ],
+    [t]
+  )
+
+  const exportFormats = useMemo(
+    () => [
+      { label: "CSV", detail: t("starExplorer.exportFormatCsv"), status: t("starExplorer.exportFormatCurrent") },
+      { label: "JSON", detail: t("starExplorer.exportFormatJson"), status: t("starExplorer.exportFormatCurrent") },
+      { label: "Markdown", detail: t("starExplorer.exportFormatMd"), status: t("starExplorer.exportFormatCurrent") },
+      { label: "HTML", detail: t("starExplorer.exportFormatHtml"), status: t("starExplorer.exportFormatLater") },
+    ],
+    [t]
+  )
+
+  const removedStarSignals = useMemo(
+    () => [
+      { label: t("starExplorer.removedSignalUnstar"), count: 18, detail: t("starExplorer.removedSignalUnstarDetail") },
+      { label: t("starExplorer.removedSignalStale"), count: 34, detail: t("starExplorer.removedSignalStaleDetail") },
+      { label: t("starExplorer.removedSignalLicense"), count: 31, detail: t("starExplorer.removedSignalLicenseDetail") },
+    ],
+    [t]
+  )
+
+  const healthMeta: Record<RepoHealth, { label: string; className: string }> = useMemo(
+    () => ({
+      active: { label: t("starExplorer.healthActive"), className: "text-status-safe" },
+      watch: { label: t("starExplorer.healthWatch"), className: "text-status-warning" },
+      stale: { label: t("starExplorer.healthStale"), className: "text-status-danger" },
+    }),
+    [t]
+  )
 
   // === 原有筛选/分页/弹窗状态 ===
   const [searchQuery, setSearchQuery] = useState("")
@@ -382,11 +397,11 @@ export default function StarExplorer() {
         if (repoResult.items.length === 0) {
           setAllRepos(sampleRepos)
           setUsingFallback(true)
-          setAnalysisStatus("API 暂时不可用，已回退到演示数据。")
+          setAnalysisStatus(t("starExplorer.apiUnavailable"))
         } else {
           setAllRepos(repoResult.items.map(adaptApiRepo))
           setUsingFallback(false)
-          setAnalysisStatus(`已加载 ${LOGIN} 的星标仓库分析。`)
+          setAnalysisStatus(t("starExplorer.loadedAnalysis", { login: LOGIN }))
         }
 
         if (statsResult) {
@@ -395,11 +410,11 @@ export default function StarExplorer() {
         setTags(tagsResult)
       } catch (err) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : "加载数据失败"
+        const msg = err instanceof Error ? err.message : t("starExplorer.loadingHint")
         setError(msg)
         setAllRepos(sampleRepos)
         setUsingFallback(true)
-        setAnalysisStatus("网络异常，已回退到演示数据。")
+        setAnalysisStatus(t("starExplorer.networkError"))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -409,7 +424,7 @@ export default function StarExplorer() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   // === 筛选与排序（基于 allRepos）===
   const filteredRepos = useMemo(() => {
@@ -519,14 +534,14 @@ export default function StarExplorer() {
   const handleExport = (format: string) => {
     setExportFormat(format)
     setExportOpen(true)
-    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}。`)
+    setAnalysisStatus(t("starExplorer.prepareExport", { format }))
   }
 
   const handleConfirmExport = async () => {
     const fmtRaw = exportFormat.toLowerCase()
     const supported = ["csv", "json", "markdown"] as const
     if (!supported.includes(fmtRaw as (typeof supported)[number])) {
-      setAnalysisStatus("HTML 格式暂不支持导出，请选择 CSV、JSON 或 Markdown。")
+      setAnalysisStatus(t("starExplorer.htmlNotSupported"))
       setExportOpen(false)
       return
     }
@@ -553,39 +568,39 @@ export default function StarExplorer() {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
-        setAnalysisStatus(`已成功导出 ${exportFormat} 格式文件。`)
+        setAnalysisStatus(t("starExplorer.exportSuccess", { format: exportFormat }))
       } else {
-        setAnalysisStatus("导出失败：服务端未返回数据。")
+        setAnalysisStatus(t("starExplorer.exportFailedNoData"))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "导出失败"
-      setAnalysisStatus(`导出异常：${msg}`)
+      const msg = err instanceof Error ? err.message : t("starExplorer.exportError", { message: "" })
+      setAnalysisStatus(t("starExplorer.exportError", { message: msg }))
     }
     setExportOpen(false)
   }
 
   const handleBatchAnalyze = async () => {
-    setAnalysisStatus("正在触发星标仓库规则分类...")
+    setAnalysisStatus(t("starExplorer.triggeringClassify"))
     try {
       const result = await classifyRepos(LOGIN)
       if (result) {
-        setAnalysisStatus(`分类完成：已处理 ${result.classified} 个仓库，错误 ${result.errors} 个。`)
+        setAnalysisStatus(t("starExplorer.classifyComplete", { classified: result.classified, errors: result.errors }))
       } else {
-        setAnalysisStatus("分类服务暂时不可用。")
+        setAnalysisStatus(t("starExplorer.classifyUnavailable"))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "分类失败"
-      setAnalysisStatus(`分类异常：${msg}`)
+      const msg = err instanceof Error ? err.message : ""
+      setAnalysisStatus(t("starExplorer.classifyError", { message: msg }))
     }
   }
 
   const handleRemoveFilter = (filterKey: string) => {
-    setAnalysisStatus(`已移除筛选条件：${filterKey}。`)
+    setAnalysisStatus(t("starExplorer.filterRemoved", { filter: filterKey }))
   }
 
   const openRepoAnalysis = (fullName: string) => {
     localStorage.setItem("selected-star-repo", fullName)
-    setAnalysisStatus(`已选择 ${fullName}，请进入"单个仓库"页查看深度分析。`)
+    setAnalysisStatus(t("starExplorer.selectedRepo", { repo: fullName }))
     navigate("/analysis")
   }
 
@@ -604,36 +619,76 @@ export default function StarExplorer() {
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
-                指定开发者
+                {t("starExplorer.designatedDev")}
               </Badge>
               <Badge className="font-mono text-xs">@{developerProfile.login}</Badge>
               <Badge variant="secondary" className="font-mono text-xs">
-                {usingFallback ? developerProfile.demoMode : `真实数据：${stats?.repoCount ?? allRepos.length} 条仓库`}
+                {usingFallback ? developerProfile.demoMode : t("starExplorer.realDataCount", { count: stats?.repoCount ?? allRepos.length })}
               </Badge>
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">星标仓库</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">{t("starExplorer.title")}</h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              开发者星标全局分析：围绕指定开发者的全部星标仓库做组合画像、筛选排序、规则分类和风险识别。
+              {t("starExplorer.desc")}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={handleBatchAnalyze}>
               <Sparkles className="h-4 w-4" />
-              更新星标仓库分析
+              {t("starExplorer.updateAnalysis")}
             </Button>
           </div>
         </section>
 
         {/* 指标卡片区 */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Star} label="星标仓库概览" value={String(stats?.repoCount ?? developerProfile.totalStars)} detail={usingFallback ? "本地演示数据总量" : "API 返回仓库总数"} />
-          <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
-          <MetricCard icon={Tags} label="自动标签覆盖" value={tagCoveragePercent} detail={`${tags.length} 个分类 / ${stats?.repoCount ?? allRepos.length} 个仓库`} />
-          <MetricCard icon={Flame} label="隐藏宝石" value={String(hiddenGemsCount)} detail="≤1000 星但近期有更新" />
-          <MetricCard icon={AlertTriangle} label="沉睡星标" value={String(sleepStarsCount)} detail="超过 90 天未更新" />
-          <MetricCard icon={Activity} label="活跃仓库" value={String(stats?.activeRepoCount ?? 512)} detail="最近 90 天有更新" />
-          <MetricCard icon={LineChart} label="已取消星标" value={usingFallback ? "18" : "0"} detail={usingFallback ? "疑似取消星标但不删除" : "需 API 同步后计算"} />
-          <MetricCard icon={AlertTriangle} label="协议风险" value={String(licenseRiskCount)} detail="GPL 或未知协议需复核" />
+          <MetricCard
+            icon={Star}
+            label={t("starExplorer.starCount")}
+            value={String(stats?.repoCount ?? developerProfile.totalStars)}
+            detail={usingFallback ? t("starExplorer.starCountDetail") : t("starExplorer.starCountDetailApi")}
+          />
+          <MetricCard
+            icon={Activity}
+            label={t("starExplorer.lastSync")}
+            value={developerProfile.syncedAt}
+            detail={t("starExplorer.lastSyncDetail")}
+          />
+          <MetricCard
+            icon={Tags}
+            label={t("starExplorer.tagCoverage")}
+            value={tagCoveragePercent}
+            detail={t("starExplorer.tagCoverageDetailCount", { count: tags.length, total: stats?.repoCount ?? allRepos.length })}
+          />
+          <MetricCard
+            icon={Flame}
+            label={t("starExplorer.hiddenGems")}
+            value={String(hiddenGemsCount)}
+            detail={t("starExplorer.hiddenGemsDetail")}
+          />
+          <MetricCard
+            icon={AlertTriangle}
+            label={t("starExplorer.sleepingStars")}
+            value={String(sleepStarsCount)}
+            detail={t("starExplorer.sleepingStarsDetail")}
+          />
+          <MetricCard
+            icon={Activity}
+            label={t("starExplorer.activeRepos")}
+            value={String(stats?.activeRepoCount ?? 512)}
+            detail={t("starExplorer.activeReposDetail")}
+          />
+          <MetricCard
+            icon={LineChart}
+            label={t("starExplorer.removedStars")}
+            value={usingFallback ? "18" : "0"}
+            detail={usingFallback ? t("starExplorer.removedStarsDetail") : t("starExplorer.removedStarsDetailApi")}
+          />
+          <MetricCard
+            icon={AlertTriangle}
+            label={t("starExplorer.licenseRisk")}
+            value={String(licenseRiskCount)}
+            detail={t("starExplorer.licenseRiskDetail")}
+          />
         </section>
 
         {/* 语言分布 + 主题聚类 */}
@@ -642,9 +697,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Radar className="h-5 w-5 text-primary" />
-                语言分布
+                {t("starExplorer.languageDist")}
               </CardTitle>
-              <CardDescription>用于判断开发者长期技术关注方向</CardDescription>
+              <CardDescription>{t("starExplorer.languageDistDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {languageStats.map((item) => (
@@ -665,9 +720,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Layers3 className="h-5 w-5 text-primary" />
-                主题聚类
+                {t("starExplorer.topicClusters")}
               </CardTitle>
-              <CardDescription>把星标仓库从散列表整理成兴趣地图</CardDescription>
+              <CardDescription>{t("starExplorer.topicClustersDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {topicClusters.map((cluster) => (
@@ -695,9 +750,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Tags className="h-5 w-5 text-primary" />
-                规则分类覆盖
+                {t("starExplorer.classificationCov")}
               </CardTitle>
-              <CardDescription>对应设计文档中的主题、仓库名称、仓库描述分类策略</CardDescription>
+              <CardDescription>{t("starExplorer.classificationCovDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {classificationSources.map((source) => (
@@ -706,7 +761,7 @@ export default function StarExplorer() {
                     <span className="text-sm font-semibold text-on-surface">{source.label}</span>
                     <Badge variant="secondary" className="font-mono text-xs">{source.count}</Badge>
                   </div>
-                  <div className="mb-2 text-xs text-muted-foreground">置信度 {source.confidence}</div>
+                  <div className="mb-2 text-xs text-muted-foreground">{t("starExplorer.classificationConfidence", { confidence: source.confidence })}</div>
                   <p className="text-xs leading-5 text-muted-foreground">{source.detail}</p>
                 </div>
               ))}
@@ -717,9 +772,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Clock className="h-5 w-5 text-primary" />
-                兴趣时间线
+                {t("starExplorer.timeline")}
               </CardTitle>
-              <CardDescription>按 starred_at 聚合开发者关注变化</CardDescription>
+              <CardDescription>{t("starExplorer.timelineDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {starTimeline.map((item) => (
@@ -741,13 +796,13 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Tags className="h-5 w-5 text-primary" />
-                标签云
+                {t("tagCloud.title")}
                 {!usingFallback && tags.length > 0 && (
-                  <Badge variant="secondary" className="font-mono text-xs ml-2">{tags.length} 个分类</Badge>
+                  <Badge variant="secondary" className="font-mono text-xs ml-2">{t("tagCloud.badge", { count: tags.length })}</Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                基于 Topic 精确匹配 + 仓库名称/描述模糊匹配生成的规则标签，字号越大表示命中仓库越多
+                {t("tagCloud.desc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -776,7 +831,7 @@ export default function StarExplorer() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {usingFallback ? "演示模式下无标签数据，请连接后端 API 后触发分类。" : "暂无标签数据，请先点击"更新星标仓库分析"触发规则分类。"}
+                  {usingFallback ? t("tagCloud.noDataFallback") : t("tagCloud.noData")}
                 </p>
               )}
             </CardContent>
@@ -789,9 +844,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-5 w-5 text-primary" />
-                协议分布
+                {t("starExplorer.licenseDist")}
               </CardTitle>
-              <CardDescription>只做工程提醒，不作为法律意见</CardDescription>
+              <CardDescription>{t("starExplorer.licenseDistDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {licenseStats.map((item) => (
@@ -807,9 +862,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Download className="h-5 w-5 text-primary" />
-                导出一致性
+                {t("starExplorer.exportConsistency")}
               </CardTitle>
-              <CardDescription>导出内容应与当前筛选结果一致</CardDescription>
+              <CardDescription>{t("starExplorer.exportConsistencyDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3">
               {exportFormats.map((format) => (
@@ -826,9 +881,9 @@ export default function StarExplorer() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-primary" />
-                已取消星标
+                {t("starExplorer.removedStarSignals")}
               </CardTitle>
-              <CardDescription>增量同步不直接删除已取消星标的记录</CardDescription>
+              <CardDescription>{t("starExplorer.removedStarSignalsDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {removedStarSignals.map((signal) => (
@@ -847,12 +902,12 @@ export default function StarExplorer() {
         {/* 仓库列表头部 */}
         <section className="flex flex-col gap-3 border-t border-outline-variant/50 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-on-surface">全部星标仓库列表</h2>
-            <p className="mt-1 text-sm text-muted-foreground">浏览、筛选和排序当前开发者的全部星标仓库。</p>
+            <h2 className="text-xl font-semibold tracking-tight text-on-surface">{t("starExplorer.allRepos")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("starExplorer.allReposDesc")}</p>
           </div>
           <Button className="gap-2" onClick={() => handleExport("Markdown")}>
             <Download className="h-4 w-4" />
-            导出报告
+            {t("starExplorer.exportReport")}
           </Button>
         </section>
 
@@ -863,7 +918,7 @@ export default function StarExplorer() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="搜索仓库、描述、topic 或自动标签..."
+                  placeholder={t("starExplorer.searchPlaceholder")}
                   className="pl-9"
                   value={searchQuery}
                   onChange={(event) => {
@@ -874,34 +929,34 @@ export default function StarExplorer() {
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:w-[620px]">
                 <Select value={selectedLanguage} onChange={(event) => setSelectedLanguage(event.target.value)}>
-                  <SelectOption value="">语言</SelectOption>
+                  <SelectOption value="">{t("starExplorer.language")}</SelectOption>
                   <SelectOption value="python">Python</SelectOption>
                   <SelectOption value="typescript">TypeScript</SelectOption>
                   <SelectOption value="rust">Rust</SelectOption>
                 </Select>
                 <Select value={selectedTopic} onChange={(event) => setSelectedTopic(event.target.value)}>
-                  <SelectOption value="">主题</SelectOption>
+                  <SelectOption value="">{t("starExplorer.topic")}</SelectOption>
                   <SelectOption value="ai">AI</SelectOption>
                   <SelectOption value="mcp">MCP</SelectOption>
                   <SelectOption value="rag">RAG</SelectOption>
                 </Select>
                 <Select value={selectedLicense} onChange={(event) => setSelectedLicense(event.target.value)}>
-                  <SelectOption value="">协议</SelectOption>
+                  <SelectOption value="">{t("starExplorer.license")}</SelectOption>
                   <SelectOption value="mit">MIT</SelectOption>
                   <SelectOption value="apache">Apache-2.0</SelectOption>
                   <SelectOption value="gpl">GPL-3.0</SelectOption>
                 </Select>
                 <Select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
-                  <SelectOption value="starred_at">排序：标星时间</SelectOption>
-                  <SelectOption value="stars">排序：星数</SelectOption>
-                  <SelectOption value="forks">排序：分叉数</SelectOption>
-                  <SelectOption value="updated_at">排序：更新时间</SelectOption>
+                  <SelectOption value="starred_at">{t("starExplorer.sortByStarredAt")}</SelectOption>
+                  <SelectOption value="stars">{t("starExplorer.sortByStars")}</SelectOption>
+                  <SelectOption value="forks">{t("starExplorer.sortByForks")}</SelectOption>
+                  <SelectOption value="updated_at">{t("starExplorer.sortByUpdatedAt")}</SelectOption>
                 </Select>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">已筛选:</span>
+              <span className="text-xs text-muted-foreground">{t("starExplorer.filtered")}</span>
               {visibleFilters.map((filter) => (
                 <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 font-mono text-xs">
                   {filter.label}
@@ -923,11 +978,11 @@ export default function StarExplorer() {
                 }}
               >
                 <Filter className="h-3 w-3" />
-                清除全部
+                {t("starExplorer.clearAll")}
               </Button>
               <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs text-muted-foreground">
                 <ArrowDownUp className="h-3 w-3" />
-                排序
+                {t("starExplorer.sort")}
               </Button>
             </div>
           </CardContent>
@@ -938,8 +993,8 @@ export default function StarExplorer() {
           <Card>
             <CardContent className="p-10 text-center">
               <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              <h3 className="text-base font-semibold text-on-surface">正在加载星标仓库...</h3>
-              <p className="mt-1 text-sm text-muted-foreground">首次同步可能耗时较长，请耐心等待。</p>
+              <h3 className="text-base font-semibold text-on-surface">{t("starExplorer.loadingTitle")}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t("starExplorer.loadingHint")}</p>
             </CardContent>
           </Card>
         )}
@@ -951,21 +1006,21 @@ export default function StarExplorer() {
               {filteredRepos.length === 0 ? (
                 <div className="p-10 text-center">
                   <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                  <h3 className="text-base font-semibold text-on-surface">无搜索结果</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">调整关键词、语言、主题或协议筛选后再试。</p>
+                  <h3 className="text-base font-semibold text-on-surface">{t("starExplorer.noResults")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("starExplorer.noResultsHint")}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[280px]">仓库</TableHead>
-                      <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
-                      <TableHead className="text-right">分数</TableHead>
-                      <TableHead className="hidden sm:table-cell">语言</TableHead>
-                      <TableHead className="hidden lg:table-cell">协议</TableHead>
-                      <TableHead className="hidden xl:table-cell">最近更新</TableHead>
-                      <TableHead className="hidden xl:table-cell">自动标签</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+                      <TableHead className="w-[280px]">{t("starExplorer.repo")}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t("starExplorer.category")}</TableHead>
+                      <TableHead className="text-right">{t("starExplorer.score")}</TableHead>
+                      <TableHead className="hidden sm:table-cell">{t("starExplorer.languageCol")}</TableHead>
+                      <TableHead className="hidden lg:table-cell">{t("starExplorer.licenseCol")}</TableHead>
+                      <TableHead className="hidden xl:table-cell">{t("starExplorer.lastUpdate")}</TableHead>
+                      <TableHead className="hidden xl:table-cell">{t("starExplorer.autoTags")}</TableHead>
+                      <TableHead className="text-right">{t("starExplorer.action")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1012,7 +1067,7 @@ export default function StarExplorer() {
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
                             <LineChart className="h-4 w-4" />
-                            查看单个仓库
+                            {t("starExplorer.viewRepo")}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -1028,9 +1083,9 @@ export default function StarExplorer() {
         <Card className={`border-status-warning/40 bg-surface-container-low ${error ? "border-status-danger/40" : ""}`}>
           <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
-              {error ? `错误：${error}` : usingFallback ? "当前展示的是演示数据，真实 API 连接失败。" : "数据已同步，GitHub API 限流或网络失败时会自动降级。"}
+              {error ? `${t("starExplorer.errorPrefix")}${error}` : usingFallback ? t("starExplorer.fallbackNotice") : t("starExplorer.syncedNotice")}
             </span>
-            <Badge variant="outline" className="w-fit">{error ? "错误状态" : usingFallback ? "演示模式" : "已连接"}</Badge>
+            <Badge variant="outline" className="w-fit">{error ? t("starExplorer.demoErrorStatus") : usingFallback ? t("starExplorer.demoMode") : t("starExplorer.connected")}</Badge>
           </CardContent>
         </Card>
 
@@ -1042,7 +1097,7 @@ export default function StarExplorer() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm text-muted-foreground">
-              第 <span className="font-mono text-on-surface">{currentPage}</span> / {totalPages} 页
+              {t("starExplorer.pageInfo", { current: currentPage, total: totalPages })}
             </span>
             <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
               <ChevronRight className="h-4 w-4" />
@@ -1055,12 +1110,12 @@ export default function StarExplorer() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
             <Card className="w-full max-w-lg">
               <CardHeader>
-                <CardTitle>导出预览</CardTitle>
-                <CardDescription>导出格式：{exportFormat}，内容与当前筛选结果一致。</CardDescription>
+                <CardTitle>{t("starExplorer.exportPreview")}</CardTitle>
+                <CardDescription>{t("starExplorer.exportConsistentHint", { format: exportFormat })}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3 text-sm text-muted-foreground">
-                  当前将导出 {filteredRepos.length} 个仓库，排序方式为 {sortKey}。
+                  {t("starExplorer.exportReposCount", { count: filteredRepos.length, sort: sortKey })}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {["CSV", "JSON", "Markdown", "HTML"].map((format) => (
@@ -1070,8 +1125,8 @@ export default function StarExplorer() {
                   ))}
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setExportOpen(false)}>取消</Button>
-                  <Button onClick={handleConfirmExport}>确认导出</Button>
+                  <Button variant="outline" onClick={() => setExportOpen(false)}>{t("starExplorer.cancel")}</Button>
+                  <Button onClick={handleConfirmExport}>{t("starExplorer.confirmExport")}</Button>
                 </div>
               </CardContent>
             </Card>

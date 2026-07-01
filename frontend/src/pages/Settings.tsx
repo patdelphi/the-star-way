@@ -3,7 +3,7 @@
  * 设置页 - 后端连接、数据库、导出目录等配置信息
  */
 import { useEffect, useState } from "react"
-import { useTranslation } from "react-i18next"
+import { useTranslation, Trans } from "react-i18next"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,14 +39,14 @@ export default function Settings() {
         const data = await res.json()
         const users = data.data || []
         setBackendStatus("online")
-        setBackendInfo(`在线，${users.length} 个用户`)
+        setBackendInfo(t("settings.onlineUsers", { count: users.length }))
       } else {
         setBackendStatus("offline")
         setBackendInfo(`HTTP ${res.status}`)
       }
     } catch {
       setBackendStatus("offline")
-      setBackendInfo("无法连接")
+      setBackendInfo(t("settings.offline"))
     }
   }
 
@@ -66,7 +66,7 @@ export default function Settings() {
             {t("nav.settings")}
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            应用配置、后端连接状态和数据源管理
+            {t("settings.subtitle")}
           </p>
         </div>
       </section>
@@ -78,17 +78,17 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Server className="h-5 w-5 text-primary" />
-              后端 API
+              {t("settings.backendApi")}
             </CardTitle>
-            <CardDescription>本地 API 服务连接状态</CardDescription>
+            <CardDescription>{t("settings.backendApiDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">地址</span>
+              <span className="text-sm text-muted-foreground">{t("settings.address")}</span>
               <code className="text-xs font-mono bg-surface-container-high px-2 py-0.5 rounded">{API_BASE}</code>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">状态</span>
+              <span className="text-sm text-muted-foreground">{t("settings.status")}</span>
               <div className="flex items-center gap-2">
                 {backendStatus === "online" ? (
                   <CheckCircle2 className="h-4 w-4 text-status-safe" />
@@ -98,19 +98,19 @@ export default function Settings() {
                   <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
                 <span className="text-sm">
-                  {backendStatus === "online" ? "已连接" : backendStatus === "offline" ? "未连接" : "检测中"}
+                  {backendStatus === "online" ? t("settings.online") : backendStatus === "offline" ? t("settings.offline") : t("settings.checking")}
                 </span>
               </div>
             </div>
             {backendInfo && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">信息</span>
+                <span className="text-sm text-muted-foreground">{t("settings.info")}</span>
                 <span className="text-xs text-muted-foreground">{backendInfo}</span>
               </div>
             )}
             <Button variant="outline" size="sm" className="w-full gap-2" onClick={checkBackend}>
               <RefreshCw className="h-4 w-4" />
-              重新检测
+              {t("settings.reCheck")}
             </Button>
           </CardContent>
         </Card>
@@ -120,21 +120,21 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Database className="h-5 w-5 text-primary" />
-              数据库
+              {t("settings.database")}
             </CardTitle>
-            <CardDescription>SQLite 本地存储</CardDescription>
+            <CardDescription>{t("settings.databaseDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">类型</span>
+              <span className="text-sm text-muted-foreground">{t("settings.dbType")}</span>
               <Badge variant="outline" className="font-mono text-xs">SQLite (WAL)</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">位置</span>
+              <span className="text-sm text-muted-foreground">{t("settings.dbLocation")}</span>
               <span className="text-xs text-muted-foreground truncate max-w-[180px]">backend/data/starway.db</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">模式</span>
+              <span className="text-sm text-muted-foreground">{t("settings.dbMode")}</span>
               <Badge variant="secondary" className="font-mono text-xs">Demo 数据（691 条）</Badge>
             </div>
           </CardContent>
@@ -145,15 +145,15 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Key className="h-5 w-5 text-primary" />
-              GitHub Token
+              {t("settings.githubToken")}
             </CardTitle>
-            <CardDescription>Personal Access Token 用于同步更多仓库</CardDescription>
+            <CardDescription>{t("settings.githubTokenDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">状态</span>
+              <span className="text-sm text-muted-foreground">{t("settings.status")}</span>
               <Badge variant={token ? "default" : "outline"} className="font-mono text-xs">
-                {token ? "已配置" : "未配置"}
+                {token ? t("settings.tokenConfigured") : t("settings.tokenNotConfigured")}
               </Badge>
             </div>
             <div className="relative">
@@ -177,21 +177,27 @@ export default function Settings() {
                 variant="default"
                 size="sm"
                 className="flex-1"
-                onClick={() => { setGitHubToken(token); setBackendInfo("Token 已保存") }}
+                onClick={() => { setGitHubToken(token); setBackendInfo(t("settings.tokenSaved")) }}
               >
-                保存
+                {t("settings.save")}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={() => { clearGitHubToken(); setToken(""); setBackendInfo("Token 已清除") }}
+                onClick={() => { clearGitHubToken(); setToken(""); setBackendInfo(t("settings.tokenCleared")) }}
               >
-                清除
+                {t("settings.clear")}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              在 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitHub Settings → Developer settings → Personal access tokens</a> 创建， scopes 勾选 <code>public_repo</code> 即可
+              <Trans
+                i18nKey="settings.tokenHint"
+                components={{
+                  a: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />,
+                  code: <code />,
+                }}
+              />
             </p>
           </CardContent>
         </Card>
@@ -201,13 +207,13 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <FolderOpen className="h-5 w-5 text-primary" />
-              导出
+              {t("settings.export")}
             </CardTitle>
-            <CardDescription>支持的导出格式</CardDescription>
+            <CardDescription>{t("settings.exportDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">格式</span>
+              <span className="text-sm text-muted-foreground">{t("settings.exportFormats")}</span>
               <div className="flex gap-1.5">
                 <Badge variant="outline" className="text-[10px]">CSV</Badge>
                 <Badge variant="outline" className="text-[10px]">JSON</Badge>
@@ -215,7 +221,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">编码</span>
+              <span className="text-sm text-muted-foreground">{t("settings.encoding")}</span>
               <span className="text-xs text-muted-foreground">UTF-8 BOM</span>
             </div>
           </CardContent>
@@ -226,21 +232,21 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <RefreshCw className="h-5 w-5 text-primary" />
-              AI 增强
+              {t("settings.aiEnhance")}
             </CardTitle>
-            <CardDescription>智能分析功能（V0.2）</CardDescription>
+            <CardDescription>{t("settings.aiEnhanceDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">状态</span>
-              <Badge variant="outline" className="text-xs">框架已就绪</Badge>
+              <span className="text-sm text-muted-foreground">{t("settings.status")}</span>
+              <Badge variant="outline" className="text-xs">{t("settings.aiReady")}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Provider</span>
+              <span className="text-sm text-muted-foreground">{t("settings.aiProvider")}</span>
               <span className="text-xs text-muted-foreground">OpenAI-compatible / Ollama</span>
             </div>
             <p className="text-xs text-muted-foreground pt-1">
-              需配置 API Key 和 Base URL 后启用翻译和分析功能
+              {t("settings.aiHint")}
             </p>
           </CardContent>
         </Card>

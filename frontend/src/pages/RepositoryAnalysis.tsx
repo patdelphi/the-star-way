@@ -4,6 +4,7 @@
  * 通过 getRepos / getStats / getTags 获取数据；API 不可用时自动回退到内置 Demo 数据。
  */
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
   Activity,
@@ -188,59 +189,70 @@ function formatStars(n: number): string {
   return String(n)
 }
 
-/** 从 ISO 日期字符串提取 YYYY-MM-DD */
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "未知"
-  return dateStr.split("T")[0]
-}
-
-/** 为仅有 API 数据、没有 Demo 分析数据的仓库生成默认分析结构 */
-function buildDefaultAnalysis(repo: Repo & { tags: string[] }): RepoAnalysis {
-  return {
-    fullName: repo.full_name,
-    description: repo.description ?? "暂无描述",
-    language: repo.language ?? "Unknown",
-    stars: formatStars(repo.stars),
-    forks: String(repo.forks),
-    updatedAt: formatDate(repo.pushed_at),
-    license: repo.license ?? "未知",
-    category: "未分类",
-    summary: `【${repo.full_name}】暂无深度分析摘要。`,
-    stack: repo.language ? [repo.language] : [],
-    tags: repo.tags.length > 0 ? repo.tags : [],
-    maintainSignals: [
-      { label: "最近更新", value: formatDate(repo.pushed_at), tone: "safe" },
-      { label: "Issue 压力", value: repo.open_issues > 50 ? "偏高" : "中等", tone: repo.open_issues > 50 ? "warning" : "safe" },
-      { label: "社区热度", value: "未知", tone: "warning" },
-      { label: "接口稳定性", value: "未知", tone: "warning" },
-    ],
-    scores: [
-      { label: "学习价值", value: 50 },
-      { label: "复用价值", value: 50 },
-      { label: "维护活跃", value: 50 },
-      { label: "集成难度", value: 50 },
-    ],
-    risks: [
-      {
-        label: "协议风险",
-        detail: repo.license ? `${repo.license}，请自行评估。` : "协议未知，请谨慎使用。",
-        tone: repo.license ? "safe" : "warning",
-      },
-    ],
-    similar: [],
-  }
-}
-
 /* ========== 主组件 ========== */
 export default function RepositoryAnalysis() {
+  const { t } = useTranslation()
   const [selectedRepo, setSelectedRepo] = useState(repoAnalyses[0].fullName)
-  const [status, setStatus] = useState("正在初始化...")
+  const [status, setStatus] = useState(t("repoAnalysis.initializing"))
   const [loading, setLoading] = useState(true)
 
   // API 返回的真实数据
   const [apiRepos, setApiRepos] = useState<(Repo & { starred_at: string; tags: string[] })[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [allTags, setAllTags] = useState<{ tag: string; count: number }[]>([])
+
+  /** 从 ISO 日期字符串提取 YYYY-MM-DD */
+  const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return t("repoAnalysis.unknown")
+    return dateStr.split("T")[0]
+  }
+
+  /** 为仅有 API 数据、没有 Demo 分析数据的仓库生成默认分析结构 */
+  const buildDefaultAnalysis = (repo: Repo & { tags: string[] }): RepoAnalysis => {
+    return {
+      fullName: repo.full_name,
+      description: repo.description ?? t("repoAnalysis.noDesc"),
+      language: repo.language ?? t("repoAnalysis.unknown"),
+      stars: formatStars(repo.stars),
+      forks: String(repo.forks),
+      updatedAt: formatDate(repo.pushed_at),
+      license: repo.license ?? t("repoAnalysis.unknown"),
+      category: t("repoAnalysis.unknown"),
+      summary: t("repoAnalysis.noDeepSummary", { name: repo.full_name }),
+      stack: repo.language ? [repo.language] : [],
+      tags: repo.tags.length > 0 ? repo.tags : [],
+      maintainSignals: [
+        { label: t("repoAnalysis.signalLastUpdate"), value: formatDate(repo.pushed_at), tone: "safe" },
+        { label: t("repoAnalysis.signalIssuePressure"), value: repo.open_issues > 50 ? "偏高" : "中等", tone: repo.open_issues > 50 ? "warning" : "safe" },
+        { label: t("repoAnalysis.signalCommunityHeat"), value: t("repoAnalysis.unknown"), tone: "warning" },
+        { label: t("repoAnalysis.signalApiStability"), value: t("repoAnalysis.unknown"), tone: "warning" },
+      ],
+      scores: [
+        { label: t("repoAnalysis.learningValue"), value: 50 },
+        { label: t("repoAnalysis.reuseValue"), value: 50 },
+        { label: t("repoAnalysis.maintainActive"), value: 50 },
+        { label: t("repoAnalysis.integrationDifficulty"), value: 50 },
+      ],
+      risks: [
+        {
+          label: t("repoAnalysis.licenseRisk"),
+          detail: repo.license ? `${repo.license}，${t("repoAnalysis.unknown")}。` : t("repoAnalysis.unknown"),
+          tone: repo.license ? "safe" : "warning",
+        },
+      ],
+      similar: [],
+    }
+  }
+
+  /** 组装状态栏文本 */
+  const buildStatusText = (repoCount: number, tagCount: number, stats: UserStats | null): string => {
+    const parts: string[] = []
+    if (repoCount > 0) parts.push(t("repoAnalysis.loadedRepos", { count: repoCount }))
+    if (tagCount > 0) parts.push(t("repoAnalysis.tagCount", { count: tagCount }))
+    if (stats) parts.push(t("repoAnalysis.repoStats", { total: stats.repoCount, active: stats.activeRepoCount }))
+    if (parts.length === 0) return t("repoAnalysis.noApiData")
+    return parts.join("，") + "。"
+  }
 
   /** 初始化：并行加载仓库列表、统计和标签 */
   useEffect(() => {
@@ -267,7 +279,7 @@ export default function RepositoryAnalysis() {
           const existsInDemo = repoAnalyses.some((r) => r.fullName === storedRepo)
           if (existsInApi || existsInDemo) {
             setSelectedRepo(storedRepo)
-            setStatus(`已从星标仓库列表带入 ${storedRepo}。`)
+            setStatus(t("repoAnalysis.importedFromStarred", { repo: storedRepo }))
           } else {
             setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
           }
@@ -276,7 +288,7 @@ export default function RepositoryAnalysis() {
         }
       } catch (err) {
         if (cancelled) return
-        setStatus("API 不可用，已回退到 Demo 数据。")
+        setStatus(t("repoAnalysis.apiUnavailable"))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -286,17 +298,7 @@ export default function RepositoryAnalysis() {
     return () => {
       cancelled = true
     }
-  }, [])
-
-  /** 组装状态栏文本 */
-  function buildStatusText(repoCount: number, tagCount: number, stats: UserStats | null): string {
-    const parts: string[] = []
-    if (repoCount > 0) parts.push(`已加载 ${repoCount} 个仓库`)
-    if (tagCount > 0) parts.push(`${tagCount} 个标签`)
-    if (stats) parts.push(`共 ${stats.repoCount} 个仓库（${stats.activeRepoCount} 个活跃）`)
-    if (parts.length === 0) return "暂无 API 数据，展示 Demo 数据。"
-    return parts.join("，") + "。"
-  }
+  }, [t])
 
   /** 下拉选择器的数据源：优先 API，回退 Demo */
   const selectorOptions = useMemo(() => {
@@ -340,7 +342,7 @@ export default function RepositoryAnalysis() {
 
   /** 重新分析按钮 */
   const runMockAnalysis = () => {
-    setStatus(`已重新生成 ${activeRepo.fullName} 的分析卡片。`)
+    setStatus(t("repoAnalysis.importedFromStarred", { repo: activeRepo.fullName }))
   }
 
   return (
@@ -351,27 +353,27 @@ export default function RepositoryAnalysis() {
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
-                仓库智能分析
+                {t("repoAnalysis.badge")}
               </Badge>
               <Badge variant="secondary" className="font-mono text-xs">
                 {apiRepos.length > 0 ? "API 数据" : "静态演示"}
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-              单个仓库
+              {t("repoAnalysis.title")}
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              面向单个星标项目的分析工作台，补齐 README 摘要、技术栈解析、维护信号、协议风险、学习价值和相似项目推荐。
+              {t("repoAnalysis.desc")}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={runMockAnalysis} disabled={loading}>
               <LineChart className="h-4 w-4" />
-              重新分析
+              {t("repoAnalysis.reAnalyze")}
             </Button>
             <Button className="gap-2" disabled={loading}>
               <ExternalLink className="h-4 w-4" />
-              打开 GitHub
+              {t("repoAnalysis.openGithub")}
             </Button>
           </div>
         </section>
@@ -381,7 +383,7 @@ export default function RepositoryAnalysis() {
           <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="搜索或选择一个仓库进行分析" disabled={loading} />
+              <Input className="pl-9" placeholder={t("repoAnalysis.searchPlaceholder")} disabled={loading} />
             </div>
             <div className="w-full lg:w-80">
               <Select value={selectedRepo} onChange={(event) => setSelectedRepo(event.target.value)} disabled={loading}>
@@ -395,13 +397,13 @@ export default function RepositoryAnalysis() {
             <Button variant="outline" size="sm" className="gap-2" asChild>
               <Link to={`/repo/${activeRepo.fullName}`}>
                 <ExternalLink className="h-4 w-4" />
-                查看详情
+                {t("repoAnalysis.viewDetail")}
               </Link>
             </Button>
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                加载中...
+                {t("repoAnalysis.loading")}
               </div>
             )}
           </CardContent>
@@ -448,10 +450,10 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Tags className="h-5 w-5 text-primary" />
-                自动标签
+                {t("repoAnalysis.autoTags")}
                 {allTags.length > 0 && (
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    (全局 {allTags.length} 个)
+                    ({t("repoAnalysis.globalTagCount", { count: allTags.length })})
                   </span>
                 )}
               </CardTitle>
@@ -464,7 +466,7 @@ export default function RepositoryAnalysis() {
                   </Badge>
                 ))
               ) : (
-                <span className="text-sm text-muted-foreground">暂无标签</span>
+                <span className="text-sm text-muted-foreground">{t("repoAnalysis.noTags")}</span>
               )}
             </CardContent>
           </Card>
@@ -474,7 +476,7 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Activity className="h-5 w-5 text-primary" />
-                维护信号
+                {t("repoAnalysis.maintainSignals")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -494,20 +496,20 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <BookOpenText className="h-5 w-5 text-primary" />
-                README 摘要
+                {t("repoAnalysis.readmeSummary")}
               </CardTitle>
               <CardDescription>
                 {userStats
-                  ? `用户共 ${userStats.repoCount} 个仓库（${userStats.activeRepoCount} 个活跃）`
-                  : "模拟 README 与描述字段生成的项目理解卡片"}
+                  ? t("repoAnalysis.repoStats", { total: userStats.repoCount, active: userStats.activeRepoCount })
+                  : t("repoAnalysis.readmeSummaryDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <p className="text-sm leading-7 text-on-surface-variant">{activeRepo.summary}</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <MiniFact icon={FileText} label="适合场景" value={activeRepo.category} />
-                <MiniFact icon={Layers3} label="主语言" value={activeRepo.language} />
-                <MiniFact icon={CheckCircle2} label="演示结论" value="值得继续追踪" />
+                <MiniFact icon={FileText} label={t("repoAnalysis.suitableFor")} value={activeRepo.category} />
+                <MiniFact icon={Layers3} label={t("repoAnalysis.mainLang")} value={activeRepo.language} />
+                <MiniFact icon={CheckCircle2} label={t("repoAnalysis.conclusion")} value={t("repoAnalysis.conclusionValue")} />
               </div>
             </CardContent>
           </Card>
@@ -516,9 +518,9 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Code2 className="h-5 w-5 text-primary" />
-                技术栈解析
+                {t("repoAnalysis.techStack")}
               </CardTitle>
-              <CardDescription>用于后续学习路线和复用建议的基础维度</CardDescription>
+              <CardDescription>{t("repoAnalysis.techStackDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {activeRepo.stack.length > 0 ? (
@@ -526,12 +528,12 @@ export default function RepositoryAnalysis() {
                   <div key={item} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
                     <span className="text-sm font-medium text-on-surface">{item}</span>
                     <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
-                      已识别
+                      {t("repoAnalysis.identified")}
                     </Badge>
                   </div>
                 ))
               ) : (
-                <span className="text-sm text-muted-foreground">暂无技术栈数据</span>
+                <span className="text-sm text-muted-foreground">{t("repoAnalysis.noStack")}</span>
               )}
             </CardContent>
           </Card>
@@ -543,12 +545,12 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-primary" />
-                活跃度分析
+                {t("repoAnalysis.activityAnalysis")}
               </CardTitle>
               <CardDescription>
                 {userStats?.languages && userStats.languages.length > 0
-                  ? `语言分布：${userStats.languages.map((l) => `${l.language}(${l.count})`).join("、")}`
-                  : "静态评分用于呈现未来分析结果的版式"}
+                  ? `${t("repoAnalysis.languageDistTitle")}：${userStats.languages.map((l) => `${l.language}(${l.count})`).join("、")}`
+                  : t("repoAnalysis.activityAnalysisDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -570,9 +572,9 @@ export default function RepositoryAnalysis() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <ShieldAlert className="h-5 w-5 text-primary" />
-                协议风险
+                {t("repoAnalysis.licenseRisk")}
               </CardTitle>
-              <CardDescription>只做工程提醒，不作为法律意见</CardDescription>
+              <CardDescription>{t("repoAnalysis.licenseRiskDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {activeRepo.risks.map((risk) => (
@@ -598,9 +600,9 @@ export default function RepositoryAnalysis() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Network className="h-5 w-5 text-primary" />
-              相似项目
+              {t("repoAnalysis.similarRepos")}
             </CardTitle>
-            <CardDescription>用于后续横向比较、替代方案和学习路径生成</CardDescription>
+            <CardDescription>{t("repoAnalysis.similarReposDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {activeRepo.similar.length > 0 ? (
@@ -616,7 +618,7 @@ export default function RepositoryAnalysis() {
                 </div>
               ))
             ) : (
-              <div className="col-span-3 text-sm text-muted-foreground">暂无相似项目推荐</div>
+              <div className="col-span-3 text-sm text-muted-foreground">{t("repoAnalysis.noSimilar")}</div>
             )}
           </CardContent>
         </Card>

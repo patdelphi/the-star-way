@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { useParams } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -99,21 +100,9 @@ function formatCount(num: number): string {
   return String(num)
 }
 
-/** 格式化时间差：显示为 "X 天前" */
-function formatTimeAgo(dateStr: string | null): string {
-  if (!dateStr) return "未知时间"
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays <= 0) return "今天"
-  if (diffDays === 1) return "昨天"
-  if (diffDays < 30) return `${diffDays} 天前`
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} 个月前`
-  return `${Math.floor(diffDays / 365)} 年前`
-}
-
 const RepoDetail: React.FC = () => {
+  const { t } = useTranslation()
+
   // 从路由参数中获取仓库 owner 和 name
   const { owner, name } = useParams<{ owner: string; name: string }>()
 
@@ -121,6 +110,20 @@ const RepoDetail: React.FC = () => {
   const [repoData, setRepoData] = useState<RepoDetailData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  /** 格式化时间差：显示为 "X 天前" */
+  const formatTimeAgo = (dateStr: string | null): string => {
+    if (!dateStr) return t("repoDetail.unknownTime")
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays <= 0) return t("repoDetail.today")
+    if (diffDays === 1) return t("repoDetail.yesterday")
+    if (diffDays < 30) return t("repoDetail.daysAgo", { count: diffDays })
+    if (diffDays < 365) return t("repoDetail.monthsAgo", { count: Math.floor(diffDays / 30) })
+    return t("repoDetail.yearsAgo", { count: Math.floor(diffDays / 365) })
+  }
 
   /** 复制克隆地址到剪贴板 */
   const handleCopyClone = () => {
@@ -130,7 +133,7 @@ const RepoDetail: React.FC = () => {
     navigator.clipboard.writeText(cloneUrl)
       .then(() => {
         // eslint-disable-next-line no-console
-        console.log("克隆地址已复制")
+        console.log(t("repoDetail.cloneCopied"))
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
@@ -145,7 +148,7 @@ const RepoDetail: React.FC = () => {
     async function fetchRepo() {
       // 参数校验：owner 和 name 必须存在
       if (!owner || !name) {
-        setError("缺少仓库参数")
+        setError(t("repoDetail.missingParams"))
         setLoading(false)
         return
       }
@@ -162,11 +165,11 @@ const RepoDetail: React.FC = () => {
           setRepoData(data)
         } else {
           // API 返回 null（不可用或无数据），回退到 Demo 数据并标记提示
-          setError("API 暂不可用，显示 Demo 数据")
+          setError(t("repoDetail.apiUnavailable"))
         }
       } catch (err) {
         if (cancelled) return
-        setError("获取数据失败，显示 Demo 数据")
+        setError(t("repoDetail.fetchError"))
         // eslint-disable-next-line no-console
         console.error("获取仓库详情失败:", err)
       } finally {
@@ -182,7 +185,7 @@ const RepoDetail: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [owner, name])
+  }, [owner, name, t])
 
   // 决定实际展示的数据（API 数据优先，否则用 Demo 数据）
   const displayRepo = repoData
@@ -202,7 +205,7 @@ const RepoDetail: React.FC = () => {
   const licenseHealth = displayRepo?.license
     ? {
         license: displayRepo.license,
-        riskLevel: "低风险",
+        riskLevel: t("repoDetail.riskLevel"),
         riskColor: "text-status-safe",
       }
     : demoLicenseHealth
@@ -213,7 +216,7 @@ const RepoDetail: React.FC = () => {
         {/* Loading 状态 */}
         {loading && (
           <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground">加载中...</div>
+            <div className="text-muted-foreground">{t("repoDetail.loading")}</div>
           </div>
         )}
 
@@ -243,28 +246,28 @@ const RepoDetail: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <Star className="h-4 w-4 text-primary" />
               <span className="font-medium text-on-surface">{formatCount(displayStars)}</span>
-              <span>星标</span>
+              <span>{t("repoDetail.stars")}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <GitFork className="h-4 w-4" />
               <span className="font-medium text-on-surface">{formatCount(displayForks)}</span>
-              <span>分叉</span>
+              <span>{t("repoDetail.forks")}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              <span>更新于 {formatTimeAgo(displayPushedAt)}</span>
+              <span>{t("repoDetail.updated", { time: formatTimeAgo(displayPushedAt) })}</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-3 pt-2">
             <Button className="gap-2" asChild>
               <a href={displayHtmlUrl} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4" />
-                在 GitHub 打开
+                {t("repoDetail.openGithub")}
               </a>
             </Button>
             <Button variant="outline" className="gap-2" onClick={handleCopyClone}>
               <Copy className="h-4 w-4" />
-              复制克隆地址
+              {t("repoDetail.copyClone")}
             </Button>
           </div>
         </section>
@@ -276,7 +279,7 @@ const RepoDetail: React.FC = () => {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Cpu className="h-5 w-5 text-primary" />
-                <CardTitle className="text-xl">AI 智能分析</CardTitle>
+                <CardTitle className="text-xl">{t("repoDetail.aiAnalysis")}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -284,7 +287,7 @@ const RepoDetail: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
                   <Star className="h-4 w-4 text-primary" />
-                  <span>{demoAiAnalysis.reason}</span>
+                  <span>{t("repoDetail.whyStarred")}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {demoAiAnalysis.reasonText}
@@ -295,7 +298,7 @@ const RepoDetail: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
                   <School className="h-4 w-4 text-domain-frontend" />
-                  <span>学习价值</span>
+                  <span>{t("repoDetail.learningValues")}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {demoAiAnalysis.learningValues.map((tag) => (
@@ -310,7 +313,7 @@ const RepoDetail: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
                   <Puzzle className="h-4 w-4 text-domain-backend" />
-                  <span>复用建议</span>
+                  <span>{t("repoDetail.reuseAdvice")}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {demoAiAnalysis.reuseAdvice}
@@ -326,14 +329,14 @@ const RepoDetail: React.FC = () => {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Gavel className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">协议健康度</CardTitle>
+                  <CardTitle className="text-lg">{t("repoDetail.licenseHealth")}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-status-safe" />
-                    <span className="font-medium text-on-surface">{licenseHealth.license} 协议</span>
+                    <span className="font-medium text-on-surface">{t("repoDetail.licenseType", { license: licenseHealth.license })}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -341,7 +344,7 @@ const RepoDetail: React.FC = () => {
                     {licenseHealth.riskLevel}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    可自由商用、修改与分发
+                    {t("repoDetail.licenseFreeDesc")}
                   </span>
                 </div>
               </CardContent>
@@ -352,7 +355,7 @@ const RepoDetail: React.FC = () => {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Network className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">系统雷达</CardTitle>
+                  <CardTitle className="text-lg">{t("repoDetail.systemRadar")}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -378,7 +381,7 @@ const RepoDetail: React.FC = () => {
         {/* 推荐相关项目（占 12/12） */}
         <section className="space-y-4">
           <h2 className="text-xl font-semibold tracking-tight text-on-surface">
-            推荐相关项目
+            {t("repoDetail.relatedRepos")}
           </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {demoRelatedRepos.map((repo) => (
