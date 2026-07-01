@@ -477,6 +477,44 @@ export default function StarExplorer() {
     })
   }, [stats])
 
+  // === 从真实数据计算指标 ===
+  // 沉睡星标 = 总仓库 - 活跃仓库
+  const sleepStarsCount = useMemo(() => {
+    if (usingFallback) return 34
+    const total = stats?.repoCount ?? allRepos.length
+    const active = stats?.activeRepoCount ?? 0
+    return total - active
+  }, [stats, allRepos, usingFallback])
+
+  // 隐藏宝石 = 低星（<=1000）但近期有更新的仓库
+  const hiddenGemsCount = useMemo(() => {
+    if (usingFallback) return 27
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+    return allRepos.filter((r) => {
+      const starNum = parseInt(r.stars.replace(/[kK]/g, "000").replace(/[^0-9]/g, "")) || 0
+      if (starNum > 1000) return false
+      const pushed = r.updatedAt ? new Date(r.updatedAt) : null
+      return pushed && pushed >= ninetyDaysAgo
+    }).length
+  }, [allRepos, usingFallback])
+
+  // 协议风险 = GPL / 未知协议
+  const licenseRiskCount = useMemo(() => {
+    if (usingFallback) return 31
+    return licenseStats
+      .filter((l) => l.tone !== "text-status-safe")
+      .reduce((sum, l) => sum + l.count, 0)
+  }, [licenseStats, usingFallback])
+
+  // 自动标签覆盖率 = tags 数 / repoCount
+  const tagCoveragePercent = useMemo(() => {
+    if (usingFallback) return "83%"
+    const total = stats?.repoCount ?? allRepos.length
+    if (total === 0) return "0%"
+    return `${Math.round((tags.length / total) * 100)}%`
+  }, [tags, stats, allRepos, usingFallback])
+
   // === 事件处理 ===
   const handleExport = (format: string) => {
     setExportFormat(format)
@@ -590,12 +628,12 @@ export default function StarExplorer() {
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={Star} label="星标仓库概览" value={String(stats?.repoCount ?? developerProfile.totalStars)} detail={usingFallback ? "本地演示数据总量" : "API 返回仓库总数"} />
           <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
-          <MetricCard icon={Tags} label="自动标签覆盖" value={stats?.aiEnabled ? "85%" : "83%"} detail="主题 / 名称 / 描述规则命中" />
-          <MetricCard icon={Flame} label="隐藏宝石" value="27" detail="低星高价值候选" />
-          <MetricCard icon={AlertTriangle} label="沉睡星标" value="34" detail="长期未更新或需复核项目" />
+          <MetricCard icon={Tags} label="自动标签覆盖" value={tagCoveragePercent} detail={`${tags.length} 个分类 / ${stats?.repoCount ?? allRepos.length} 个仓库`} />
+          <MetricCard icon={Flame} label="隐藏宝石" value={String(hiddenGemsCount)} detail="≤1000 星但近期有更新" />
+          <MetricCard icon={AlertTriangle} label="沉睡星标" value={String(sleepStarsCount)} detail="超过 90 天未更新" />
           <MetricCard icon={Activity} label="活跃仓库" value={String(stats?.activeRepoCount ?? 512)} detail="最近 90 天有更新" />
-          <MetricCard icon={LineChart} label="已取消星标" value="18" detail="疑似取消星标但不删除" />
-          <MetricCard icon={AlertTriangle} label="协议风险" value="31" detail="GPL 或未知协议需复核" />
+          <MetricCard icon={LineChart} label="已取消星标" value={usingFallback ? "18" : "0"} detail={usingFallback ? "疑似取消星标但不删除" : "需 API 同步后计算"} />
+          <MetricCard icon={AlertTriangle} label="协议风险" value={String(licenseRiskCount)} detail="GPL 或未知协议需复核" />
         </section>
 
         {/* 语言分布 + 主题聚类 */}

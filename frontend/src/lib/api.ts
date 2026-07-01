@@ -68,6 +68,21 @@ export interface ApiError {
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3210'
 const API_TIMEOUT = 8000 // 8 秒超时
+const TOKEN_KEY = 'starway-github-token'
+
+// ===== Token 管理 =====
+
+export function getGitHubToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setGitHubToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearGitHubToken(): void {
+  localStorage.removeItem(TOKEN_KEY)
+}
 
 // ===== 工具函数 =====
 

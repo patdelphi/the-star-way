@@ -27,7 +27,7 @@ const navItems = [
   { path: "/developers", icon: Users, labelKey: "nav.developers" },
   { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
   { path: "/analysis", icon: LineChart, labelKey: "nav.repoAnalysis" },
-  { path: "#", icon: Settings, labelKey: "nav.settings" },
+  { path: "/settings", icon: Settings, labelKey: "nav.settings" },
 ]
 
 const footerLinks = [

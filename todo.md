@@ -178,12 +178,53 @@
 
 ---
 
+## 前端页面接入真实 API ✅ 已完成
+
+### 已完成任务
+- [x] StarExplorer.tsx 接入真实 API（列表/筛选/排序/分页/统计/导出/分类）
+- [x] Developers.tsx 接入真实 API（用户列表/同步状态）
+- [x] RepositoryAnalysis.tsx 接入真实 API（统计/标签融合）
+- [x] RepoDetail.tsx 接入真实 API（单仓库详情，useParams 路由）
+- [x] App.tsx 添加 `/repo/:owner/:name` 和 `/settings` 路由
+- [x] Sidebar.tsx 设置菜单链接改为 `/settings`
+- [x] 前端 TypeScript 编译通过
+- [x] 前端生产构建验证通过（npm run build，1.02s）
+
+---
+
+## 标签云 ✅ 已完成
+
+- [x] StarExplorer 添加标签云区块（62 个分类动态字号）
+- [x] seed.ts 导入后自动触发规则分类（691 仓库 → 1889 标签）
+- [x] 标签覆盖率、隐藏宝石、沉睡星标、协议风险从真实数据计算
+
+---
+
+## GitHub Token 支持 ✅ 已完成
+
+- [x] api.ts 添加 getGitHubToken / setGitHubToken / clearGitHubToken（localStorage）
+- [x] Settings.tsx 添加 GitHub Token 输入框（密码显示/隐藏切换）
+- [x] Developers.tsx 同步时自动读取 token 传入 syncStars
+- [x] 同步状态显示是否使用了 Token
+
+---
+
+## 设置页 ✅ 已完成
+
+- [x] 创建 Settings.tsx 页面
+- [x] 后端连接状态检测（在线/离线）
+- [x] 数据库信息展示（SQLite WAL、Demo 数据）
+- [x] 导出格式说明（CSV/JSON/Markdown）
+- [x] AI 增强框架状态（已就绪，需配置 API Key）
+
+---
+
 ## 未完成 / 后续
 
-- [ ] 前端页面接入真实 API（替换 demo 数据）
-- [ ] 前端 i18n 覆盖所有页面（当前仅覆盖导航和顶部栏）
-- [ ] 具体 AI 调用实现（GPT / Claude 等集成）
-- [ ] 导出功能前端对接（下载对话框）
+- [ ] 前端 i18n 覆盖所有页面 body 内容（当前仅覆盖导航和顶部栏）
+- [ ] 具体 AI 调用实现（GPT / Claude / Ollama 集成）
+- [ ] StarCatalog / Dashboard 页面接入路由（视需求启用）
+- [ ] GitHub OAuth 设备流认证（完整 CLI 认证流程）
 
 ---
 

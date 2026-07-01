@@ -26,7 +26,7 @@ import {
   GitFork,
   Loader2,
 } from "lucide-react"
-import { getUsers, syncStars } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken } from "@/lib/api"
 
 // ===== 类型定义 =====
 interface Developer {
@@ -252,9 +252,10 @@ export default function Developers() {
   const runSync = async (name: string) => {
     setSyncStatus("同步中")
     try {
-      const result = await syncStars(name)
+      const token = getGitHubToken()
+      const result = await syncStars(name, token || undefined)
       if (result !== null) {
-        setSyncStatus("同步成功")
+        setSyncStatus(token ? "同步成功（已使用 Token）" : "同步成功（匿名模式）")
         setSearchResult(`@${name} 星标已更新`)
       } else {
         setSyncStatus("网络失败")
