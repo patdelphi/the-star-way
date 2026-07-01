@@ -4,7 +4,9 @@
 
 当前系统已经能跑通本地 API、SQLite、CSV 快照、真实 GitHub starred 同步、规则分类和前端页面接入。
 
-## 本轮开发成果（2026-07-01）
+---
+
+## 第一轮开发成果（2026-07-01）
 
 ### P0：核心数据透明化（全部完成）
 
@@ -35,31 +37,75 @@
 | ✅ | Removed Stars 只有标记，没有独立视图 | `GET /api/users/:login/removed-stars` + 前端弹窗展示已移除仓库列表 |
 | ✅ | License 风险缺少解释 | 点击 License 风险指标卡片弹出风险说明弹窗 + 对应仓库列表 |
 
-### AI 功能（完成 2/5）
+---
 
-| 状态 | 功能 | 成果 |
-|---|---|---|
-| ✅ | README 摘要 | `GET /api/repos/:fullName/readme-summary`，AI 生成中文摘要并缓存到 `translations` 表；RepoDetail 页面展示 |
-| ⏳ | 仓库描述中文摘要 | 可由 README 摘要覆盖，待需求明确后实现 |
-| ✅ | Star DNA | `GET /api/users/:login/star-dna`，基于语言/标签统计生成开发者画像；Developers 页面展示 |
-| ⏳ | 学习路径 | 基于用户选择的标签或仓库集合生成，待设计 |
-| ⏳ | 替代方案 / 相似项目推荐 | 需要 embedding 或更完整的规则基线，最后做 |
+## 第二轮开发成果（2026-07-01 续）
+
+### 1. Markdown 报告导出
+
+| 成果 | 说明 |
+|---|---|
+| `GET /api/users/:login/report` | 生成面向阅读的分析报告（Markdown） |
+| 报告内容 | 概览（总数/活跃/沉睡/风险/Gems）、技术栈（语言/标签/License 分布）、风险分析、隐藏宝石、完整仓库列表 |
+| 前端 | StarExplorer 页面"生成报告"按钮，点击直接下载 `.md` 文件 |
+
+### 2. Dashboard 导航重构
+
+| 成果 | 说明 |
+|---|---|
+| Sidebar 分组 | 总览（Dashboard/Developers）、数据浏览（StarExplorer/StarCatalog）、分析工具（RepoAnalysis）、系统（Settings） |
+| Dashboard 快速入口 | 底部新增 3 个卡片：星标仓库（检索分析）、分类目录（标签浏览）、单个仓库（深度分析） |
+
+### 3. 学习路径 AI
+
+| 成果 | 说明 |
+|---|---|
+| `GET /api/users/:login/learning-path` | AI 基于用户语言和标签生成个性化学习路径 |
+| 输出格式 | Markdown：阶段一（巩固基础）→ 阶段二（深入实践）→ 阶段三（拓展前沿）→ 学习建议 |
+| 前端 | Dashboard 页面展示学习路径卡片 |
+| 缓存 | 结果缓存到 `translations` 表（target_lang = 'learning'） |
+
+### 4. 批量中文摘要
+
+| 成果 | 说明 |
+|---|---|
+| `GET /api/users/:login/cn-summaries` | 批量返回用户所有星标仓库中已有缓存的中文摘要 |
+| 前端 | StarExplorer 表格中，仓库名称下方显示中文摘要（`text-xs text-primary line-clamp-2`） |
+| 数据来源 | 复用 README 摘要的 `translations` 表缓存 |
 
 ---
 
-## 遗留任务
+## 后端新增 API 汇总
 
-| 优先级 | 任务 | 说明 |
+| 端点 | 方法 | 说明 |
 |---|---|---|
-| P1 | Dashboard 导航结构重构 | Dashboard 做总览，StarExplorer 做检索分析，StarCatalog 做标签目录 |
-| P2 | Markdown 报告导出 | 增加面向阅读的报告模板：开发者画像、技术栈、风险、推荐仓库 |
-| AI | 仓库描述中文摘要 | 列表页批量翻译或用户主动触发 |
-| AI | 学习路径 | 基于用户选择的标签或仓库集合生成学习路线 |
-| AI | 替代方案推荐 | 需要 embedding 或更完整的规则基线 |
+| `/api/users/:login/summary` | GET | 用户统计概览（7 项指标） |
+| `/api/users/:login/sync-runs` | GET | 同步历史记录 |
+| `/api/users/:login/removed-stars` | GET | 已移除的星标仓库 |
+| `/api/users/:login/star-dna` | GET | AI 开发者画像 |
+| `/api/users/:login/learning-path` | GET | AI 学习路径推荐 |
+| `/api/users/:login/report` | GET | Markdown 分析报告 |
+| `/api/users/:login/cn-summaries` | GET | 批量中文摘要 |
+| `/api/token-source` | GET | Token 来源信息 |
+| `/api/repos/:fullName/readme-summary` | GET | 单仓库 README 中文摘要 |
+| `/api/repos/:fullName/tags` | POST/DELETE | 手动标签增删 |
 
-## 下一轮推荐任务
+---
 
-1. **Dashboard 导航结构重构**：将 Dashboard、StarCatalog、StarExplorer 的职责明确分离
-2. **Markdown 报告导出**：基于用户数据生成可读的分析报告
-3. **学习路径 AI**：基于用户的星标标签生成学习路线推荐
-4. **批量中文摘要**：为列表页仓库批量生成中文描述摘要
+## 验证状态
+
+- 后端测试：96 测试全部通过
+- 前端编译：零 TypeScript 错误
+- 总 commit 数：13
+
+---
+
+## 后续可选方向
+
+| 方向 | 价值 | 复杂度 |
+|---|---|---|
+| 仓库相似度推荐 | 高 — 基于标签/语言的相似项目推荐 | 高（需要 embedding 或更复杂的规则） |
+| 批量 README 摘要预生成 | 中 — 后台批量为所有仓库生成中文摘要 | 中（需要异步队列） |
+| 团队协作功能 | 中 — 多用户共享分析结果 | 高（需要权限和分享机制） |
+| 数据可视化增强 | 中 — 技术栈饼图、时间趋势图等 | 中 |
+| 邮件/通知提醒 | 低 — 沉睡仓库提醒、新 Hidden Gems 发现 | 低 |
