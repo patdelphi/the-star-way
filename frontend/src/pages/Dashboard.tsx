@@ -24,7 +24,19 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { getGlobalOverview, type GlobalOverview } from "@/lib/api"
-import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
+import {
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts"
 
 
 // ===== 技术雷达六维映射规则 =====
@@ -253,7 +265,6 @@ function pickTopItems<T extends { count: number }>(items: T[], limit: number): T
 }
 
 function TrendBars({ data }: { data: { label: string; value: number }[] }) {
-  const maxValue = Math.max(...data.map((item) => item.value), 1)
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
 
@@ -273,23 +284,15 @@ function TrendBars({ data }: { data: { label: string; value: number }[] }) {
           <div className="text-sm font-medium text-on-surface">峰值数量</div>
         </div>
       </div>
-      <div className="flex h-44 items-end gap-2 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-3">
-        {data.map((item) => {
-          const height = Math.max(8, (item.value / maxValue) * 100)
-          return (
-            <div key={item.label} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
-              <div className="flex flex-1 items-end">
-                <div
-                  className="w-full rounded-t-sm bg-primary/80 transition-colors hover:bg-primary"
-                  style={{ height: `${height}%` }}
-                  title={`${item.label}: ${item.value}`}
-                />
-              </div>
-              <div className="truncate text-center font-mono text-[10px] text-muted-foreground">{item.label}</div>
-            </div>
-          )
-        })}
-      </div>
+      <ResponsiveContainer width="100%" height={180}>
+        <AreaChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <Tooltip />
+          <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   )
 }
@@ -564,24 +567,28 @@ const Dashboard: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 items-center">
-                <PieChart
-                  data={languageStats.slice(0, 8).map((l, i) => ({
-                    label: l.language || "Unknown",
-                    value: l.count,
-                    color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
-                  }))}
-                  size={180}
-                  donut
-                />
-                <PieChartLegend
-                  data={languageStats.slice(0, 8).map((l, i) => ({
-                    label: l.language || "Unknown",
-                    value: l.count,
-                    color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
-                  }))}
-                />
-              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <RechartsPie>
+                  <Pie
+                    data={languageStats.slice(0, 8).map((l, i) => ({
+                      name: l.language || "Unknown",
+                      value: l.count,
+                    }))}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {languageStats.slice(0, 8).map((_, i) => (
+                      <Cell key={i} fill={LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </RechartsPie>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         )}
