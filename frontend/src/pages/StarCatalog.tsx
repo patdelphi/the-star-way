@@ -1,306 +1,347 @@
 /**
  * StarCatalog.tsx
- * 星项目目录页
- * 展示所有同步仓库的列表，支持搜索、筛选、导出和分页
+ * 星项目目录页 - 按标签分类浏览视图（类似 Awesome-list）
+ * 展示所有仓库按标签分组，支持搜索筛选、展开/折叠
  */
 
-import React, { useState } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { useTranslation } from "react-i18next"
+import { Link } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectOption } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Search,
-  Filter,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  GitFork,
-  MoreVertical,
-  Languages,
-} from "lucide-react"
+import { Search, Star, GitFork, ChevronDown, ChevronRight } from "lucide-react"
+import { getRepos, getTags } from "@/lib/api"
+import type { Repo } from "@/lib/api"
 
-// 示例数据
-const sampleRepos = [
+// Demo 数据：标签列表
+const DEMO_TAGS: { tag: string; count: number }[] = [
+  { tag: "react", count: 12 },
+  { tag: "python", count: 9 },
+  { tag: "typescript", count: 8 },
+  { tag: "cli", count: 6 },
+  { tag: "ai", count: 5 },
+  { tag: "rust", count: 4 },
+  { tag: "go", count: 3 },
+]
+
+// Demo 数据：仓库列表
+const DEMO_REPOS: (Repo & { tags: string[] })[] = [
   {
-    fullName: "vercel/next.js",
-    description: "面向 Web 的 React 应用框架。",
-    stars: "127.5k",
-    forks: "27.1k",
-    language: "TypeScript",
-    langColor: "bg-domain-frontend",
-    aiTags: ["网页框架", "React"],
+    github_id: 1, full_name: "vercel/next.js", owner: "vercel", name: "next.js",
+    description: "The React Framework for the Web", html_url: "https://github.com/vercel/next.js",
+    language: "TypeScript", license: "MIT", stars: 127500, forks: 27100,
+    open_issues: 300, pushed_at: "2024-06-01T00:00:00Z", created_at: "2016-01-01T00:00:00Z",
+    tags: ["react", "typescript"],
   },
   {
-    fullName: "hwchase17/langchain",
-    description: "通过可组合组件构建大模型应用。",
-    stars: "95.3k",
-    forks: "15.2k",
-    language: "Python",
-    langColor: "bg-domain-backend",
-    aiTags: ["人工智能", "大模型", "应用框架"],
+    github_id: 2, full_name: "facebook/react", owner: "facebook", name: "react",
+    description: "The library for web and native user interfaces", html_url: "https://github.com/facebook/react",
+    language: "JavaScript", license: "MIT", stars: 225000, forks: 46000,
+    open_issues: 400, pushed_at: "2024-05-15T00:00:00Z", created_at: "2013-05-01T00:00:00Z",
+    tags: ["react"],
   },
   {
-    fullName: "neovim/neovim",
-    description: "专注可扩展性和可用性的 Vim 分支编辑器。",
-    stars: "82.1k",
-    forks: "5.6k",
-    language: "C",
-    langColor: "bg-domain-tools",
-    aiTags: ["编辑器", "命令行工具"],
+    github_id: 3, full_name: "hwchase17/langchain", owner: "hwchase17", name: "langchain",
+    description: "Build context-aware reasoning applications", html_url: "https://github.com/hwchase17/langchain",
+    language: "Python", license: "MIT", stars: 95300, forks: 15200,
+    open_issues: 200, pushed_at: "2024-06-10T00:00:00Z", created_at: "2022-10-01T00:00:00Z",
+    tags: ["python", "ai"],
+  },
+  {
+    github_id: 4, full_name: "BurntSushi/ripgrep", owner: "BurntSushi", name: "ripgrep",
+    description: "ripgrep recursively searches directories for a regex pattern", html_url: "https://github.com/BurntSushi/ripgrep",
+    language: "Rust", license: "MIT", stars: 46000, forks: 2000,
+    open_issues: 50, pushed_at: "2024-06-05T00:00:00Z", created_at: "2015-08-01T00:00:00Z",
+    tags: ["rust", "cli"],
+  },
+  {
+    github_id: 5, full_name: "golang/go", owner: "golang", name: "go",
+    description: "The Go programming language", html_url: "https://github.com/golang/go",
+    language: "Go", license: "BSD-3-Clause", stars: 122000, forks: 18000,
+    open_issues: 800, pushed_at: "2024-06-08T00:00:00Z", created_at: "2014-07-01T00:00:00Z",
+    tags: ["go"],
+  },
+  {
+    github_id: 6, full_name: "denoland/deno", owner: "denoland", name: "deno",
+    description: "A modern runtime for JavaScript and TypeScript", html_url: "https://github.com/denoland/deno",
+    language: "Rust", license: "MIT", stars: 95000, forks: 5200,
+    open_issues: 600, pushed_at: "2024-06-02T00:00:00Z", created_at: "2018-06-01T00:00:00Z",
+    tags: ["typescript", "rust"],
+  },
+  {
+    github_id: 7, full_name: "cli/cli", owner: "cli", name: "cli",
+    description: "GitHub's official command line tool", html_url: "https://github.com/cli/cli",
+    language: "Go", license: "MIT", stars: 36000, forks: 6000,
+    open_issues: 300, pushed_at: "2024-06-09T00:00:00Z", created_at: "2019-08-01T00:00:00Z",
+    tags: ["cli", "go"],
   },
 ]
 
-// 活跃筛选标签
-const activeFilters = [
-  { key: "lang", label: "TypeScript", value: "typescript" },
-  { key: "topic", label: "人工智能", value: "ai" },
-]
+// 格式化星数
+function formatStars(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
 
 const StarCatalog: React.FC = () => {
+  const { t } = useTranslation()
+  const defaultUser = "demo-user"
+
+  // 数据状态
+  const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
+  const [repos, setRepos] = useState<(Repo & { tags: string[] })[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
+
+  // UI 状态
   const [searchQuery, setSearchQuery] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const totalPages = 498
+  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set())
 
-  const handleExport = (format: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`导出格式: ${format}`)
-  }
+  // 加载标签和仓库数据
+  useEffect(() => {
+    let cancelled = false
 
-  const handleRemoveFilter = (filterKey: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`移除筛选: ${filterKey}`)
-  }
+    async function fetchData() {
+      setLoading(true)
+      try {
+        const [tagsRes, reposRes] = await Promise.all([
+          getTags(defaultUser),
+          getRepos(defaultUser, { pageSize: 10000 }),
+        ])
+
+        if (cancelled) return
+
+        // 判断是否为 demo 模式（API 不可用时使用本地 demo 数据）
+        const hasRepos = reposRes.items && reposRes.items.length > 0
+        const hasTags = tagsRes && tagsRes.length > 0
+
+        if (hasTags && hasRepos) {
+          // API 正常，使用真实数据
+          setTags(tagsRes)
+          setRepos(reposRes.items)
+          setIsDemoMode(false)
+        } else {
+          // API 不可用，回退到 demo 数据
+          setTags(DEMO_TAGS)
+          setRepos(DEMO_REPOS)
+          setIsDemoMode(true)
+        }
+      } catch {
+        if (!cancelled) {
+          setTags(DEMO_TAGS)
+          setRepos(DEMO_REPOS)
+          setIsDemoMode(true)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchData()
+    return () => { cancelled = true }
+  }, [])
+
+  // 默认展开前 3 个标签（按 count 降序）
+  useEffect(() => {
+    if (tags.length > 0 && expandedTags.size === 0) {
+      const top3 = [...tags].sort((a, b) => b.count - a.count).slice(0, 3).map(t => t.tag)
+      setExpandedTags(new Set(top3))
+    }
+  }, [tags])
+
+  // 搜索过滤
+  const filteredRepos = useMemo(() => {
+    if (!searchQuery.trim()) return repos
+    const q = searchQuery.toLowerCase()
+    return repos.filter(
+      (r) =>
+        r.full_name.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q))
+    )
+  }, [repos, searchQuery])
+
+  // 按标签分组的仓库
+  const tagSections = useMemo(() => {
+    return tags.map((tagInfo) => {
+      const tagRepos = filteredRepos.filter((r) => r.tags?.includes(tagInfo.tag))
+      return { ...tagInfo, repos: tagRepos }
+    })
+  }, [tags, filteredRepos])
+
+  // 切换标签展开/折叠
+  const toggleTag = useCallback((tag: string) => {
+    setExpandedTags((prev) => {
+      const next = new Set(prev)
+      if (next.has(tag)) {
+        next.delete(tag)
+      } else {
+        next.add(tag)
+      }
+      return next
+    })
+  }, [])
+
+  // 点击标签时滚动到对应 section
+  const scrollToTag = useCallback((tag: string) => {
+    const el = document.getElementById(`tag-section-${tag}`)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+      // 同时展开
+      if (!expandedTags.has(tag)) {
+        toggleTag(tag)
+      }
+    }
+  }, [expandedTags, toggleTag])
 
   return (
     <div className="min-h-screen bg-grid-pattern p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* 页面标题与导出 */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-              星项目目录
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              正在浏览 <span className="font-medium text-primary">1,492</span> 个同步的仓库
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport("CSV")}>
-              CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("JSON")}>
-              JSON
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("MD")}>
-              MD
-            </Button>
-          </div>
+        {/* 页面标题 */}
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
+            {t("starCatalog.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("starCatalog.desc", { count: repos.length })}
+          </p>
         </div>
 
-        {/* 高级筛选栏（Glassmorphism Card） */}
+        {/* Demo 模式提示 */}
+        {isDemoMode && (
+          <Card className="border-yellow-500/50 bg-yellow-500/10">
+            <CardContent className="p-3">
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                {t("starCatalog.demoMode")}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 搜索框（Glassmorphism Card） */}
         <Card className="glass-panel">
           <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              {/* 搜索 + 下拉筛选 */}
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="搜索仓库、描述或标签..."
-                    className="pl-9"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">语言</SelectOption>
-                      <SelectOption value="typescript">TypeScript</SelectOption>
-                      <SelectOption value="python">Python</SelectOption>
-                      <SelectOption value="rust">Rust</SelectOption>
-                      <SelectOption value="go">Go</SelectOption>
-                    </Select>
-                  </div>
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">主题</SelectOption>
-                      <SelectOption value="ai">人工智能</SelectOption>
-                      <SelectOption value="web">网页应用</SelectOption>
-                      <SelectOption value="cli">命令行</SelectOption>
-                      <SelectOption value="data">数据</SelectOption>
-                    </Select>
-                  </div>
-                  <div className="w-32">
-                    <Select defaultValue="">
-                      <SelectOption value="">协议</SelectOption>
-                      <SelectOption value="mit">MIT</SelectOption>
-                      <SelectOption value="apache">Apache</SelectOption>
-                      <SelectOption value="gpl">GPL</SelectOption>
-                    </Select>
-                  </div>
-                  <Button variant="outline" size="icon" className="shrink-0">
-                    <Filter className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* 活跃筛选标签 */}
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">已筛选:</span>
-                  {activeFilters.map((filter) => (
-                    <Badge
-                      key={filter.key}
-                      variant="secondary"
-                      className="flex items-center gap-1 font-mono text-xs"
-                    >
-                      {filter.label}
-                      <button
-                        onClick={() => handleRemoveFilter(filter.key)}
-                        className="ml-1 rounded-full hover:bg-surface-container-high"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs text-muted-foreground hover:text-on-surface"
-                    onClick={() => handleRemoveFilter("all")}
-                  >
-                    清除全部
-                  </Button>
-                </div>
-              )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("starCatalog.searchPlaceholder")}
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* 数据表格 */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[280px]">仓库</TableHead>
-                  <TableHead className="hidden md:table-cell">简介</TableHead>
-                  <TableHead className="text-right">星数</TableHead>
-                  <TableHead className="hidden sm:table-cell">语言</TableHead>
-                  <TableHead className="hidden lg:table-cell">AI 标签</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sampleRepos.map((repo) => (
-                  <TableRow key={repo.fullName}>
-                    <TableCell>
-                      <div className="font-medium text-on-surface">{repo.fullName}</div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <span className="text-sm text-muted-foreground line-clamp-1">
-                        {repo.description}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 text-sm text-muted-foreground">
-                        <Star className="h-3.5 w-3.5 text-primary" />
-                        <span className="font-medium text-on-surface">{repo.stars}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge className={`${repo.langColor} text-white text-xs`}>
-                        {repo.language}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {repo.aiTags.map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="outline"
-                            className="font-mono text-[10px] uppercase tracking-wider"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Languages className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <GitFork className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* 分页栏 */}
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            显示第 <span className="font-medium text-on-surface">1</span> 到{" "}
-            <span className="font-medium text-on-surface">3</span> 条，共{" "}
-            <span className="font-medium text-on-surface">1,492</span> 条
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+        {/* 标签列表（水平滚动） */}
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {tags.map((tagInfo) => (
+            <button
+              key={tagInfo.tag}
+              onClick={() => scrollToTag(tagInfo.tag)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                expandedTags.has(tagInfo.tag)
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-on-surface"
+              }`}
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-8 min-w-[2rem] bg-primary text-on-primary">
-                1
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 min-w-[2rem]">
-                2
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 min-w-[2rem]">
-                3
-              </Button>
-              <span className="px-1 text-muted-foreground">...</span>
-              <Button variant="outline" size="sm" className="h-8 min-w-[2rem]">
-                {totalPages}
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+              <span className="font-medium">{tagInfo.tag}</span>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {tagInfo.count}
+              </Badge>
+            </button>
+          ))}
         </div>
+
+        {/* 加载状态 */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-muted-foreground">{t("starCatalog.loading")}</p>
+          </div>
+        )}
+
+        {/* 标签分类内容区 */}
+        {!loading && (
+          <div className="space-y-6">
+            {tagSections.map((section) => (
+              <div key={section.tag} id={`tag-section-${section.tag}`}>
+                {/* 标签标题行（可点击展开/折叠） */}
+                <button
+                  onClick={() => toggleTag(section.tag)}
+                  className="flex w-full items-center gap-2 rounded-lg p-3 transition-colors hover:bg-surface-container-high/50"
+                >
+                  {expandedTags.has(section.tag) ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <h2 className="text-lg font-semibold text-on-surface">{section.tag}</h2>
+                  <Badge variant="secondary" className="text-xs">
+                    {section.repos.length} {t("starCatalog.repos")}
+                  </Badge>
+                </button>
+
+                {/* 仓库卡片网格 */}
+                {expandedTags.has(section.tag) && (
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {section.repos.map((repo) => (
+                      <Card key={repo.full_name} className="glass-panel transition-shadow hover:shadow-md">
+                        <CardContent className="p-4">
+                          {/* 仓库名 */}
+                          <Link
+                            to={`/repo/${repo.owner}/${repo.name}`}
+                            className="font-medium text-primary hover:underline line-clamp-1"
+                          >
+                            {repo.full_name}
+                          </Link>
+
+                          {/* 描述 */}
+                          <p className="mt-1.5 text-sm text-muted-foreground line-clamp-1">
+                            {repo.description || t("starCatalog.noDesc")}
+                          </p>
+
+                          {/* 统计信息 */}
+                          <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                            {/* Stars */}
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-medium text-on-surface">{formatStars(repo.stars)}</span>
+                            </div>
+                            {/* Forks */}
+                            <div className="flex items-center gap-1">
+                              <GitFork className="h-3.5 w-3.5" />
+                              <span className="font-medium text-on-surface">{formatStars(repo.forks)}</span>
+                            </div>
+                            {/* Language */}
+                            {repo.language && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {repo.language}
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+
+                    {/* 无仓库 */}
+                    {section.repos.length === 0 && (
+                      <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
+                        {t("starCatalog.noReposInTag")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* 无标签数据 */}
+            {tags.length === 0 && (
+              <div className="py-20 text-center">
+                <p className="text-muted-foreground">{t("starCatalog.noTags")}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

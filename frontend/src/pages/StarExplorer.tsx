@@ -366,6 +366,7 @@ export default function StarExplorer() {
   const [selectedTopic, setSelectedTopic] = useState("")
   const [selectedLicense, setSelectedLicense] = useState("")
   const [sortKey, setSortKey] = useState("starred_at")
+  const [quickFilter, setQuickFilter] = useState<"none" | "hiddenGems" | "sleepStars">("none")
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState("Markdown")
   const [analysisStatus, setAnalysisStatus] = useState("")
@@ -429,6 +430,8 @@ export default function StarExplorer() {
   // === 筛选与排序（基于 allRepos）===
   const filteredRepos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
     const result = allRepos.filter((repo) => {
       const matchesQuery =
         !query ||
@@ -439,7 +442,17 @@ export default function StarExplorer() {
       const matchesLanguage = !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
       const matchesTopic = !selectedTopic || repo.topics.some((t) => t.toLowerCase().includes(selectedTopic.toLowerCase()))
       const matchesLicense = !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
-      return matchesQuery && matchesLanguage && matchesTopic && matchesLicense
+      // 快捷筛选：隐藏宝石 / 沉睡星标
+      let matchesQuick = true
+      if (quickFilter === "hiddenGems") {
+        const starNum = parseInt(repo.stars.replace(/[kK]/g, "000").replace(/[^0-9]/g, "")) || 0
+        const pushed = repo.updatedAt ? new Date(repo.updatedAt) : null
+        matchesQuick = starNum <= 1000 && pushed !== null && pushed >= ninetyDaysAgo
+      } else if (quickFilter === "sleepStars") {
+        const pushed = repo.updatedAt ? new Date(repo.updatedAt) : null
+        matchesQuick = pushed !== null && pushed < ninetyDaysAgo
+      }
+      return matchesQuery && matchesLanguage && matchesTopic && matchesLicense && matchesQuick
     })
 
     const parseCount = (value: string) => {
@@ -453,7 +466,7 @@ export default function StarExplorer() {
       if (sortKey === "updated_at") return b.updatedAt.localeCompare(a.updatedAt)
       return b.starredAt.localeCompare(a.starredAt)
     })
-  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos])
+  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos, quickFilter])
 
   // === 分页 ===
   const totalPages = Math.max(1, Math.ceil(filteredRepos.length / ITEMS_PER_PAGE))
@@ -595,6 +608,9 @@ export default function StarExplorer() {
   }
 
   const handleRemoveFilter = (filterKey: string) => {
+    if (filterKey === "quickFilter") {
+      setQuickFilter("none")
+    }
     setAnalysisStatus(t("starExplorer.filterRemoved", { filter: filterKey }))
   }
 
@@ -608,6 +624,8 @@ export default function StarExplorer() {
     selectedLanguage && { key: "lang", label: selectedLanguage },
     selectedTopic && { key: "topic", label: selectedTopic },
     selectedLicense && { key: "license", label: selectedLicense },
+    quickFilter === "hiddenGems" && { key: "quickFilter", label: t("starExplorer.filterHiddenGems") },
+    quickFilter === "sleepStars" && { key: "quickFilter", label: t("starExplorer.filterSleepStars") },
     ...activeFilters,
   ].filter(Boolean) as { key: string; label: string }[]
 
@@ -953,6 +971,33 @@ export default function StarExplorer() {
                   <SelectOption value="updated_at">{t("starExplorer.sortByUpdatedAt")}</SelectOption>
                 </Select>
               </div>
+              {/* 快捷筛选按钮 */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={quickFilter === "hiddenGems" ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    setQuickFilter(quickFilter === "hiddenGems" ? "none" : "hiddenGems")
+                    setCurrentPage(1)
+                  }}
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                  {t("starExplorer.filterHiddenGems")}
+                </Button>
+                <Button
+                  variant={quickFilter === "sleepStars" ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    setQuickFilter(quickFilter === "sleepStars" ? "none" : "sleepStars")
+                    setCurrentPage(1)
+                  }}
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {t("starExplorer.filterSleepStars")}
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -974,6 +1019,7 @@ export default function StarExplorer() {
                   setSelectedTopic("")
                   setSelectedLicense("")
                   setSearchQuery("")
+                  setQuickFilter("none")
                   handleRemoveFilter("all")
                 }}
               >

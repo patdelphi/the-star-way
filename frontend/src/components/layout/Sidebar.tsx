@@ -13,6 +13,7 @@ import {
   Terminal,
   Menu,
   Star,
+  LayoutDashboard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -24,8 +25,10 @@ import {
 } from "@/components/ui/sheet"
 
 const navItems = [
+  { path: "/dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
   { path: "/developers", icon: Users, labelKey: "nav.developers" },
   { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
+  { path: "/catalog", icon: FileText, labelKey: "nav.starCatalog" },
   { path: "/analysis", icon: LineChart, labelKey: "nav.repoAnalysis" },
   { path: "/settings", icon: Settings, labelKey: "nav.settings" },
 ]
