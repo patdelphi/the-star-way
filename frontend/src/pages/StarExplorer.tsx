@@ -24,6 +24,7 @@ import {
   Plus,
   Radar,
   Search,
+  Sparkles,
   Star,
   Tags,
   X,
