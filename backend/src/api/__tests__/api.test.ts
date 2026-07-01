@@ -63,6 +63,7 @@ describe('API 路由', () => {
     initDatabase(db)
     const records = parseCsv(MOCK_CSV)
     importCsvRecords(db, records)
+    importCsvRecords(db, records, 'octocat')
   })
 
   afterEach(() => {
@@ -77,7 +78,19 @@ describe('API 路由', () => {
     const data = JSON.parse(getBody())
     expect(data.data).toBeDefined()
     expect(data.data.length).toBeGreaterThanOrEqual(1)
-    expect(data.data.some((u: any) => u.login === DEMO_USER_LOGIN)).toBe(true)
+    expect(data.data.some((u: any) => u.login === DEMO_USER_LOGIN)).toBe(false)
+    expect(data.data.some((u: any) => u.login === 'octocat' && u.repoCount === 2)).toBe(true)
+  })
+
+  it('GET /api/overview 应返回排除 demo-user 的全局概览', async () => {
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks('/api/overview')
+    await router(req, res)
+    const data = JSON.parse(getBody())
+    expect(data.data.userCount).toBe(1)
+    expect(data.data.repoCount).toBe(2)
+    expect(data.data.languages.length).toBeGreaterThan(0)
+    expect(data.data.recentStars.length).toBeGreaterThan(0)
   })
 
   it('GET /api/users/:login/repos 应返回仓库列表', async () => {
@@ -196,6 +209,7 @@ describe('API 路由', () => {
     await router(req, res)
     expect(getStatusCode()).toBe(204)
     expect(getHeaders()['Access-Control-Allow-Origin']).toBe('*')
+    expect(getHeaders()['Access-Control-Allow-Methods']).toContain('DELETE')
   })
 
   it('resolveGitHubToken 应优先使用请求 token，其次使用环境变量', () => {
@@ -207,5 +221,30 @@ describe('API 路由', () => {
 
     if (old === undefined) delete process.env.STARWAY_GITHUB_TOKEN
     else process.env.STARWAY_GITHUB_TOKEN = old
+  })
+
+  it('POST/DELETE /api/repos/:fullName/tags 应支持手动标签增删', async () => {
+    const router = createRouter(db)
+    const encodedName = encodeURIComponent('octocat/Hello-World')
+
+    const add = createMocks(`/api/repos/${encodedName}/tags`, 'POST', JSON.stringify({ tag: 'manual-check' }))
+    await router(add.req, add.res)
+    expect(add.getStatusCode()).toBe(200)
+
+    let row = db.prepare(`
+      SELECT tag_source, confidence FROM repo_tags
+      WHERE repo_full_name = ? AND tag = ?
+    `).get('octocat/Hello-World', 'manual-check') as { tag_source: string; confidence: number } | undefined
+    expect(row).toEqual({ tag_source: 'manual', confidence: 1 })
+
+    const del = createMocks(`/api/repos/${encodedName}/tags/${encodeURIComponent('manual-check')}`, 'DELETE')
+    await router(del.req, del.res)
+    expect(del.getStatusCode()).toBe(200)
+
+    row = db.prepare(`
+      SELECT tag_source, confidence FROM repo_tags
+      WHERE repo_full_name = ? AND tag = ?
+    `).get('octocat/Hello-World', 'manual-check') as { tag_source: string; confidence: number } | undefined
+    expect(row).toBeUndefined()
   })
 })

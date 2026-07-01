@@ -12,7 +12,6 @@ import {
   Server,
   Database,
   FolderOpen,
-  Globe,
   CheckCircle2,
   XCircle,
   RefreshCw,

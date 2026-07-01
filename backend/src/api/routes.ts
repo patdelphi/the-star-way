@@ -14,6 +14,8 @@ import {
   queryRepoCount,
   queryActiveRepoCount,
   queryUserSummary,
+  queryUserListSummaries,
+  queryGlobalOverview,
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
@@ -51,7 +53,7 @@ function json(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   })
   res.end(body)
@@ -136,7 +138,7 @@ export function createRouter(db: Database.Database) {
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         })
         res.end()
@@ -148,8 +150,13 @@ export function createRouter(db: Database.Database) {
 
       // ===== GET /api/users =====
       if (method === 'GET' && url === '/api/users') {
-        const users = db.prepare('SELECT login, avatar_url, profile_url, synced_at FROM users ORDER BY login').all()
-        json(res, { data: users })
+        json(res, { data: queryUserListSummaries(db) })
+        return
+      }
+
+      // ===== GET /api/overview =====
+      if (method === 'GET' && url === '/api/overview') {
+        json(res, { data: { ...queryGlobalOverview(db), aiEnabled: aiConfig.enabled } })
         return
       }
 
@@ -553,13 +560,16 @@ export function createRouter(db: Database.Database) {
           return
         }
         const tag = payload.tag.trim()
-        db.prepare(`
-          INSERT INTO repo_tags (repo_full_name, tag, tag_source, confidence)
-          VALUES (?, ?, 'manual', 1.0)
-          ON CONFLICT(repo_full_name, tag) DO UPDATE SET
-            tag_source = 'manual',
-            confidence = 1.0
-        `).run(fullName, tag)
+        const addTag = db.transaction((repoFullName: string, tagName: string) => {
+          db.prepare(`
+            INSERT INTO repo_tags (repo_full_name, tag, tag_source, confidence)
+            VALUES (?, ?, 'manual', 1.0)
+            ON CONFLICT(repo_full_name, tag) DO UPDATE SET
+              tag_source = 'manual',
+              confidence = 1.0
+          `).run(repoFullName, tagName)
+        })
+        addTag(fullName, tag)
         json(res, { data: { fullName, tag, source: 'manual' } })
         return
       }
@@ -569,7 +579,10 @@ export function createRouter(db: Database.Database) {
       if (method === 'DELETE' && delTagMatch) {
         const fullName = decodeURIComponent(delTagMatch.fullName)
         const tag = decodeURIComponent(delTagMatch.tag)
-        db.prepare(`DELETE FROM repo_tags WHERE repo_full_name = ? AND tag = ?`).run(fullName, tag)
+        const deleteTag = db.transaction((repoFullName: string, tagName: string) => {
+          db.prepare(`DELETE FROM repo_tags WHERE repo_full_name = ? AND tag = ?`).run(repoFullName, tagName)
+        })
+        deleteTag(fullName, tag)
         json(res, { data: { fullName, tag, deleted: true } })
         return
       }
@@ -578,7 +591,13 @@ export function createRouter(db: Database.Database) {
       if (method === 'GET' && url.startsWith('/api/export')) {
         const query = parseQuery(url)
         const format = query.format || 'json'
-        const login = query.login || 'demo-user'
+        const defaultUser = db.prepare(`
+          SELECT login FROM users
+          WHERE login != 'demo-user'
+          ORDER BY synced_at DESC, login
+          LIMIT 1
+        `).get() as { login: string } | undefined
+        const login = query.login || defaultUser?.login || ''
 
         // 验证用户是否存在
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)

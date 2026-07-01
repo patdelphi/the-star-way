@@ -38,6 +38,8 @@ export interface RepoListResult {
   total: number
 }
 
+export type RepoWithStar = Repo & { starred_at: string; tags: string[] }
+
 // 统计数据
 export interface UserStats {
   languages: { language: string; count: number }[]
@@ -48,12 +50,38 @@ export interface UserStats {
   aiEnabled: boolean
 }
 
+export type GlobalOverview = UserStats & {
+  userCount: number
+  tagCount: number
+  hiddenGemsCount: number
+  sleepStarsCount: number
+  licenseRiskCount: number
+  lastSyncedAt: string | null
+  recentStars: {
+    full_name: string
+    description: string | null
+    language: string | null
+    starred_at: string
+  }[]
+  gemRepos: {
+    full_name: string
+    description: string | null
+    html_url: string
+    language: string | null
+    stars: number
+    forks: number
+  }[]
+  starTrend: { label: string; value: number }[]
+}
+
 // 用户信息
 export interface UserInfo {
   login: string
   avatar_url: string | null
   profile_url: string | null
   synced_at: string | null
+  repoCount: number
+  tagCount: number
 }
 
 // API 错误响应
@@ -140,7 +168,7 @@ export async function getUsers(): Promise<UserInfo[]> {
     }
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底
-  return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null }]
+  return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null, repoCount: 0, tagCount: 0 }]
 }
 
 /**
@@ -193,6 +221,20 @@ export async function getStats(login: string): Promise<UserStats | null> {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/stats`)
       const data = await res.json()
       return data.data as UserStats
+    }
+  } catch { /* 忽略错误，降级到 mock */ }
+  return null
+}
+
+/**
+ * 获取数据库全局概览
+ */
+export async function getGlobalOverview(): Promise<GlobalOverview | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/overview`)
+      const data = await res.json()
+      return data.data as GlobalOverview
     }
   } catch { /* 忽略错误，降级到 mock */ }
   return null
@@ -307,12 +349,16 @@ export async function getSyncRuns(login: string): Promise<{
 /**
  * 获取已移除的星标仓库
  */
-export async function getRemovedStars(login: string): Promise<Repo[]> {
+export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
   try {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/removed-stars`)
       const data = await res.json()
-      return (data.data ?? []).map(adaptApiRepo)
+      return (data.data ?? []).map((repo: Repo & { starred_at?: string | null; tags?: string[] }) => ({
+        ...repo,
+        starred_at: repo.starred_at || "",
+        tags: repo.tags || [],
+      }))
     }
   } catch { /* 忽略错误 */ }
   return []

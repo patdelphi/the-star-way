@@ -17,14 +17,16 @@ const DeveloperContext = createContext<DeveloperContextValue | null>(null)
 export function DeveloperProvider({ children }: { children: ReactNode }) {
   const [currentLogin, setCurrentLoginState] = useState(() => {
     if (typeof window === "undefined") return DEFAULT_LOGIN
-    return localStorage.getItem(STORAGE_KEY) || DEFAULT_LOGIN
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored && stored !== "demo-user" ? stored : DEFAULT_LOGIN
   })
 
   const setCurrentLogin = (login: string) => {
     const normalized = login.trim() || DEFAULT_LOGIN
-    setCurrentLoginState(normalized)
+    const safeLogin = normalized === "demo-user" ? DEFAULT_LOGIN : normalized
+    setCurrentLoginState(safeLogin)
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, normalized)
+      localStorage.setItem(STORAGE_KEY, safeLogin)
     }
   }
 

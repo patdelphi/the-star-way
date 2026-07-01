@@ -24,7 +24,6 @@ import {
   Plus,
   Radar,
   Search,
-  Sparkles,
   Star,
   Tags,
   X,
@@ -246,10 +245,10 @@ const starTimeline = [
 ]
 
 const fallbackLicenseStats = [
-  { label: "MIT", count: 286, tone: "text-status-safe" },
-  { label: "Apache-2.0", count: 142, tone: "text-status-safe" },
-  { label: "GPL 系", count: 31, tone: "text-status-warning" },
-  { label: "未知", count: 58, tone: "text-status-danger" },
+  { label: "MIT", count: 286, color: "bg-status-safe" },
+  { label: "Apache-2.0", count: 142, color: "bg-status-safe" },
+  { label: "GPL 系", count: 31, color: "bg-status-warning" },
+  { label: "未知", count: 58, color: "bg-status-danger" },
 ]
 
 /**
@@ -597,12 +596,22 @@ export default function StarExplorer() {
     if (!stats?.licenses?.length) return fallbackLicenseStats
     return stats.licenses.map((l) => {
       const lic = l.license || "未知"
-      let tone = "text-status-safe"
-      if (lic.toLowerCase().includes("gpl")) tone = "text-status-warning"
-      else if (lic === "未知" || lic.toLowerCase() === "other") tone = "text-status-danger"
-      return { label: lic, count: l.count, tone }
+      let color = "bg-status-safe"
+      if (lic.toLowerCase().includes("gpl")) color = "bg-status-warning"
+      else if (lic === "未知" || lic.toLowerCase() === "other") color = "bg-status-danger"
+      return { label: lic, count: l.count, color }
     })
   }, [stats])
+
+  const totalLanguageCount = useMemo(
+    () => languageStats.reduce((sum, item) => sum + item.count, 0),
+    [languageStats],
+  )
+
+  const totalLicenseCount = useMemo(
+    () => licenseStats.reduce((sum, item) => sum + item.count, 0),
+    [licenseStats],
+  )
 
   // === 从真实数据计算指标 ===
   // 沉睡星标 = 总仓库 - 活跃仓库
@@ -722,14 +731,17 @@ export default function StarExplorer() {
 
   const openRemovedStars = async () => {
     const repos = await getRemovedStars(currentLogin)
-    setRemovedRepos(repos)
+    setRemovedRepos(repos.map(adaptApiRepo))
     setRemovedOpen(true)
   }
 
   const openRepoAnalysis = (fullName: string) => {
     localStorage.setItem("selected-star-repo", fullName)
     setAnalysisStatus(t("starExplorer.selectedRepo", { repo: fullName }))
-    navigate("/analysis")
+    const [owner, name] = fullName.split("/")
+    if (owner && name) {
+      navigate(`/repo/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`)
+    }
   }
 
   const openTagEditor = (fullName: string) => {
@@ -894,18 +906,26 @@ export default function StarExplorer() {
               </CardTitle>
               <CardDescription>{t("starExplorer.languageDistDesc")}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {languageStats.map((item) => (
-                <div key={item.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-on-surface">{item.label}</span>
-                    <span className="font-mono text-muted-foreground">{item.count}</span>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {languageStats.slice(0, 12).map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
+                      <span className="truncate text-sm text-on-surface">{item.label}</span>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono text-xs text-on-surface">{item.count}</div>
+                      <div className="font-mono text-[10px] text-muted-foreground">
+                        {totalLanguageCount > 0 ? Math.round((item.count / totalLanguageCount) * 100) : 0}%
+                      </div>
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-surface-container-high">
-                    <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${Math.min(100, item.count / 3)}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </CardContent>
           </Card>
 
@@ -1000,27 +1020,24 @@ export default function StarExplorer() {
             </CardHeader>
             <CardContent>
               {tags.length > 0 ? (
-                <div className="flex flex-wrap gap-2.5 items-center justify-center py-2">
-                  {tags.map(({ tag, count }) => {
-                    // 按 count 计算字号/颜色深浅（最小 0.8rem，最大 1.6rem）
-                    const maxCount = tags[0].count
-                    const ratio = count / maxCount
-                    const fontSize = 0.75 + ratio * 0.85
-                    const opacity = 0.5 + ratio * 0.5
-                    return (
-                      <span
-                        key={tag}
-                        className="inline-block rounded-full border border-outline-variant/50 bg-surface-container-low px-3 py-1 text-sm font-medium text-on-surface transition-colors hover:bg-primary hover:text-on-primary hover:border-primary cursor-default"
-                        style={{
-                          fontSize: `${fontSize}rem`,
-                          opacity,
-                        }}
-                      >
-                        {tag}
-                        <span className="ml-1.5 text-[0.7em] font-mono text-muted-foreground">{count}</span>
-                      </span>
-                    )
-                  })}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {tags.slice(0, 24).map(({ tag, count }) => (
+                    <button
+                      key={tag}
+                      className={`flex min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
+                        selectedTopic === tag
+                          ? "border-primary bg-primary text-on-primary"
+                          : "border-outline-variant/60 bg-surface-container-low hover:bg-surface-container"
+                      }`}
+                      onClick={() => {
+                        setSelectedTopic(selectedTopic === tag ? "" : tag)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      <span className="truncate text-sm font-medium">{tag}</span>
+                      <span className="shrink-0 font-mono text-xs opacity-80">{count}</span>
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -1031,9 +1048,9 @@ export default function StarExplorer() {
           </Card>
         </section>
 
-        {/* 协议分布 + 导出一致性 + 已取消星标 */}
+        {/* 协议分布 + 已取消星标 */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <Card className="xl:col-span-4">
+          <Card className="xl:col-span-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-5 w-5 text-primary" />
@@ -1041,36 +1058,27 @@ export default function StarExplorer() {
               </CardTitle>
               <CardDescription>{t("starExplorer.licenseDistDesc")}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {licenseStats.map((item) => (
-                <div key={item.label} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
-                  <span className={`text-sm font-medium ${item.tone}`}>{item.label}</span>
-                  <span className="font-mono text-sm text-on-surface">{item.count}</span>
+                <div key={item.label} className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
+                    <span className="truncate text-sm text-on-surface">{item.label}</span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-xs text-on-surface">{item.count}</div>
+                    <div className="font-mono text-[10px] text-muted-foreground">
+                      {totalLicenseCount > 0 ? Math.round((item.count / totalLicenseCount) * 100) : 0}%
+                    </div>
+                  </div>
                 </div>
               ))}
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="xl:col-span-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Download className="h-5 w-5 text-primary" />
-                {t("starExplorer.exportConsistency")}
-              </CardTitle>
-              <CardDescription>{t("starExplorer.exportConsistencyDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              {exportFormats.map((format) => (
-                <div key={format.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3">
-                  <div className="text-sm font-semibold text-on-surface">{format.label}</div>
-                  <div className="text-xs text-muted-foreground">{format.detail}</div>
-                  <Badge variant="outline" className="mt-2 text-[10px]">{format.status}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="xl:col-span-4">
+          <Card className="xl:col-span-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-primary" />
@@ -1354,8 +1362,8 @@ export default function StarExplorer() {
           </Card>
         )}
 
-        {/* 错误/状态提示 */}
-        <Card className={`border-status-warning/40 bg-surface-container-low ${error ? "border-status-danger/40" : ""}`}>
+        {/* 列表数据状态提示 */}
+        <Card className={`border-outline-variant/60 bg-surface-container-low ${error ? "border-status-danger/40" : ""}`}>
           <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
               {error ? `${t("starExplorer.errorPrefix")}${error}` : usingFallback ? t("starExplorer.fallbackNotice") : t("starExplorer.syncedNotice")}

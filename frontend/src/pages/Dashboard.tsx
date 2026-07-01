@@ -18,20 +18,13 @@ import {
   Star,
   GitFork,
   ExternalLink,
-  Compass,
-  FileText,
-  LineChart,
-  BookOpen,
   PieChart as PieChartIcon,
   Tags,
   Clock,
   TrendingUp,
 } from "lucide-react"
-import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
+import { getGlobalOverview, type GlobalOverview } from "@/lib/api"
 import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
-import { LineChart } from "@/components/charts/LineChart"
-import type { RepoListResult } from "@/lib/api"
-import { useDeveloper } from "@/contexts/DeveloperContext"
 
 
 // ===== 技术雷达六维映射规则 =====
@@ -220,20 +213,9 @@ function calcRadarData(tags: { tag: string; count: number }[]): RadarItem[] {
 }
 
 /**
- * 从仓库中筛选宝藏项目（隐藏宝石：低星高价值）
+ * 将全库概览中的仓库数据转换为卡片展示数据
  */
-function pickGemRepos(repos: RepoListResult['items']): GemRepo[] {
-  if (!repos || repos.length === 0) return []
-  const candidates = repos
-    .filter(r => r.stars >= 50 && r.stars <= 10000)
-    .sort((a, b) => {
-      // 优先推荐 stars 适中（1000-5000）的仓库
-      const scoreA = a.stars >= 1000 && a.stars <= 5000 ? a.stars + 5000 : a.stars
-      const scoreB = b.stars >= 1000 && b.stars <= 5000 ? b.stars + 5000 : b.stars
-      return scoreB - scoreA
-    })
-    .slice(0, 3)
-
+function adaptGemRepos(repos: GlobalOverview['gemRepos']): GemRepo[] {
   const langColorMap: Record<string, string> = {
     'Python': 'bg-domain-backend',
     'TypeScript': 'bg-domain-frontend',
@@ -245,7 +227,7 @@ function pickGemRepos(repos: RepoListResult['items']): GemRepo[] {
     'Java': 'bg-domain-backend',
   }
 
-  return candidates.map(r => ({
+  return repos.map(r => ({
     fullName: r.full_name,
     description: r.description || '',
     stars: formatNumber(r.stars),
@@ -261,9 +243,86 @@ function formatNumber(n: number): string {
   return String(n)
 }
 
+function calcPercent(value: number, total: number): number {
+  if (total <= 0) return 0
+  return Math.round((value / total) * 100)
+}
+
+function pickTopItems<T extends { count: number }>(items: T[], limit: number): T[] {
+  return [...items].sort((a, b) => b.count - a.count).slice(0, limit)
+}
+
+function TrendBars({ data }: { data: { label: string; value: number }[] }) {
+  const maxValue = Math.max(...data.map((item) => item.value), 1)
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{total}</div>
+          <div className="text-sm font-medium text-on-surface">近 12 月新增</div>
+        </div>
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{peak?.label || "-"}</div>
+          <div className="text-sm font-medium text-on-surface">峰值月份</div>
+        </div>
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{peak?.value || 0}</div>
+          <div className="text-sm font-medium text-on-surface">峰值数量</div>
+        </div>
+      </div>
+      <div className="flex h-44 items-end gap-2 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-3">
+        {data.map((item) => {
+          const height = Math.max(8, (item.value / maxValue) * 100)
+          return (
+            <div key={item.label} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
+              <div className="flex flex-1 items-end">
+                <div
+                  className="w-full rounded-t-sm bg-primary/80 transition-colors hover:bg-primary"
+                  style={{ height: `${height}%` }}
+                  title={`${item.label}: ${item.value}`}
+                />
+              </div>
+              <div className="truncate text-center font-mono text-[10px] text-muted-foreground">{item.label}</div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CompactStatGrid({
+  items,
+  total,
+  limit = 16,
+}: {
+  items: { label: string; count: number; color: string }[]
+  total: number
+  limit?: number
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {items.slice(0, limit).map((item) => (
+        <div key={item.label} className="min-w-0 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="truncate text-sm font-medium text-on-surface">{item.label}</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-mono text-lg font-semibold text-on-surface">{item.count}</span>
+            <span className="font-mono text-xs text-muted-foreground">{calcPercent(item.count, total)}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const Dashboard: React.FC = () => {
   const { t } = useTranslation()
-  const { currentLogin } = useDeveloper()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -273,11 +332,11 @@ const Dashboard: React.FC = () => {
   const [hotTopics, setHotTopics] = useState<string[]>(demoHotTopics)
   const [gemRepos, setGemRepos] = useState<GemRepo[]>(demoGemRepos)
   const [repoCount, setRepoCount] = useState(691)
-  const [learningPath, setLearningPath] = useState<string | null>(null)
   const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
   const [topicStats, setTopicStats] = useState<{ topic: string; count: number }[]>([])
   const [recentStars, setRecentStars] = useState<{ fullName: string; description: string; language: string; starredAt: string }[]>([])
   const [starTrend, setStarTrend] = useState<{ label: string; value: number }[]>([])
+  const [userCount, setUserCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -287,69 +346,56 @@ const Dashboard: React.FC = () => {
         setLoading(true)
         setError(null)
 
-        const [repoResult, stats, tags] = await Promise.all([
-          getRepos(currentLogin, { page: 1, pageSize: 100 }),
-          getStats(currentLogin),
-          getTags(currentLogin),
-        ])
+        const overview = await getGlobalOverview()
 
         if (cancelled) return
+        if (!overview) {
+          throw new Error(t('dashboard.loadError'))
+        }
 
-        // 技术人格：从 stats.languages 计算
-        if (stats && stats.languages && stats.languages.length > 0) {
-          setPersonalityData(categorizeLanguages(stats.languages))
-          setRepoCount(stats.repoCount)
-          setLanguageStats(stats.languages)
+        // 技术人格：从全库语言分布计算
+        setUserCount(overview.userCount)
+        setRepoCount(overview.repoCount)
+        if (overview.languages.length > 0) {
+          setPersonalityData(categorizeLanguages(overview.languages))
+          setLanguageStats(overview.languages)
         } else {
           setPersonalityData(demoPersonalityData)
           setLanguageStats([])
         }
 
-        // 技术雷达：从 tags 计算
-        setRadarData(calcRadarData(tags))
+        // 技术雷达：从全库 Topic 聚类计算
+        setRadarData(calcRadarData(overview.topics.map((item) => ({ tag: item.topic, count: item.count }))))
 
-        // 热门主题：从 stats.topics 取前 6 个
-        if (stats && stats.topics && stats.topics.length > 0) {
-          setHotTopics(stats.topics.slice(0, 6).map(t => t.topic))
-          setTopicStats(stats.topics)
+        // 热门主题：从全库 topics 取前 6 个
+        if (overview.topics.length > 0) {
+          setHotTopics(overview.topics.slice(0, 6).map(t => t.topic))
+          setTopicStats(overview.topics)
         } else {
           setHotTopics(demoHotTopics)
           setTopicStats([])
         }
 
-        // 宝藏项目：从 repos 筛选
-        const gems = pickGemRepos(repoResult.items)
+        // 宝藏项目：从全库候选仓库生成
+        const gems = adaptGemRepos(overview.gemRepos)
         if (gems.length > 0) {
           setGemRepos(gems)
         } else {
           setGemRepos(demoGemRepos)
         }
 
-        // 最近星标：按 starred_at 倒序取前 10
-        const recent = repoResult.items
-          .filter((r) => r.starred_at)
-          .sort((a, b) => new Date(b.starred_at).getTime() - new Date(a.starred_at).getTime())
-          .slice(0, 10)
+        // 最近星标：全库最近星标
+        const recent = overview.recentStars
           .map((r) => ({
-            fullName: r.fullName,
+            fullName: r.full_name,
             description: r.description || '',
             language: r.language || 'Unknown',
             starredAt: r.starred_at,
           }))
         setRecentStars(recent)
 
-        // 星标时间趋势：按月聚合
-        const monthMap = new Map<string, number>()
-        for (const r of repoResult.items) {
-          if (r.starred_at) {
-            const key = r.starred_at.slice(0, 7) // YYYY-MM
-            monthMap.set(key, (monthMap.get(key) || 0) + 1)
-          }
-        }
-        const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-        // 只展示最近 12 个月
-        const last12 = sortedMonths.slice(-12)
-        setStarTrend(last12.map(([label, value]) => ({ label: label.slice(5), value })))
+        // 星标时间趋势：全库按月聚合
+        setStarTrend(overview.starTrend)
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : String(err))
@@ -367,14 +413,10 @@ const Dashboard: React.FC = () => {
 
     loadData()
 
-    getLearningPath(currentLogin).then((result) => {
-      if (result?.path) setLearningPath(result.path)
-    }).catch(() => {})
-
     return () => {
       cancelled = true
     }
-  }, [currentLogin])
+  }, [t])
 
   const radarGradient = useMemo(() => {
     const total = radarData.reduce((sum, r) => sum + r.value, 0)
@@ -400,10 +442,10 @@ const Dashboard: React.FC = () => {
             </div>
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-                @{currentLogin}
+                {t('dashboard.globalOverview')}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {t('dashboard.engineReady')}
+                {t('dashboard.globalOverviewDesc', { count: userCount })}
               </p>
             </div>
           </div>
@@ -582,14 +624,17 @@ const Dashboard: React.FC = () => {
                 <TrendingUp className="h-5 w-5 text-primary" />
                 <CardTitle className="text-xl">{t("dashboard.starTrend")}</CardTitle>
               </div>
+              <CardDescription>
+                按全库真实用户的 starred_at 聚合最近 12 个月新增星标。
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <LineChart data={starTrend} height={180} />
+              <TrendBars data={starTrend} />
             </CardContent>
           </Card>
         )}
 
-        {/* 标签云 */}
+        {/* Top 标签 */}
         {topicStats.length > 0 && (
           <Card>
             <CardHeader>
@@ -597,30 +642,19 @@ const Dashboard: React.FC = () => {
                 <Tags className="h-5 w-5 text-primary" />
                 <CardTitle className="text-xl">{t("dashboard.tagCloud")}</CardTitle>
               </div>
+              <CardDescription>
+                Top 标签按全库仓库 topics 出现次数排序，数量表示命中仓库数。
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2 items-center justify-center">
-                {topicStats.slice(0, 30).map((t, i) => {
-                  const maxCount = topicStats[0].count
-                  const minCount = topicStats[topicStats.length - 1].count
-                  const sizeScale = maxCount > minCount
-                    ? 0.75 + ((t.count - minCount) / (maxCount - minCount)) * 0.75
-                    : 1
-                  return (
-                    <span
-                      key={i}
-                      className="inline-block rounded-full px-3 py-1 font-medium transition-transform hover:scale-105 cursor-default"
-                      style={{
-                        fontSize: `${sizeScale}rem`,
-                        backgroundColor: `${LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]}20`,
-                        color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
-                      }}
-                    >
-                      {t.topic}
-                    </span>
-                  )
-                })}
-              </div>
+              <CompactStatGrid
+                total={topicStats.reduce((sum, item) => sum + item.count, 0)}
+                items={pickTopItems(topicStats, 16).map((item, i) => ({
+                  label: item.topic,
+                  count: item.count,
+                  color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+                }))}
+              />
             </CardContent>
           </Card>
         )}
@@ -629,9 +663,14 @@ const Dashboard: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold tracking-tight text-on-surface">
-              {t('dashboard.gemRepos')}
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-on-surface">
+                {t('dashboard.gemRepos')}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                规则：真实用户星标中，GitHub stars 50-10000，最近 90 天有更新，按 stars 倒序取前 3。
+              </p>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {gemRepos.map((repo) => (
@@ -666,71 +705,6 @@ const Dashboard: React.FC = () => {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        </section>
-
-        {/* 个性化学习路径 */}
-        {learningPath && (
-          <section>
-            <h2 className="text-lg font-semibold tracking-tight text-on-surface mb-4 flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              {t("dashboard.learningPathTitle")}
-            </h2>
-            <Card className="bg-surface-container-low/50 border-primary/20">
-              <CardContent className="p-5">
-                <div className="prose prose-sm max-w-none dark:prose-invert text-sm leading-relaxed text-on-surface whitespace-pre-line">
-                  {learningPath}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
-        {/* 快速入口 */}
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight text-on-surface mb-4">
-            {t("dashboard.quickAccess")}
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Link to="/explorer">
-              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <Compass className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-sm">{t("nav.starExplorer")}</div>
-                    <div className="text-xs text-muted-foreground">{t("dashboard.exploreDesc")}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link to="/catalog">
-              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-domain-backend/10">
-                    <FileText className="h-5 w-5 text-domain-backend" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-sm">{t("nav.starCatalog")}</div>
-                    <div className="text-xs text-muted-foreground">{t("dashboard.catalogDesc")}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link to="/analysis">
-              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-domain-ai/10">
-                    <LineChart className="h-5 w-5 text-domain-ai" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-sm">{t("nav.repoAnalysis")}</div>
-                    <div className="text-xs text-muted-foreground">{t("dashboard.analysisDesc")}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
           </div>
         </section>
       </div>

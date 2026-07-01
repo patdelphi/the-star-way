@@ -40,12 +40,12 @@ type RepoDetailData = Repo & {
 
 /** 默认 AI 分析数据 */
 const demoAiAnalysis = {
-  reason: "你为何星标该项目",
+  reason: "项目价值判断",
   reasonText:
-    "该项目提供了将各类文档（PDF、Word、PPT 等）转换为 Markdown 的简洁方案，与你关注的文档处理与 AI 工具链方向高度契合。",
+    "该项目提供了将各类文档（PDF、Word、PPT 等）转换为 Markdown 的方案，适用于需要把非结构化文档转为可检索、可处理文本的通用场景。",
   learningValues: ["文档解析", "Markdown 生成", "Python 工具链"],
   reuseAdvice:
-    "可直接集成到文档处理流水线中，或作为 RAG 系统的前置解析模块复用。",
+    "可作为文档转换、内容抽取或知识库入库流程的前置模块；正式集成前应评估格式覆盖、解析质量、异常处理和许可证要求。",
 }
 
 /** 默认协议健康度数据 */
@@ -198,7 +198,7 @@ const RepoDetail: React.FC = () => {
   const displayRepo = repoData
 
   // 头部展示字段
-  const displayFullName = displayRepo?.full_name ?? `${owner}/${name}` ?? "microsoft/markitdown"
+  const displayFullName = displayRepo?.full_name ?? (owner && name ? `${owner}/${name}` : "microsoft/markitdown")
   const displayDescription = displayRepo?.description ?? "用于把文件和办公文档转换为 Markdown 的 Python 工具。"
   const displayStars = displayRepo?.stars ?? 40200
   const displayForks = displayRepo?.forks ?? 1800
@@ -211,7 +211,7 @@ const RepoDetail: React.FC = () => {
   // 协议健康度：根据 API 返回的 license 动态展示
   const licenseHealth = displayRepo?.license
     ? {
-        license: displayRepo.license,
+        license: displayLicense,
         riskLevel: t("repoDetail.riskLevel"),
         riskColor: "text-status-safe",
       }

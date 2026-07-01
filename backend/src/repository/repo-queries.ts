@@ -12,6 +12,8 @@ import type {
   LicenseStat,
 } from '../db/types.js'
 
+const SYSTEM_DEMO_LOGIN = 'demo-user'
+
 // ===== 列表查询 =====
 
 /**
@@ -363,5 +365,222 @@ export function queryUserSummary(db: Database.Database, userLogin: string): {
     sleepStarsCount,
     licenseRiskCount,
     lastSyncedAt,
+  }
+}
+
+/**
+ * 查询用户列表摘要
+ * 排除系统演示用户，并按有效星标数量展示真实同步规模。
+ */
+export function queryUserListSummaries(db: Database.Database): Array<{
+  login: string
+  avatar_url: string | null
+  profile_url: string | null
+  synced_at: string | null
+  repoCount: number
+  tagCount: number
+}> {
+  return db.prepare(`
+    SELECT
+      u.login,
+      u.avatar_url,
+      u.profile_url,
+      u.synced_at,
+      COUNT(DISTINCT CASE WHEN s.removed_at IS NULL THEN s.repo_full_name END) as repoCount,
+      COUNT(DISTINCT rt.tag) as tagCount
+    FROM users u
+    LEFT JOIN stars s ON s.user_login = u.login
+    LEFT JOIN repo_tags rt ON rt.repo_full_name = s.repo_full_name AND s.removed_at IS NULL
+    WHERE u.login != ?
+    GROUP BY u.login, u.avatar_url, u.profile_url, u.synced_at
+    ORDER BY u.login
+  `).all(SYSTEM_DEMO_LOGIN) as Array<{
+    login: string
+    avatar_url: string | null
+    profile_url: string | null
+    synced_at: string | null
+    repoCount: number
+    tagCount: number
+  }>
+}
+
+/**
+ * 查询全库概览统计
+ * 只统计真实用户的有效星标，避免 demo-user 和 removed_at 记录污染总览。
+ */
+export function queryGlobalOverview(db: Database.Database): {
+  userCount: number
+  repoCount: number
+  activeRepoCount: number
+  tagCount: number
+  hiddenGemsCount: number
+  sleepStarsCount: number
+  licenseRiskCount: number
+  lastSyncedAt: string | null
+  languages: LanguageStat[]
+  topics: TopicStat[]
+  licenses: LicenseStat[]
+  recentStars: Array<{
+    full_name: string
+    description: string | null
+    language: string | null
+    starred_at: string
+  }>
+  gemRepos: Array<{
+    full_name: string
+    description: string | null
+    html_url: string
+    language: string | null
+    stars: number
+    forks: number
+  }>
+  starTrend: Array<{ label: string; value: number }>
+} {
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const baseWhere = `s.removed_at IS NULL AND s.user_login != ?`
+
+  const userRow = db.prepare(`
+    SELECT COUNT(*) as cnt, MAX(synced_at) as lastSyncedAt
+    FROM users
+    WHERE login != ?
+  `).get(SYSTEM_DEMO_LOGIN) as { cnt: number; lastSyncedAt: string | null }
+
+  const repoRow = db.prepare(`
+    SELECT COUNT(DISTINCT s.repo_full_name) as cnt
+    FROM stars s
+    WHERE ${baseWhere}
+  `).get(SYSTEM_DEMO_LOGIN) as { cnt: number }
+
+  const activeRow = db.prepare(`
+    SELECT COUNT(DISTINCT r.full_name) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere} AND r.pushed_at >= ?
+  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+
+  const tagRow = db.prepare(`
+    SELECT COUNT(DISTINCT rt.tag) as cnt
+    FROM repo_tags rt
+    JOIN stars s ON rt.repo_full_name = s.repo_full_name
+    WHERE ${baseWhere}
+  `).get(SYSTEM_DEMO_LOGIN) as { cnt: number }
+
+  const hiddenGemsRow = db.prepare(`
+    SELECT COUNT(DISTINCT r.full_name) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere} AND r.stars <= 1000 AND r.pushed_at >= ?
+  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+
+  const sleepRow = db.prepare(`
+    SELECT COUNT(DISTINCT r.full_name) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere} AND (r.pushed_at IS NULL OR r.pushed_at < ?)
+  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+
+  const riskRow = db.prepare(`
+    SELECT COUNT(DISTINCT r.full_name) as cnt
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere}
+      AND (LOWER(COALESCE(r.license, '')) LIKE '%gpl%'
+           OR COALESCE(r.license, '') = ''
+           OR LOWER(COALESCE(r.license, '')) = 'other')
+  `).get(SYSTEM_DEMO_LOGIN) as { cnt: number }
+
+  const languages = db.prepare(`
+    SELECT COALESCE(r.language, 'Unknown') as language, COUNT(DISTINCT r.full_name) as count
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere}
+    GROUP BY COALESCE(r.language, 'Unknown')
+    ORDER BY count DESC
+  `).all(SYSTEM_DEMO_LOGIN) as LanguageStat[]
+
+  const licenses = db.prepare(`
+    SELECT COALESCE(r.license, 'Unknown') as license, COUNT(DISTINCT r.full_name) as count
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere}
+    GROUP BY COALESCE(r.license, 'Unknown')
+    ORDER BY count DESC
+  `).all(SYSTEM_DEMO_LOGIN) as LicenseStat[]
+
+  const topicRows = db.prepare(`
+    SELECT DISTINCT r.full_name, r.topics_json
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere} AND r.topics_json IS NOT NULL
+  `).all(SYSTEM_DEMO_LOGIN) as { topics_json: string }[]
+  const topicCount = new Map<string, number>()
+  for (const row of topicRows) {
+    try {
+      const topics: string[] = JSON.parse(row.topics_json)
+      for (const topic of topics) topicCount.set(topic, (topicCount.get(topic) || 0) + 1)
+    } catch {
+      // 忽略坏数据，保证概览接口稳定返回。
+    }
+  }
+  const topics = Array.from(topicCount.entries())
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const recentStars = db.prepare(`
+    SELECT r.full_name, r.description, r.language, MAX(s.starred_at) as starred_at
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere} AND s.starred_at IS NOT NULL
+    GROUP BY r.full_name, r.description, r.language
+    ORDER BY starred_at DESC
+    LIMIT 10
+  `).all(SYSTEM_DEMO_LOGIN) as Array<{
+    full_name: string
+    description: string | null
+    language: string | null
+    starred_at: string
+  }>
+
+  const gemRepos = db.prepare(`
+    SELECT DISTINCT r.full_name, r.description, r.html_url, r.language, r.stars, r.forks
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE ${baseWhere}
+      AND r.stars BETWEEN 50 AND 10000
+      AND r.pushed_at >= ?
+    ORDER BY r.stars DESC
+    LIMIT 3
+  `).all(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as Array<{
+    full_name: string
+    description: string | null
+    html_url: string
+    language: string | null
+    stars: number
+    forks: number
+  }>
+
+  const trendRows = db.prepare(`
+    SELECT substr(s.starred_at, 1, 7) as label, COUNT(*) as value
+    FROM stars s
+    WHERE ${baseWhere} AND s.starred_at IS NOT NULL
+    GROUP BY substr(s.starred_at, 1, 7)
+    ORDER BY label ASC
+  `).all(SYSTEM_DEMO_LOGIN) as Array<{ label: string; value: number }>
+
+  return {
+    userCount: userRow.cnt,
+    repoCount: repoRow.cnt,
+    activeRepoCount: activeRow.cnt,
+    tagCount: tagRow.cnt,
+    hiddenGemsCount: hiddenGemsRow.cnt,
+    sleepStarsCount: sleepRow.cnt,
+    licenseRiskCount: riskRow.cnt,
+    lastSyncedAt: userRow.lastSyncedAt,
+    languages,
+    topics,
+    licenses,
+    recentStars,
+    gemRepos,
+    starTrend: trendRows.slice(-12).map(row => ({ label: row.label.slice(5), value: row.value })),
   }
 }

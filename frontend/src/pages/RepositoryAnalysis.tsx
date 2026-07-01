@@ -9,6 +9,7 @@ import { Link } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
   BookOpenText,
   CheckCircle2,
   Clock,
@@ -16,6 +17,7 @@ import {
   ExternalLink,
   FileText,
   GitFork,
+  Info,
   Layers3,
   LineChart,
   Network,
@@ -370,6 +372,12 @@ export default function RepositoryAnalysis() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="gap-2" asChild>
+              <Link to="/explorer">
+                <ArrowLeft className="h-4 w-4" />
+                返回星标仓库
+              </Link>
+            </Button>
             <Button variant="outline" className="gap-2" onClick={runMockAnalysis} disabled={loading}>
               <LineChart className="h-4 w-4" />
               {t("repoAnalysis.reAnalyze")}
@@ -380,6 +388,17 @@ export default function RepositoryAnalysis() {
             </Button>
           </div>
         </section>
+
+        <Card className="border-primary/20 bg-surface-container-low">
+          <CardContent className="flex gap-3 p-4 text-sm leading-6 text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div>
+              <span className="font-medium text-on-surface">数据来源与容错：</span>
+              仓库名称、描述、语言、stars、forks、更新时间、license 和 topics 来自同步 GitHub stars 时保存的本地数据库。
+              README 摘要、深度分析、相似项目和评分只有在 AI 接口成功生成后才可信；没有 AI 结果时页面只展示基础字段，并用默认占位说明“暂无深度分析”。
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 搜索与选择器 */}
         <Card className="border-outline-variant/60 bg-surface-container-low">
