@@ -4,7 +4,7 @@
  * API 不可用时自动回退到 Demo 数据。
  */
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -885,7 +885,9 @@ export default function StarExplorer() {
                         <TableCell>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-on-surface">{repo.fullName}</span>
+                              <Link to={`/repo/${repo.fullName}`} className="font-medium text-on-surface hover:text-primary hover:underline">
+                                {repo.fullName}
+                              </Link>
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>

@@ -2,9 +2,11 @@
  * RepoDetail.tsx
  * 仓库详情页
  * 展示单个仓库的详细信息、AI 智能分析、协议健康度和相关推荐
+ * 通过路由参数获取 owner/name，调用真实 API 获取数据，API 不可用时回退到静态 Demo 数据
  */
 
-import React from "react"
+import React, { useState, useEffect } from "react"
+import { useParams } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,9 +23,20 @@ import {
   ShieldCheck,
   Network,
 } from "lucide-react"
+import { getRepo, type Repo } from "@/lib/api"
 
-// AI 分析数据
-const aiAnalysis = {
+// ===== 类型定义 =====
+
+/** API 返回的仓库详情（包含 Repo 字段及 starred_at、tags） */
+type RepoDetailData = Repo & {
+  starred_at: string
+  tags: string[]
+}
+
+// ===== Demo 静态数据（API 不可用时的兜底数据） =====
+
+/** 默认 AI 分析数据 */
+const demoAiAnalysis = {
   reason: "你为何星标该项目",
   reasonText:
     "该项目提供了将各类文档（PDF、Word、PPT 等）转换为 Markdown 的简洁方案，与你关注的文档处理与 AI 工具链方向高度契合。",
@@ -32,23 +45,23 @@ const aiAnalysis = {
     "可直接集成到文档处理流水线中，或作为 RAG 系统的前置解析模块复用。",
 }
 
-// 协议健康度
-const licenseHealth = {
+/** 默认协议健康度数据 */
+const demoLicenseHealth = {
   license: "MIT",
   riskLevel: "低风险",
   riskColor: "text-status-safe",
 }
 
-// 系统雷达数据（柱状图）
-const systemRadar = [
+/** 默认系统雷达数据（柱状图） */
+const demoSystemRadar = [
   { label: "活跃度", value: 85, color: "bg-primary" },
   { label: "社区", value: 72, color: "bg-domain-frontend" },
   { label: "文档", value: 90, color: "bg-domain-backend" },
   { label: "稳定性", value: 78, color: "bg-domain-ai" },
 ]
 
-// 推荐相关项目
-const relatedRepos = [
+/** 默认推荐相关项目 */
+const demoRelatedRepos = [
   {
     fullName: "JupyterLab/jupyterlab",
     description: "JupyterLab 交互式计算环境。",
@@ -75,9 +88,46 @@ const relatedRepos = [
   },
 ]
 
+/** 格式化数字：大于 1000 时显示为 k */
+function formatCount(num: number): string {
+  if (num >= 10000) {
+    return `${(num / 1000).toFixed(1)}k`
+  }
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}k`
+  }
+  return String(num)
+}
+
+/** 格式化时间差：显示为 "X 天前" */
+function formatTimeAgo(dateStr: string | null): string {
+  if (!dateStr) return "未知时间"
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays <= 0) return "今天"
+  if (diffDays === 1) return "昨天"
+  if (diffDays < 30) return `${diffDays} 天前`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} 个月前`
+  return `${Math.floor(diffDays / 365)} 年前`
+}
+
 const RepoDetail: React.FC = () => {
+  // 从路由参数中获取仓库 owner 和 name
+  const { owner, name } = useParams<{ owner: string; name: string }>()
+
+  // 数据获取状态
+  const [repoData, setRepoData] = useState<RepoDetailData | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  /** 复制克隆地址到剪贴板 */
   const handleCopyClone = () => {
-    navigator.clipboard.writeText("git clone https://github.com/microsoft/markitdown.git")
+    const cloneUrl = repoData
+      ? `git clone ${repoData.html_url}.git`
+      : "git clone https://github.com/microsoft/markitdown.git"
+    navigator.clipboard.writeText(cloneUrl)
       .then(() => {
         // eslint-disable-next-line no-console
         console.log("克隆地址已复制")
@@ -88,45 +138,129 @@ const RepoDetail: React.FC = () => {
       })
   }
 
+  /** 在 useEffect 中调用 API 获取仓库详情 */
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchRepo() {
+      // 参数校验：owner 和 name 必须存在
+      if (!owner || !name) {
+        setError("缺少仓库参数")
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        // 默认用户 'demo-user'
+        const data = await getRepo("demo-user", `${owner}/${name}`)
+        if (cancelled) return
+
+        if (data) {
+          setRepoData(data)
+        } else {
+          // API 返回 null（不可用或无数据），回退到 Demo 数据并标记提示
+          setError("API 暂不可用，显示 Demo 数据")
+        }
+      } catch (err) {
+        if (cancelled) return
+        setError("获取数据失败，显示 Demo 数据")
+        // eslint-disable-next-line no-console
+        console.error("获取仓库详情失败:", err)
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchRepo()
+
+    // 清理函数：避免组件卸载后更新状态
+    return () => {
+      cancelled = true
+    }
+  }, [owner, name])
+
+  // 决定实际展示的数据（API 数据优先，否则用 Demo 数据）
+  const displayRepo = repoData
+
+  // 头部展示字段
+  const displayFullName = displayRepo?.full_name ?? `${owner}/${name}` ?? "microsoft/markitdown"
+  const displayDescription = displayRepo?.description ?? "用于把文件和办公文档转换为 Markdown 的 Python 工具。"
+  const displayStars = displayRepo?.stars ?? 40200
+  const displayForks = displayRepo?.forks ?? 1800
+  const displayPushedAt = displayRepo?.pushed_at ?? null
+  const displayHtmlUrl = displayRepo?.html_url ?? `https://github.com/${owner}/${name}`
+  const displayLanguage = displayRepo?.language ?? "Python"
+  const displayLicense = displayRepo?.license ?? "MIT"
+  const displayTags = displayRepo?.tags ?? ["AI 工具", displayLanguage].filter(Boolean)
+
+  // 协议健康度：根据 API 返回的 license 动态展示
+  const licenseHealth = displayRepo?.license
+    ? {
+        license: displayRepo.license,
+        riskLevel: "低风险",
+        riskColor: "text-status-safe",
+      }
+    : demoLicenseHealth
+
   return (
     <div className="min-h-screen bg-grid-pattern p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
+        {/* Loading 状态 */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-muted-foreground">加载中...</div>
+          </div>
+        )}
+
+        {/* Error 提示（API 不可用回退到 Demo） */}
+        {error && !loading && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            {error}
+          </div>
+        )}
+
         {/* 头部信息 */}
         <section className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="default" className="font-mono text-xs uppercase tracking-wider">
-              AI 工具
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-xs uppercase tracking-wider">
-              Python
-            </Badge>
+            {displayTags.map((tag) => (
+              <Badge key={tag} variant="default" className="font-mono text-xs uppercase tracking-wider">
+                {tag}
+              </Badge>
+            ))}
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-            microsoft/markitdown
+            {displayFullName}
           </h1>
           <p className="max-w-3xl text-base text-muted-foreground">
-            用于把文件和办公文档转换为 Markdown 的 Python 工具。
+            {displayDescription}
           </p>
           <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Star className="h-4 w-4 text-primary" />
-              <span className="font-medium text-on-surface">40.2k</span>
+              <span className="font-medium text-on-surface">{formatCount(displayStars)}</span>
               <span>星标</span>
             </div>
             <div className="flex items-center gap-1.5">
               <GitFork className="h-4 w-4" />
-              <span className="font-medium text-on-surface">1.8k</span>
+              <span className="font-medium text-on-surface">{formatCount(displayForks)}</span>
               <span>分叉</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              <span>更新于 2 天前</span>
+              <span>更新于 {formatTimeAgo(displayPushedAt)}</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button className="gap-2">
-              <ExternalLink className="h-4 w-4" />
-              在 GitHub 打开
+            <Button className="gap-2" asChild>
+              <a href={displayHtmlUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                在 GitHub 打开
+              </a>
             </Button>
             <Button variant="outline" className="gap-2" onClick={handleCopyClone}>
               <Copy className="h-4 w-4" />
@@ -150,10 +284,10 @@ const RepoDetail: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
                   <Star className="h-4 w-4 text-primary" />
-                  <span>{aiAnalysis.reason}</span>
+                  <span>{demoAiAnalysis.reason}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  {aiAnalysis.reasonText}
+                  {demoAiAnalysis.reasonText}
                 </p>
               </div>
 
@@ -164,7 +298,7 @@ const RepoDetail: React.FC = () => {
                   <span>学习价值</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {aiAnalysis.learningValues.map((tag) => (
+                  {demoAiAnalysis.learningValues.map((tag) => (
                     <Badge key={tag} variant="default" className="font-mono text-xs uppercase tracking-wider">
                       {tag}
                     </Badge>
@@ -179,7 +313,7 @@ const RepoDetail: React.FC = () => {
                   <span>复用建议</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  {aiAnalysis.reuseAdvice}
+                  {demoAiAnalysis.reuseAdvice}
                 </p>
               </div>
             </CardContent>
@@ -222,7 +356,7 @@ const RepoDetail: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {systemRadar.map((item) => (
+                {demoSystemRadar.map((item) => (
                   <div key={item.label} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{item.label}</span>
@@ -247,7 +381,7 @@ const RepoDetail: React.FC = () => {
             推荐相关项目
           </h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {relatedRepos.map((repo) => (
+            {demoRelatedRepos.map((repo) => (
               <Card key={repo.fullName} className="group flex flex-col transition-shadow hover:shadow-md">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">

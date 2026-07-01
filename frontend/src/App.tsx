@@ -4,6 +4,7 @@ import { TopBar } from "./components/layout/TopBar"
 import Developers from "./pages/Developers"
 import StarExplorer from "./pages/StarExplorer"
 import RepositoryAnalysis from "./pages/RepositoryAnalysis"
+import RepoDetail from "./pages/RepoDetail"
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/developers" element={<Developers />} />
             <Route path="/explorer" element={<StarExplorer />} />
             <Route path="/analysis" element={<RepositoryAnalysis />} />
+            <Route path="/repo/:owner/:name" element={<RepoDetail />} />
             <Route path="/" element={<Navigate to="/developers" replace />} />
             <Route path="*" element={<Navigate to="/developers" replace />} />
           </Routes>

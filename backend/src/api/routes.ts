@@ -174,7 +174,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/repos/*fullName（支持 owner/repo 格式） =====
       const repoMatch = matchRoute('/api/users/:login/repos/*', url.split('?')[0])
       if (method === 'GET' && repoMatch) {
-        const fullName = repoMatch['*'] || ''
+        const fullName = decodeURIComponent(repoMatch['*'] || '')
         const repo = queryRepoByName(db, fullName)
         if (!repo) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)

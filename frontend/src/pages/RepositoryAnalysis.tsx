@@ -4,6 +4,7 @@
  * 通过 getRepos / getStats / getTags 获取数据；API 不可用时自动回退到内置 Demo 数据。
  */
 import { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -391,6 +392,12 @@ export default function RepositoryAnalysis() {
                 ))}
               </Select>
             </div>
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link to={`/repo/${activeRepo.fullName}`}>
+                <ExternalLink className="h-4 w-4" />
+                查看详情
+              </Link>
+            </Button>
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
