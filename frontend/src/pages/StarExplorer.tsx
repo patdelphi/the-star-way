@@ -479,6 +479,61 @@ export default function StarExplorer() {
     })
   }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos, quickFilter])
 
+  // === 筛选项命中数量（基于当前其他筛选条件）===
+  const filterCounts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+    const baseFilter = (repo: StarRepo, exclude: 'language' | 'topic' | 'license') => {
+      const matchesQuery =
+        !query ||
+        [repo.fullName, repo.description, repo.language, repo.category, ...repo.topics, ...repo.autoTags]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      const matchesLanguage = exclude === 'language' || !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
+      const matchesTopic = exclude === 'topic' || !selectedTopic || repo.topics.some((t) => t.toLowerCase().includes(selectedTopic.toLowerCase()))
+      const matchesLicense = exclude === 'license' || !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
+      let matchesQuick = true
+      if (quickFilter === "hiddenGems") {
+        const starNum = parseInt(repo.stars.replace(/[kK]/g, "000").replace(/[^0-9]/g, "")) || 0
+        const pushed = repo.updatedAt ? new Date(repo.updatedAt) : null
+        matchesQuick = starNum <= 1000 && pushed !== null && pushed >= ninetyDaysAgo
+      } else if (quickFilter === "sleepStars") {
+        const pushed = repo.updatedAt ? new Date(repo.updatedAt) : null
+        matchesQuick = pushed !== null && pushed < ninetyDaysAgo
+      }
+      return matchesQuery && matchesLanguage && matchesTopic && matchesLicense && matchesQuick
+    }
+
+    const langCounts: Record<string, number> = {}
+    const topicCounts: Record<string, number> = {}
+    const licenseCounts: Record<string, number> = {}
+
+    for (const repo of allRepos) {
+      if (baseFilter(repo, 'language')) {
+        const lang = repo.language || 'Unknown'
+        langCounts[lang] = (langCounts[lang] || 0) + 1
+      }
+      if (baseFilter(repo, 'topic')) {
+        for (const t of repo.topics) {
+          topicCounts[t] = (topicCounts[t] || 0) + 1
+        }
+      }
+      if (baseFilter(repo, 'license')) {
+        const lic = repo.license || 'Unknown'
+        licenseCounts[lic] = (licenseCounts[lic] || 0) + 1
+      }
+    }
+
+    return {
+      languages: Object.entries(langCounts).sort((a, b) => b[1] - a[1]).slice(0, 20),
+      topics: Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 20),
+      licenses: Object.entries(licenseCounts).sort((a, b) => b[1] - a[1]).slice(0, 10),
+    }
+  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, allRepos, quickFilter])
+
   // === 分页 ===
   const totalPages = Math.max(1, Math.ceil(filteredRepos.length / pageSize))
   const paginatedRepos = useMemo(() => {
@@ -957,23 +1012,29 @@ export default function StarExplorer() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:w-[620px]">
-                <Select value={selectedLanguage} onChange={(event) => setSelectedLanguage(event.target.value)}>
+                <Select value={selectedLanguage} onChange={(event) => { setSelectedLanguage(event.target.value); setCurrentPage(1) }}>
                   <SelectOption value="">{t("starExplorer.language")}</SelectOption>
-                  <SelectOption value="python">Python</SelectOption>
-                  <SelectOption value="typescript">TypeScript</SelectOption>
-                  <SelectOption value="rust">Rust</SelectOption>
+                  {filterCounts.languages.map(([lang, count]) => (
+                    <SelectOption key={lang} value={lang.toLowerCase()}>
+                      {lang} ({count})
+                    </SelectOption>
+                  ))}
                 </Select>
-                <Select value={selectedTopic} onChange={(event) => setSelectedTopic(event.target.value)}>
+                <Select value={selectedTopic} onChange={(event) => { setSelectedTopic(event.target.value); setCurrentPage(1) }}>
                   <SelectOption value="">{t("starExplorer.topic")}</SelectOption>
-                  <SelectOption value="ai">AI</SelectOption>
-                  <SelectOption value="mcp">MCP</SelectOption>
-                  <SelectOption value="rag">RAG</SelectOption>
+                  {filterCounts.topics.map(([topic, count]) => (
+                    <SelectOption key={topic} value={topic.toLowerCase()}>
+                      {topic} ({count})
+                    </SelectOption>
+                  ))}
                 </Select>
-                <Select value={selectedLicense} onChange={(event) => setSelectedLicense(event.target.value)}>
+                <Select value={selectedLicense} onChange={(event) => { setSelectedLicense(event.target.value); setCurrentPage(1) }}>
                   <SelectOption value="">{t("starExplorer.license")}</SelectOption>
-                  <SelectOption value="mit">MIT</SelectOption>
-                  <SelectOption value="apache">Apache-2.0</SelectOption>
-                  <SelectOption value="gpl">GPL-3.0</SelectOption>
+                  {filterCounts.licenses.map(([lic, count]) => (
+                    <SelectOption key={lic} value={lic.toLowerCase()}>
+                      {lic} ({count})
+                    </SelectOption>
+                  ))}
                 </Select>
                 <Select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
                   <SelectOption value="starred_at">{t("starExplorer.sortByStarredAt")}</SelectOption>
