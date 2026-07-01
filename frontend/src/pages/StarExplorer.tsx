@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  FileText,
   Filter,
   Flame,
   GitFork,
@@ -28,7 +29,7 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars } from "@/lib/api"
+import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport } from "@/lib/api"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Badge } from "@/components/ui/badge"
@@ -1088,10 +1089,16 @@ export default function StarExplorer() {
             <h2 className="text-xl font-semibold tracking-tight text-on-surface">{t("starExplorer.allRepos")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{t("starExplorer.allReposDesc")}</p>
           </div>
-          <Button className="gap-2" onClick={() => handleExport("Markdown")}>
-            <Download className="h-4 w-4" />
-            {t("starExplorer.exportReport")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => downloadReport(currentLogin)}>
+              <FileText className="h-4 w-4" />
+              {t("starExplorer.generateReport")}
+            </Button>
+            <Button className="gap-2" onClick={() => handleExport("Markdown")}>
+              <Download className="h-4 w-4" />
+              {t("starExplorer.exportReport")}
+            </Button>
+          </div>
         </section>
 
         {/* 筛选卡片 */}

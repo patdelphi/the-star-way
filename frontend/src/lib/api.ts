@@ -353,6 +353,19 @@ export async function getStarDna(login: string): Promise<{
 }
 
 /**
+ * 下载分析报告（Markdown）
+ */
+export function downloadReport(login: string): void {
+  const url = `${API_BASE}/api/users/${login}/report`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${login}-star-report.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+/**
  * 获取后端 GitHub Token 来源
  */
 export async function getTokenSource(): Promise<{

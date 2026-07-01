@@ -207,6 +207,7 @@
     "removedStarsTitle": "已移除的 Star",
     "removedStarsDesc": "共 {{count}} 个仓库已从你的星标列表中移除",
     "noRemovedStars": "暂无已移除的仓库",
+    "generateReport": "生成报告",
     "licenseRiskTitle": "License 风险说明",
     "licenseRiskDesc": "以下 {{count}} 个仓库使用 GPL 或未知协议，可能限制商业使用",
     "licenseRiskExplain": "GPL 协议要求衍生作品也开源；未知协议意味着使用条款不明确。",

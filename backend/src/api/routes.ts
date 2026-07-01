@@ -17,7 +17,7 @@ import {
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
-import { exportCsv, exportJson, exportMarkdown } from '../export/exporter.js'
+import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
 import { generateReadmeSummary, generateStarDna } from '../ai/client.js'
 
@@ -538,6 +538,19 @@ export function createRouter(db: Database.Database) {
           }
         } catch (err: any) {
           error(res, 'EXPORT_ERROR', `导出失败: ${err?.message || err}`, 500)
+        }
+        return
+      }
+
+      // ===== GET /api/users/:login/report =====
+      const reportMatch = matchRoute('/api/users/:login/report', url.split('?')[0])
+      if (method === 'GET' && reportMatch) {
+        const { login } = reportMatch
+        try {
+          const md = exportReportMarkdown(db, login)
+          text(res, md, 'text/markdown', 200)
+        } catch (err: any) {
+          error(res, 'REPORT_ERROR', `生成报告失败: ${err?.message || err}`, 500)
         }
         return
       }

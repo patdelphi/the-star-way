@@ -207,6 +207,7 @@
     "removedStarsTitle": "Removed Stars",
     "removedStarsDesc": "{{count}} repositories removed from your starred list",
     "noRemovedStars": "No removed repositories",
+    "generateReport": "Generate Report",
     "licenseRiskTitle": "License Risk Explanation",
     "licenseRiskDesc": "{{count}} repositories use GPL or unknown licenses, which may restrict commercial use",
     "licenseRiskExplain": "GPL requires derivative works to be open source; unknown licenses have unclear terms.",

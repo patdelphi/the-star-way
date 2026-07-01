@@ -134,3 +134,182 @@ export function exportMarkdown(db: Database.Database, login: string, params: Omi
 
   return lines.join('\r\n') + '\r\n'
 }
+
+// ===== 分析报告导出 =====
+
+import {
+  queryActiveRepoCount,
+  queryLanguageStats,
+  queryTopicStats,
+  queryLicenseStats,
+} from '../repository/repo-queries.js'
+
+/**
+ * 生成面向阅读的分析报告（Markdown）
+ * @param db 数据库连接
+ * @param login 用户名
+ * @returns Markdown 文本
+ */
+export function exportReportMarkdown(db: Database.Database, login: string): string {
+  const now = new Date().toISOString()
+  const total = queryRepoCount(db, login)
+  const active = queryActiveRepoCount(db, login)
+  const languages = queryLanguageStats(db, login)
+  const topics = queryTopicStats(db, login)
+  const licenses = queryLicenseStats(db, login)
+
+  // 沉睡星标（90天未更新）
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const sleepStars = db.prepare(`
+    SELECT r.full_name, r.description, r.language, r.stars, r.pushed_at
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ? AND r.pushed_at < ?
+    ORDER BY r.pushed_at ASC
+    LIMIT 20
+  `).all(login, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
+
+  // License 风险
+  const licenseRisk = db.prepare(`
+    SELECT r.full_name, r.description, r.language, r.stars, r.license
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ? AND (
+      LOWER(r.license) LIKE '%gpl%' OR r.license = '' OR r.license = 'other' OR r.license = 'NOASSERTION'
+    )
+    ORDER BY r.stars DESC
+    LIMIT 20
+  `).all(login) as Array<{ full_name: string; description: string; language: string; stars: number; license: string }>
+
+  // Hidden Gems（星标 <= 1000 且 90天内有更新）
+  const hiddenGems = db.prepare(`
+    SELECT r.full_name, r.description, r.language, r.stars, r.pushed_at
+    FROM repos r
+    JOIN stars s ON r.full_name = s.repo_full_name
+    WHERE s.user_login = ? AND r.stars <= 1000 AND r.pushed_at > ?
+    ORDER BY r.stars DESC
+    LIMIT 20
+  `).all(login, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
+
+  const lines: string[] = []
+
+  lines.push(`# the-star-way 星标分析报告`)
+  lines.push('')
+  lines.push(`**用户**: \`${login}\``)
+  lines.push(`**生成时间**: ${now}`)
+  lines.push('')
+
+  // 概览
+  lines.push(`## 概览`)
+  lines.push('')
+  lines.push(`- 星标仓库总数: **${total}**`)
+  lines.push(`- 活跃仓库数（90天内更新）: **${active}**`)
+  lines.push(`- 沉睡仓库数: **${sleepStars.length}**`)
+  lines.push(`- License 风险仓库数: **${licenseRisk.length}**`)
+  lines.push(`- Hidden Gems: **${hiddenGems.length}**`)
+  lines.push('')
+
+  // 技术栈
+  lines.push(`## 技术栈概览`)
+  lines.push('')
+  lines.push(`### 主要语言`)
+  lines.push('')
+  lines.push('| 语言 | 数量 | 占比 |')
+  lines.push('| --- | --- | --- |')
+  for (const l of languages.slice(0, 10)) {
+    const pct = total > 0 ? ((l.count / total) * 100).toFixed(1) : '0.0'
+    lines.push(`| ${l.language || 'Unknown'} | ${l.count} | ${pct}% |`)
+  }
+  lines.push('')
+
+  lines.push(`### 主要标签`)
+  lines.push('')
+  lines.push('| 标签 | 数量 |')
+  lines.push('| --- | --- |')
+  for (const t of topics.slice(0, 10)) {
+    lines.push(`| ${t.topic} | ${t.count} |`)
+  }
+  lines.push('')
+
+  lines.push(`### License 分布`)
+  lines.push('')
+  lines.push('| License | 数量 |')
+  lines.push('| --- | --- |')
+  for (const l of licenses.slice(0, 10)) {
+    lines.push(`| ${l.license || 'Unknown'} | ${l.count} |`)
+  }
+  lines.push('')
+
+  // 风险分析
+  if (licenseRisk.length > 0) {
+    lines.push(`## 风险分析`)
+    lines.push('')
+    lines.push(`### License 风险`)
+    lines.push('')
+    lines.push('以下仓库使用 GPL 或未知协议，可能限制商业使用：')
+    lines.push('')
+    lines.push('| 仓库 | 语言 | Stars | License |')
+    lines.push('| --- | --- | --- | --- |')
+    for (const r of licenseRisk) {
+      lines.push(`| ${r.full_name} | ${r.language || ''} | ${r.stars} | ${r.license || ''} |`)
+    }
+    lines.push('')
+  }
+
+  if (sleepStars.length > 0) {
+    lines.push(`### 沉睡星标`)
+    lines.push('')
+    lines.push('以下仓库超过 90 天未更新：')
+    lines.push('')
+    lines.push('| 仓库 | 语言 | Stars | 最后更新 |')
+    lines.push('| --- | --- | --- | --- |')
+    for (const r of sleepStars) {
+      lines.push(`| ${r.full_name} | ${r.language || ''} | ${r.stars} | ${r.pushed_at?.slice(0, 10) || ''} |`)
+    }
+    lines.push('')
+  }
+
+  // Hidden Gems
+  if (hiddenGems.length > 0) {
+    lines.push(`## 隐藏宝石`)
+    lines.push('')
+    lines.push('星标数 <= 1000 且近期活跃的值得关注项目：')
+    lines.push('')
+    lines.push('| 仓库 | 语言 | Stars | 最后更新 |')
+    lines.push('| --- | --- | --- | --- |')
+    for (const r of hiddenGems) {
+      lines.push(`| ${r.full_name} | ${r.language || ''} | ${r.stars} | ${r.pushed_at?.slice(0, 10) || ''} |`)
+    }
+    lines.push('')
+  }
+
+  // 完整列表
+  const result = queryRepos(db, { userLogin: login, limit: 999999, offset: 0 })
+  lines.push(`## 完整仓库列表`)
+  lines.push('')
+  lines.push(`共 ${result.total} 个仓库`)
+  lines.push('')
+  lines.push('| Repository | Language | Stars | Forks | License | Tags |')
+  lines.push('| --- | --- | --- | --- | --- | --- |')
+  for (const item of result.items) {
+    const repo = item.repo
+    const esc = (v: string | null | undefined) => {
+      if (v == null) return ''
+      return String(v).replace(/\|/g, '\\|')
+    }
+    lines.push(
+      `| ${esc(repo.full_name)} | ${esc(repo.language)} | ${repo.stars} | ${repo.forks} | ${esc(repo.license)} | ${esc(item.tags.join(', '))} |`
+    )
+  }
+
+  return lines.join('\r\n') + '\r\n'
+}
+
+function queryRepoCount(db: Database.Database, userLogin?: string): number {
+  const where = userLogin ? 'WHERE s.user_login = ?' : ''
+  const sql = `SELECT COUNT(*) as cnt FROM repos r JOIN stars s ON r.full_name = s.repo_full_name ${where}`
+  const row = userLogin
+    ? db.prepare(sql).get(userLogin) as { cnt: number }
+    : db.prepare(sql).get() as { cnt: number }
+  return row?.cnt || 0
+}
