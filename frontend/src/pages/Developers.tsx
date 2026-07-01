@@ -3,8 +3,9 @@
  * 开发者管理页面
  * 三列卡片网格展示开发者列表，支持搜索添加、删除、分页、选中高亮
  * 选中开发者在下方展开 Dashboard 详情面板，可同步该开发者星标
+ * 改造：接入真实 API getUsers / syncStars，API 不可用时回退 Demo 数据
  */
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,10 +24,23 @@ import {
   Diamond,
   ExternalLink,
   GitFork,
+  Loader2,
 } from "lucide-react"
+import { getUsers, syncStars } from "@/lib/api"
 
-// ===== Demo 开发者数据 =====
-const demoDevelopers = [
+// ===== 类型定义 =====
+interface Developer {
+  id: string
+  name: string
+  stars: number
+  isActive: boolean
+  avatar_url?: string | null
+  profile_url?: string | null
+  synced_at?: string | null
+}
+
+// ===== Demo 开发者数据（API 不可用时回退） =====
+const demoDevelopers: Developer[] = [
   { id: "1", name: "patdelphi", stars: 691, isActive: true },
   { id: "2", name: "torvalds", stars: 0, isActive: false },
   { id: "3", name: "antirez", stars: 128, isActive: false },
@@ -117,11 +131,64 @@ const syncStates = [
 ]
 
 export default function Developers() {
-  const [developers, setDevelopers] = useState(demoDevelopers)
+  // 开发者列表状态（初始为空，由 useEffect 加载）
+  const [developers, setDevelopers] = useState<Developer[]>([])
+  // 加载状态
+  const [loading, setLoading] = useState(false)
+  // 错误信息
+  const [error, setError] = useState<string | null>(null)
+  // 是否使用 API 模式（true 表示成功接入真实 API）
+  const [isApiMode, setIsApiMode] = useState(false)
+
   const [searchInput, setSearchInput] = useState("")
   const [searchResult, setSearchResult] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [syncStatus, setSyncStatus] = useState(syncStates[0])
+
+  // 页面加载时调用真实 API 获取用户列表
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    getUsers()
+      .then((users) => {
+        if (cancelled) return
+        // 判断 API 是否返回了有效数据（非空且不是兜底 demo-user）
+        const isValidApiData =
+          users.length > 0 && !(users.length === 1 && users[0].login === "demo-user")
+        if (isValidApiData) {
+          const mapped: Developer[] = users.map((u, i) => ({
+            id: String(i + 1),
+            name: u.login,
+            stars: 0, // API 未直接提供 stars 数量
+            isActive: i === 0,
+            avatar_url: u.avatar_url,
+            profile_url: u.profile_url,
+            synced_at: u.synced_at,
+          }))
+          setDevelopers(mapped)
+          setIsApiMode(true)
+        } else {
+          // API 不可用，回退到 Demo 数据
+          setDevelopers(demoDevelopers)
+          setIsApiMode(false)
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError("获取开发者列表失败，已加载本地演示数据")
+        setDevelopers(demoDevelopers)
+        setIsApiMode(false)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 分页数据
   const totalPages = Math.ceil(developers.length / ITEMS_PER_PAGE)
@@ -164,7 +231,7 @@ export default function Developers() {
       : searchInput.trim()
     if (!name) return
     if (developers.find((d) => d.name === name)) return
-    const newDev = {
+    const newDev: Developer = {
       id: Date.now().toString(),
       name,
       stars: Math.floor(Math.random() * 500),
@@ -181,12 +248,19 @@ export default function Developers() {
     }
   }
 
-  const runMockSync = (name: string) => {
-    const currentIndex = syncStates.indexOf(syncStatus)
-    const nextStatus = syncStates[(currentIndex + 1) % syncStates.length]
-    setSyncStatus(nextStatus)
-    if (nextStatus === "同步成功") {
-      setSearchResult(`@${name} 星标已更新`)
+  // 同步当前开发者星标（调用真实 API）
+  const runSync = async (name: string) => {
+    setSyncStatus("同步中")
+    try {
+      const result = await syncStars(name)
+      if (result !== null) {
+        setSyncStatus("同步成功")
+        setSearchResult(`@${name} 星标已更新`)
+      } else {
+        setSyncStatus("网络失败")
+      }
+    } catch {
+      setSyncStatus("网络失败")
     }
   }
 
@@ -262,69 +336,86 @@ export default function Developers() {
         </CardContent>
       </Card>
 
-      {/* 开发者列表 - 三列紧凑网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        {paginatedDevs.map((dev) => (
-          <Card
-            key={dev.id}
-            className={`border transition-colors cursor-pointer ${
-              dev.isActive
-                ? "border-primary bg-surface-container-high shadow-sm"
-                : "border-outline-variant/50 bg-surface-container-low hover:bg-surface-container"
-            }`}
-            onClick={() => selectDeveloper(dev.id)}
-          >
-            <CardContent className="flex items-center gap-3 py-3 px-4">
-              {/* 选中指示器 */}
-              <div
-                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                  dev.isActive ? "bg-primary" : "bg-outline-variant"
-                }`}
-              />
-              {/* 头像占位 */}
-              <div className="w-9 h-9 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0">
-                <span className="text-sm font-semibold text-primary">
-                  {dev.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              {/* 信息 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-sm font-semibold text-on-surface truncate">
-                    @{dev.name}
-                  </span>
-                  {dev.isActive && (
-                    <Badge className="bg-primary text-on-primary text-[10px] px-1.5 py-0 shrink-0">
-                      当前
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-on-surface-variant">
-                  <Star className="w-3 h-3" />
-                  <span>{dev.stars}</span>
-                </div>
-              </div>
+      {/* 错误提示 */}
+      {error && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+          {error}
+        </div>
+      )}
 
-              {/* 删除按钮 */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-on-surface-variant hover:text-error shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeDeveloper(dev.id)
-                }}
-                title="删除开发者"
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Loading 状态 */}
+      {loading && (
+        <div className="flex items-center justify-center py-16 text-on-surface-variant">
+          <Loader2 className="w-8 h-8 animate-spin mr-2" />
+          <span>加载开发者列表...</span>
+        </div>
+      )}
+
+      {/* 开发者列表 - 三列紧凑网格 */}
+      {!loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          {paginatedDevs.map((dev) => (
+            <Card
+              key={dev.id}
+              className={`border transition-colors cursor-pointer ${
+                dev.isActive
+                  ? "border-primary bg-surface-container-high shadow-sm"
+                  : "border-outline-variant/50 bg-surface-container-low hover:bg-surface-container"
+              }`}
+              onClick={() => selectDeveloper(dev.id)}
+            >
+              <CardContent className="flex items-center gap-3 py-3 px-4">
+                {/* 选中指示器 */}
+                <div
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                    dev.isActive ? "bg-primary" : "bg-outline-variant"
+                  }`}
+                />
+                {/* 头像占位 */}
+                <div className="w-9 h-9 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0">
+                  <span className="text-sm font-semibold text-primary">
+                    {dev.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                {/* 信息 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-sm font-semibold text-on-surface truncate">
+                      @{dev.name}
+                    </span>
+                    {dev.isActive && (
+                      <Badge className="bg-primary text-on-primary text-[10px] px-1.5 py-0 shrink-0">
+                        当前
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-on-surface-variant">
+                    <Star className="w-3 h-3" />
+                    <span>{dev.stars}</span>
+                  </div>
+                </div>
+
+                {/* 删除按钮 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-on-surface-variant hover:text-error shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeDeveloper(dev.id)
+                  }}
+                  title="删除开发者"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* 空状态 */}
-      {developers.length === 0 && (
+      {!loading && developers.length === 0 && (
         <div className="text-center py-16 text-on-surface-variant">
           <Plus className="w-12 h-12 mx-auto mb-4 opacity-30" />
           <p className="text-lg">暂无开发者</p>
@@ -333,7 +424,7 @@ export default function Developers() {
       )}
 
       {/* 分页 */}
-      {totalPages > 1 && (
+      {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between mb-10">
           <div className="text-sm text-muted-foreground">
             共 <span className="font-medium text-on-surface">{developers.length}</span> 位开发者
@@ -400,7 +491,7 @@ export default function Developers() {
               {/* 同步当前开发者星标 */}
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
-                onClick={() => runMockSync(activeDev.name)}
+                onClick={() => runSync(activeDev.name)}
               >
                 <RotateCw className="w-4 h-4" />
                 同步星标
@@ -411,7 +502,9 @@ export default function Developers() {
               <Badge variant={syncStatus === "同步成功" ? "default" : "outline"}>
                 {syncStatus}
               </Badge>
-              <span className="text-xs text-muted-foreground">模拟 401/404/限流/网络失败状态，不调用 GitHub API。</span>
+              {!isApiMode && (
+                <span className="text-xs text-muted-foreground">模拟 401/404/限流/网络失败状态，不调用 GitHub API。</span>
+              )}
             </div>
             <div className="flex items-baseline gap-2 pt-2">
               <span className="text-4xl font-bold tracking-tight text-primary">

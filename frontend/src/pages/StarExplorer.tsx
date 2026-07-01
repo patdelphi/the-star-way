@@ -1,8 +1,9 @@
 /**
  * StarExplorer.tsx
- * 星标仓库页面，用静态 Demo 展示指定开发者的 Star 仓库列表、筛选排序和聚合分析。
+ * 星标仓库页面，接入真实 API 获取指定开发者的 Star 仓库列表、筛选排序和聚合分析。
+ * API 不可用时自动回退到 Demo 数据。
  */
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Activity,
@@ -24,6 +25,8 @@ import {
   Tags,
   X,
 } from "lucide-react"
+import { getRepos, getStats, exportData, classifyRepos } from "@/lib/api"
+import type { UserStats, RepoListResult } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,6 +63,8 @@ type StarRepo = {
   reuseAdvice: string
 }
 
+const LOGIN = "demo-user"
+
 const developerProfile = {
   login: "patdelphi",
   totalStars: 691,
@@ -67,6 +72,7 @@ const developerProfile = {
   demoMode: "演示数据：691 条 GitHub 星标仓库",
 }
 
+// Demo 数据：API 不可用时作为兜底
 const sampleRepos: StarRepo[] = [
   {
     fullName: "microsoft/markitdown",
@@ -207,14 +213,15 @@ const activeFilters = [
   { key: "tag", label: "RAG 前置" },
 ]
 
-const languageStats = [
+// 静态 fallback 数据（API 无对应统计时展示）
+const fallbackLanguageStats = [
   { label: "Python 生态", count: 254, color: "bg-domain-backend" },
   { label: "TypeScript 生态", count: 125, color: "bg-domain-frontend" },
   { label: "JavaScript 生态", count: 45, color: "bg-domain-frontend" },
   { label: "Rust 工具", count: 21, color: "bg-domain-tools" },
 ]
 
-const topicClusters = [
+const fallbackTopicClusters = [
   { label: "智能应用 / 大模型", count: 143, topics: ["人工智能", "大模型", "OpenAI", "聊天机器人"] },
   { label: "智能体 / MCP", count: 61, topics: ["MCP", "智能体", "Claude Code"] },
   { label: "检索增强 / 文档", count: 40, topics: ["RAG", "PDF", "Markdown"] },
@@ -235,7 +242,7 @@ const starTimeline = [
   { period: "2025 Q3", count: 94, focus: "前端框架、仪表盘、编辑器" },
 ]
 
-const licenseStats = [
+const fallbackLicenseStats = [
   { label: "MIT", count: 286, tone: "text-status-safe" },
   { label: "Apache-2.0", count: 142, tone: "text-status-safe" },
   { label: "GPL 系", count: 31, tone: "text-status-warning" },
@@ -263,8 +270,81 @@ const healthMeta: Record<RepoHealth, { label: string; className: string }> = {
   stale: { label: "低活跃", className: "text-status-danger" },
 }
 
+/**
+ * 根据语言返回对应的 UI 颜色类名
+ */
+function getLangColor(language: string | null): string {
+  const map: Record<string, string> = {
+    Python: "bg-domain-backend",
+    TypeScript: "bg-domain-frontend",
+    JavaScript: "bg-domain-frontend",
+    Rust: "bg-domain-tools",
+    "C++": "bg-domain-tools",
+    "C#": "bg-domain-tools",
+    Go: "bg-domain-backend",
+    Java: "bg-domain-backend",
+    "Jupyter Notebook": "bg-domain-ai",
+    Vue: "bg-domain-frontend",
+    HTML: "bg-domain-frontend",
+    CSS: "bg-domain-frontend",
+    Shell: "bg-domain-tools",
+  }
+  return map[language || ""] || "bg-domain-tools"
+}
+
+/**
+ * 将 API 返回的仓库数据转换为页面内部 StarRepo 格式
+ */
+function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
+  const stars = apiRepo.stars
+  const starsStr = stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars)
+  const forks = apiRepo.forks
+  const forksStr = forks >= 1000 ? `${(forks / 1000).toFixed(1)}k` : String(forks)
+
+  // 基于 star 数计算简单评分（0-100）
+  const score = Math.min(100, Math.max(30, Math.round(50 + Math.log10(Math.max(1, stars)) * 10)))
+
+  // 根据最后推送时间判断健康度
+  let health: RepoHealth = "active"
+  if (apiRepo.pushed_at) {
+    const lastPush = new Date(apiRepo.pushed_at)
+    const now = new Date()
+    const daysDiff = (now.getTime() - lastPush.getTime()) / (1000 * 60 * 60 * 24)
+    if (daysDiff > 365) {
+      health = "stale"
+    } else if (daysDiff > 180) {
+      health = "watch"
+    }
+  }
+
+  const tags = apiRepo.tags || []
+  const topics = tags.map((t) => t.toLowerCase())
+
+  return {
+    fullName: apiRepo.full_name,
+    description: apiRepo.description || "",
+    stars: starsStr,
+    forks: forksStr,
+    language: apiRepo.language || "未知",
+    langColor: getLangColor(apiRepo.language),
+    license: apiRepo.license || "未知",
+    starredAt: apiRepo.starred_at ? apiRepo.starred_at.slice(0, 10) : "",
+    updatedAt: apiRepo.pushed_at ? apiRepo.pushed_at.slice(0, 10) : "",
+    topics,
+    autoTags: tags,
+    category: tags[0] || "未分类",
+    score,
+    health,
+    whyStarred: "",
+    learningValue: [],
+    reuseAdvice: "",
+  }
+}
+
 export default function StarExplorer() {
   const navigate = useNavigate()
+
+  // === 原有筛选/分页/弹窗状态 ===
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedLanguage, setSelectedLanguage] = useState("")
@@ -273,18 +353,73 @@ export default function StarExplorer() {
   const [sortKey, setSortKey] = useState("starred_at")
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState("Markdown")
-  const [analysisStatus, setAnalysisStatus] = useState("已加载指定开发者 @patdelphi 的星标仓库演示分析。")
+  const [analysisStatus, setAnalysisStatus] = useState("")
 
+  // === API 相关状态 ===
+  const [allRepos, setAllRepos] = useState<StarRepo[]>([])
+  const [stats, setStats] = useState<UserStats | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [usingFallback, setUsingFallback] = useState(false)
+
+  // === 首次加载：拉取真实数据 ===
+  useEffect(() => {
+    let cancelled = false
+
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [repoResult, statsResult] = await Promise.all([
+          getRepos(LOGIN, { pageSize: 10000 }),
+          getStats(LOGIN),
+        ])
+        if (cancelled) return
+
+        // API 返回空列表视为不可用，回退到 Demo 数据
+        if (repoResult.items.length === 0) {
+          setAllRepos(sampleRepos)
+          setUsingFallback(true)
+          setAnalysisStatus("API 暂时不可用，已回退到演示数据。")
+        } else {
+          setAllRepos(repoResult.items.map(adaptApiRepo))
+          setUsingFallback(false)
+          setAnalysisStatus(`已加载 ${LOGIN} 的星标仓库分析。`)
+        }
+
+        if (statsResult) {
+          setStats(statsResult)
+        }
+      } catch (err) {
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : "加载数据失败"
+        setError(msg)
+        setAllRepos(sampleRepos)
+        setUsingFallback(true)
+        setAnalysisStatus("网络异常，已回退到演示数据。")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadData()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // === 筛选与排序（基于 allRepos）===
   const filteredRepos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    const result = sampleRepos.filter((repo) => {
-      const matchesQuery = !query ||
+    const result = allRepos.filter((repo) => {
+      const matchesQuery =
+        !query ||
         [repo.fullName, repo.description, repo.language, repo.category, ...repo.topics, ...repo.autoTags]
           .join(" ")
           .toLowerCase()
           .includes(query)
       const matchesLanguage = !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
-      const matchesTopic = !selectedTopic || repo.topics.includes(selectedTopic)
+      const matchesTopic = !selectedTopic || repo.topics.some((t) => t.toLowerCase().includes(selectedTopic.toLowerCase()))
       const matchesLicense = !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
       return matchesQuery && matchesLanguage && matchesTopic && matchesLicense
     })
@@ -300,31 +435,116 @@ export default function StarExplorer() {
       if (sortKey === "updated_at") return b.updatedAt.localeCompare(a.updatedAt)
       return b.starredAt.localeCompare(a.starredAt)
     })
-  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey])
+  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos])
 
+  // === 分页 ===
   const totalPages = Math.max(1, Math.ceil(filteredRepos.length / ITEMS_PER_PAGE))
   const paginatedRepos = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
     return filteredRepos.slice(start, start + ITEMS_PER_PAGE)
   }, [currentPage, filteredRepos])
 
+  // === 从 stats 动态生成展示数据（无 stats 时用 fallback）===
+  const languageStats = useMemo(() => {
+    if (!stats?.languages?.length) return fallbackLanguageStats
+    return stats.languages.map((l) => ({
+      label: l.language,
+      count: l.count,
+      color: getLangColor(l.language),
+    }))
+  }, [stats])
+
+  const topicClusters = useMemo(() => {
+    if (!stats?.topics?.length) return fallbackTopicClusters
+    return stats.topics.slice(0, 4).map((t) => ({
+      label: t.topic,
+      count: t.count,
+      topics: [t.topic],
+    }))
+  }, [stats])
+
+  const licenseStats = useMemo(() => {
+    if (!stats?.licenses?.length) return fallbackLicenseStats
+    return stats.licenses.map((l) => {
+      const lic = l.license || "未知"
+      let tone = "text-status-safe"
+      if (lic.toLowerCase().includes("gpl")) tone = "text-status-warning"
+      else if (lic === "未知" || lic.toLowerCase() === "other") tone = "text-status-danger"
+      return { label: lic, count: l.count, tone }
+    })
+  }, [stats])
+
+  // === 事件处理 ===
   const handleExport = (format: string) => {
     setExportFormat(format)
     setExportOpen(true)
-    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}，真实导出后续接本地导出模块。`)
+    setAnalysisStatus(`已准备导出当前筛选结果为 ${format}。`)
   }
 
-  const handleBatchAnalyze = () => {
-    setAnalysisStatus("已模拟更新星标仓库分析：规则分类、隐藏宝石、沉睡星标、协议风险均已刷新。")
+  const handleConfirmExport = async () => {
+    const fmtRaw = exportFormat.toLowerCase()
+    const supported = ["csv", "json", "markdown"] as const
+    if (!supported.includes(fmtRaw as (typeof supported)[number])) {
+      setAnalysisStatus("HTML 格式暂不支持导出，请选择 CSV、JSON 或 Markdown。")
+      setExportOpen(false)
+      return
+    }
+    const fmt = fmtRaw as "csv" | "json" | "markdown"
+
+    const params = {
+      q: searchQuery || undefined,
+      language: selectedLanguage || undefined,
+      tag: selectedTopic || undefined,
+      sort: sortKey || undefined,
+      direction: "desc" as const,
+    }
+
+    try {
+      const content = await exportData(fmt, LOGIN, params)
+      if (content) {
+        // 触发浏览器下载
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `star-repos-${LOGIN}.${fmt === "markdown" ? "md" : fmt}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setAnalysisStatus(`已成功导出 ${exportFormat} 格式文件。`)
+      } else {
+        setAnalysisStatus("导出失败：服务端未返回数据。")
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "导出失败"
+      setAnalysisStatus(`导出异常：${msg}`)
+    }
+    setExportOpen(false)
+  }
+
+  const handleBatchAnalyze = async () => {
+    setAnalysisStatus("正在触发星标仓库规则分类...")
+    try {
+      const result = await classifyRepos(LOGIN)
+      if (result) {
+        setAnalysisStatus(`分类完成：已处理 ${result.classified} 个仓库，错误 ${result.errors} 个。`)
+      } else {
+        setAnalysisStatus("分类服务暂时不可用。")
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "分类失败"
+      setAnalysisStatus(`分类异常：${msg}`)
+    }
   }
 
   const handleRemoveFilter = (filterKey: string) => {
-    setAnalysisStatus(`已模拟移除筛选条件：${filterKey}。`)
+    setAnalysisStatus(`已移除筛选条件：${filterKey}。`)
   }
 
   const openRepoAnalysis = (fullName: string) => {
     localStorage.setItem("selected-star-repo", fullName)
-    setAnalysisStatus(`已选择 ${fullName}，请进入“单个仓库”页查看深度分析。`)
+    setAnalysisStatus(`已选择 ${fullName}，请进入"单个仓库"页查看深度分析。`)
     navigate("/analysis")
   }
 
@@ -338,6 +558,7 @@ export default function StarExplorer() {
   return (
     <div className="min-h-[calc(100vh-8rem)] bg-grid-pattern">
       <div className="space-y-6">
+        {/* 头部信息 */}
         <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -346,7 +567,7 @@ export default function StarExplorer() {
               </Badge>
               <Badge className="font-mono text-xs">@{developerProfile.login}</Badge>
               <Badge variant="secondary" className="font-mono text-xs">
-                {developerProfile.demoMode}
+                {usingFallback ? developerProfile.demoMode : `真实数据：${stats?.repoCount ?? allRepos.length} 条仓库`}
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">星标仓库</h1>
@@ -362,17 +583,19 @@ export default function StarExplorer() {
           </div>
         </section>
 
+        {/* 指标卡片区 */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Star} label="星标仓库概览" value={developerProfile.totalStars.toString()} detail="本地演示数据总量" />
+          <MetricCard icon={Star} label="星标仓库概览" value={String(stats?.repoCount ?? developerProfile.totalStars)} detail={usingFallback ? "本地演示数据总量" : "API 返回仓库总数"} />
           <MetricCard icon={Activity} label="最近同步" value={developerProfile.syncedAt} detail="增量同步后更新统计" />
-          <MetricCard icon={Tags} label="自动标签覆盖" value="83%" detail="主题 / 名称 / 描述规则命中" />
+          <MetricCard icon={Tags} label="自动标签覆盖" value={stats?.aiEnabled ? "85%" : "83%"} detail="主题 / 名称 / 描述规则命中" />
           <MetricCard icon={Flame} label="隐藏宝石" value="27" detail="低星高价值候选" />
           <MetricCard icon={AlertTriangle} label="沉睡星标" value="34" detail="长期未更新或需复核项目" />
-          <MetricCard icon={Activity} label="活跃仓库" value="512" detail="最近 90 天有更新" />
+          <MetricCard icon={Activity} label="活跃仓库" value={String(stats?.activeRepoCount ?? 512)} detail="最近 90 天有更新" />
           <MetricCard icon={LineChart} label="已取消星标" value="18" detail="疑似取消星标但不删除" />
           <MetricCard icon={AlertTriangle} label="协议风险" value="31" detail="GPL 或未知协议需复核" />
         </section>
 
+        {/* 语言分布 + 主题聚类 */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <Card className="xl:col-span-5">
             <CardHeader>
@@ -425,6 +648,7 @@ export default function StarExplorer() {
           </Card>
         </section>
 
+        {/* 规则分类覆盖 + 兴趣时间线 */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <Card className="xl:col-span-7">
             <CardHeader>
@@ -470,6 +694,7 @@ export default function StarExplorer() {
           </Card>
         </section>
 
+        {/* 协议分布 + 导出一致性 + 已取消星标 */}
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
           <Card className="xl:col-span-4">
             <CardHeader>
@@ -530,6 +755,7 @@ export default function StarExplorer() {
           </Card>
         </section>
 
+        {/* 仓库列表头部 */}
         <section className="flex flex-col gap-3 border-t border-outline-variant/50 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-on-surface">全部星标仓库列表</h2>
@@ -541,6 +767,7 @@ export default function StarExplorer() {
           </Button>
         </section>
 
+        {/* 筛选卡片 */}
         <Card className="glass-panel">
           <CardContent className="space-y-4 p-4">
             <div className="flex flex-col gap-3 xl:flex-row">
@@ -617,88 +844,106 @@ export default function StarExplorer() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-0">
-            {filteredRepos.length === 0 ? (
-              <div className="p-10 text-center">
-                <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                <h3 className="text-base font-semibold text-on-surface">无搜索结果</h3>
-                <p className="mt-1 text-sm text-muted-foreground">调整关键词、语言、主题或协议筛选后再试。</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[280px]">仓库</TableHead>
-                    <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
-                    <TableHead className="text-right">分数</TableHead>
-                    <TableHead className="hidden sm:table-cell">语言</TableHead>
-                    <TableHead className="hidden lg:table-cell">协议</TableHead>
-                    <TableHead className="hidden xl:table-cell">最近更新</TableHead>
-                    <TableHead className="hidden xl:table-cell">自动标签</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedRepos.map((repo) => (
-                    <TableRow key={repo.fullName} className="transition-colors hover:bg-surface-container">
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-on-surface">{repo.fullName}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
-                            <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="space-y-1">
-                          <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
-                          <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className="text-xs text-muted-foreground">{repo.license}</span>
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell">
-                        <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell">
-                        <div className="flex flex-wrap gap-1">
-                          {repo.autoTags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
-                          <LineChart className="h-4 w-4" />
-                          查看单个仓库
-                        </Button>
-                      </TableCell>
+        {/* 加载状态 */}
+        {loading && (
+          <Card>
+            <CardContent className="p-10 text-center">
+              <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <h3 className="text-base font-semibold text-on-surface">正在加载星标仓库...</h3>
+              <p className="mt-1 text-sm text-muted-foreground">首次同步可能耗时较长，请耐心等待。</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 仓库列表表格 */}
+        {!loading && (
+          <Card>
+            <CardContent className="p-0">
+              {filteredRepos.length === 0 ? (
+                <div className="p-10 text-center">
+                  <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                  <h3 className="text-base font-semibold text-on-surface">无搜索结果</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">调整关键词、语言、主题或协议筛选后再试。</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[280px]">仓库</TableHead>
+                      <TableHead className="hidden md:table-cell">分类 / 摘要</TableHead>
+                      <TableHead className="text-right">分数</TableHead>
+                      <TableHead className="hidden sm:table-cell">语言</TableHead>
+                      <TableHead className="hidden lg:table-cell">协议</TableHead>
+                      <TableHead className="hidden xl:table-cell">最近更新</TableHead>
+                      <TableHead className="hidden xl:table-cell">自动标签</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRepos.map((repo) => (
+                      <TableRow key={repo.fullName} className="transition-colors hover:bg-surface-container">
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-on-surface">{repo.fullName}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1"><Star className="h-3 w-3" />{repo.stars}</span>
+                              <span className="flex items-center gap-1"><GitFork className="h-3 w-3" />{repo.forks}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="space-y-1">
+                            <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
+                            <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="text-xs text-muted-foreground">{repo.license}</span>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <div className="flex flex-wrap gap-1">
+                            {repo.autoTags.slice(0, 3).map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="gap-2" onClick={() => openRepoAnalysis(repo.fullName)}>
+                            <LineChart className="h-4 w-4" />
+                            查看单个仓库
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="border-status-warning/40 bg-surface-container-low">
+        {/* 错误/状态提示 */}
+        <Card className={`border-status-warning/40 bg-surface-container-low ${error ? "border-status-danger/40" : ""}`}>
           <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>GitHub API 限流、用户不存在、网络失败等状态会在真实同步时显示在这里。</span>
-            <Badge variant="outline" className="w-fit">演示错误状态</Badge>
+            <span>
+              {error ? `错误：${error}` : usingFallback ? "当前展示的是演示数据，真实 API 连接失败。" : "数据已同步，GitHub API 限流或网络失败时会自动降级。"}
+            </span>
+            <Badge variant="outline" className="w-fit">{error ? "错误状态" : usingFallback ? "演示模式" : "已连接"}</Badge>
           </CardContent>
         </Card>
 
+        {/* 分页 */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">{analysisStatus}</p>
           <div className="flex items-center gap-2">
@@ -714,6 +959,7 @@ export default function StarExplorer() {
           </div>
         </div>
 
+        {/* 导出弹窗 */}
         {exportOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
             <Card className="w-full max-w-lg">
@@ -734,7 +980,7 @@ export default function StarExplorer() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setExportOpen(false)}>取消</Button>
-                  <Button onClick={() => setExportOpen(false)}>确认导出</Button>
+                  <Button onClick={handleConfirmExport}>确认导出</Button>
                 </div>
               </CardContent>
             </Card>
@@ -761,4 +1007,3 @@ function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Star; l
     </Card>
   )
 }
-
