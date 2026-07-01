@@ -385,7 +385,8 @@
     "catalogDesc": "Browse all starred projects by tag",
     "analysisDesc": "Deep analysis of individual repositories",
     "languageDistribution": "Language Distribution",
-    "tagCloud": "Tag Cloud"
+    "tagCloud": "Tag Cloud",
+    "recentStars": "Recent Stars"
   },
   "starCatalog": {
     "title": "Star Catalog",

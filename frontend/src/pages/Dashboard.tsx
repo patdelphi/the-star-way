@@ -24,6 +24,7 @@ import {
   BookOpen,
   PieChart as PieChartIcon,
   Tags,
+  Clock,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
 import { PieChart, PieChartLegend } from "@/components/charts/PieChart"
@@ -273,6 +274,7 @@ const Dashboard: React.FC = () => {
   const [learningPath, setLearningPath] = useState<string | null>(null)
   const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
   const [topicStats, setTopicStats] = useState<{ topic: string; count: number }[]>([])
+  const [recentStars, setRecentStars] = useState<{ fullName: string; description: string; language: string; starredAt: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -319,6 +321,19 @@ const Dashboard: React.FC = () => {
         } else {
           setGemRepos(demoGemRepos)
         }
+
+        // 最近星标：按 starred_at 倒序取前 10
+        const recent = repoResult.items
+          .filter((r) => r.starred_at)
+          .sort((a, b) => new Date(b.starred_at).getTime() - new Date(a.starred_at).getTime())
+          .slice(0, 10)
+          .map((r) => ({
+            fullName: r.fullName,
+            description: r.description || '',
+            language: r.language || 'Unknown',
+            starredAt: r.starred_at,
+          }))
+        setRecentStars(recent)
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : String(err))
@@ -508,6 +523,36 @@ const Dashboard: React.FC = () => {
                     color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
                   }))}
                 />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 最近星标 */}
+        {recentStars.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{t("dashboard.recentStars")}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentStars.map((r) => (
+                  <div key={r.fullName} className="flex items-center gap-3 rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <Link to={`/repo/${r.fullName}`} className="text-sm font-medium text-primary hover:underline truncate block">
+                        {r.fullName}
+                      </Link>
+                      <p className="text-xs text-muted-foreground truncate">{r.description}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Badge variant="outline" className="text-[10px]">{r.language}</Badge>
+                      <span className="text-xs text-muted-foreground font-mono">{r.starredAt.slice(0, 10)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
