@@ -68,20 +68,32 @@ try {
 
   if (-not (Test-Path $RuntimeDir)) { New-Item -ItemType Directory -Path $RuntimeDir | Out-Null }
   $backendLog = Join-Path $RuntimeDir "backend.log"
-  $backendErr = Join-Path $RuntimeDir "backend.err.log"
   $frontendLog = Join-Path $RuntimeDir "frontend.log"
-  $frontendErr = Join-Path $RuntimeDir "frontend.err.log"
 
   Write-Host "Starting..."
 
-  # Launch backend
-  $backendCmd = "`$env:PORT='$actualBackend'; pnpm exec tsx 'src/api/start.ts' 2>&1 | Tee-Object -FilePath '$backendLog'"
-  $backendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$backendCmd) -WorkingDirectory $BackendDir -WindowStyle Hidden -PassThru
+  # Check & rebuild native modules using pnpm's Node.js
+  Write-Host "Checking native modules..."
+  Push-Location $BackendDir
+  $testErr = pnpm exec node -e "require('better-sqlite3')" 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Rebuilding better-sqlite3..."
+    pnpm rebuild better-sqlite3 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      throw "better-sqlite3 rebuild failed. Try manually: cd backend && pnpm rebuild better-sqlite3"
+    }
+    Write-Host "Rebuild done."
+  }
+  Pop-Location
+
+  # Launch backend (child powershell, pnpm exec ensures correct Node)
+  $backendCmd = "Set-Location '$BackendDir'; `$env:PORT='$actualBackend'; pnpm exec tsx src/api/start.ts *>&1 | Tee-Object -FilePath '$backendLog'"
+  $backendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$backendCmd) -WindowStyle Hidden -PassThru
   Write-Host "Backend PID: $($backendProc.Id)"
 
   # Launch frontend
-  $frontendCmd = "`$env:VITE_API_BASE='http://localhost:$actualBackend'; pnpm exec vite --host 127.0.0.1 --port $actualFrontend 2>&1 | Tee-Object -FilePath '$frontendLog'"
-  $frontendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$frontendCmd) -WorkingDirectory $FrontendDir -WindowStyle Hidden -PassThru
+  $frontendCmd = "Set-Location '$FrontendDir'; `$env:VITE_API_BASE='http://localhost:$actualBackend'; pnpm exec vite --host 127.0.0.1 --port $actualFrontend *>&1 | Tee-Object -FilePath '$frontendLog'"
+  $frontendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$frontendCmd) -WindowStyle Hidden -PassThru
   Write-Host "Frontend PID: $($frontendProc.Id)"
 
   # Save PID
