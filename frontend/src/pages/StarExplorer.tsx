@@ -19,6 +19,8 @@ import {
   GitFork,
   Layers3,
   LineChart,
+  Pencil,
+  Plus,
   Radar,
   Search,
   Sparkles,
@@ -26,7 +28,7 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos } from "@/lib/api"
+import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars } from "@/lib/api"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Badge } from "@/components/ui/badge"
@@ -57,6 +59,7 @@ type StarRepo = {
   updatedAt: string
   topics: string[]
   autoTags: string[]
+  manualTags: string[]
   category: string
   score: number
   health: RepoHealth
@@ -85,6 +88,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-06-28",
     topics: ["rag", "markdown", "document-ai"],
     autoTags: ["RAG 前置", "文档处理", "AI 工具"],
+    manualTags: [],
     category: "文档处理",
     score: 92,
     health: "active",
@@ -104,6 +108,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-06-29",
     topics: ["mcp", "agent", "tool-use"],
     autoTags: ["MCP", "Agent", "工具调用"],
+    manualTags: [],
     category: "Agent 生态",
     score: 95,
     health: "active",
@@ -123,6 +128,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-06-30",
     topics: ["python", "cli", "packaging"],
     autoTags: ["工具链", "Python 基建", "CLI"],
+    manualTags: [],
     category: "开发工具",
     score: 90,
     health: "active",
@@ -142,6 +148,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-06-27",
     topics: ["llm", "agent", "workflow"],
     autoTags: ["LLM", "Agent", "编排"],
+    manualTags: [],
     category: "AI 应用框架",
     score: 87,
     health: "active",
@@ -161,6 +168,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-06-30",
     topics: ["editor", "cli", "developer-tools"],
     autoTags: ["编辑器", "CLI", "开发效率"],
+    manualTags: [],
     category: "开发工具",
     score: 78,
     health: "active",
@@ -180,6 +188,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2026-05-14",
     topics: ["llm", "reader", "web"],
     autoTags: ["网页解析", "LLM 输入", "RAG"],
+    manualTags: [],
     category: "数据摄取",
     score: 81,
     health: "watch",
@@ -199,6 +208,7 @@ const sampleRepos: StarRepo[] = [
     updatedAt: "2024-08-03",
     topics: ["admin", "template", "dashboard"],
     autoTags: ["沉睡星标", "前端模板", "协议关注"],
+    manualTags: [],
     category: "前端模板",
     score: 41,
     health: "stale",
@@ -303,6 +313,7 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
     updatedAt: apiRepo.pushed_at ? apiRepo.pushed_at.slice(0, 10) : "",
     topics,
     autoTags: tags,
+    manualTags: [],
     category: tags[0] || "未分类",
     score,
     health,
@@ -368,6 +379,18 @@ export default function StarExplorer() {
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState("Markdown")
   const [analysisStatus, setAnalysisStatus] = useState("")
+
+  // === 标签编辑状态 ===
+  const [tagEditOpen, setTagEditOpen] = useState(false)
+  const [tagEditRepo, setTagEditRepo] = useState<string | null>(null)
+  const [tagInput, setTagInput] = useState("")
+
+  // === Removed Stars 弹窗状态 ===
+  const [removedOpen, setRemovedOpen] = useState(false)
+  const [removedRepos, setRemovedRepos] = useState<StarRepo[]>([])
+
+  // === License 风险弹窗状态 ===
+  const [licenseRiskOpen, setLicenseRiskOpen] = useState(false)
 
   // === API 相关状态 ===
   const [allRepos, setAllRepos] = useState<StarRepo[]>([])
@@ -594,12 +617,19 @@ export default function StarExplorer() {
   }, [allRepos, usingFallback])
 
   // 协议风险 = GPL / 未知协议
-  const licenseRiskCount = useMemo(() => {
-    if (usingFallback) return 31
-    return licenseStats
-      .filter((l) => l.tone !== "text-status-safe")
-      .reduce((sum, l) => sum + l.count, 0)
-  }, [licenseStats, usingFallback])
+  const licenseRiskRepos = useMemo(() => {
+    if (usingFallback) {
+      return allRepos.filter((repo) => {
+        const license = repo.license.toLowerCase()
+        return license.includes("gpl") || license === "" || license === "other" || license === "unknown"
+      })
+    }
+    return allRepos.filter((repo) => {
+      const license = repo.license.toLowerCase()
+      return license.includes("gpl") || license === "" || license === "other" || license === "unknown"
+    })
+  }, [allRepos, usingFallback])
+  const licenseRiskCount = licenseRiskRepos.length
 
   // 自动标签覆盖率 = tags 数 / repoCount
   const tagCoveragePercent = useMemo(() => {
@@ -680,10 +710,77 @@ export default function StarExplorer() {
     setAnalysisStatus(t("starExplorer.filterRemoved", { filter: filterKey }))
   }
 
+  const openRemovedStars = async () => {
+    const repos = await getRemovedStars(currentLogin)
+    setRemovedRepos(repos)
+    setRemovedOpen(true)
+  }
+
   const openRepoAnalysis = (fullName: string) => {
     localStorage.setItem("selected-star-repo", fullName)
     setAnalysisStatus(t("starExplorer.selectedRepo", { repo: fullName }))
     navigate("/analysis")
+  }
+
+  const openTagEditor = (fullName: string) => {
+    setTagEditRepo(fullName)
+    setTagInput("")
+    setTagEditOpen(true)
+  }
+
+  const closeTagEditor = () => {
+    setTagEditOpen(false)
+    setTagEditRepo(null)
+    setTagInput("")
+  }
+
+  const handleAddTag = async () => {
+    if (!tagEditRepo || !tagInput.trim()) return
+    const tag = tagInput.trim()
+    const repo = allRepos.find((r) => r.fullName === tagEditRepo)
+    if (!repo) return
+    if (repo.manualTags.includes(tag) || repo.autoTags.includes(tag)) {
+      setAnalysisStatus(t("starExplorer.tagExists", { tag }))
+      return
+    }
+    try {
+      const success = await addRepoTag(tagEditRepo, tag)
+      if (success) {
+        setAllRepos((prev) =>
+          prev.map((r) =>
+            r.fullName === tagEditRepo ? { ...r, manualTags: [...r.manualTags, tag] } : r
+          )
+        )
+        setTagInput("")
+        setAnalysisStatus(t("starExplorer.tagAdded", { tag }))
+      } else {
+        setAnalysisStatus(t("starExplorer.tagAddFailed", { tag }))
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ""
+      setAnalysisStatus(t("starExplorer.tagAddError", { message: msg }))
+    }
+  }
+
+  const handleRemoveTag = async (fullName: string, tag: string) => {
+    const repo = allRepos.find((r) => r.fullName === fullName)
+    if (!repo || !repo.manualTags.includes(tag)) return
+    try {
+      const success = await removeRepoTag(fullName, tag)
+      if (success) {
+        setAllRepos((prev) =>
+          prev.map((r) =>
+            r.fullName === fullName ? { ...r, manualTags: r.manualTags.filter((t) => t !== tag) } : r
+          )
+        )
+        setAnalysisStatus(t("starExplorer.tagRemoved", { tag }))
+      } else {
+        setAnalysisStatus(t("starExplorer.tagRemoveFailed", { tag }))
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ""
+      setAnalysisStatus(t("starExplorer.tagRemoveError", { message: msg }))
+    }
   }
 
   const visibleFilters = [
@@ -767,12 +864,14 @@ export default function StarExplorer() {
             value={usingFallback ? "18" : "0"}
             detail={usingFallback ? t("starExplorer.removedStarsDetail") : t("starExplorer.removedStarsDetailApi")}
           />
-          <MetricCard
-            icon={AlertTriangle}
-            label={t("starExplorer.licenseRisk")}
-            value={String(summary?.licenseRiskCount ?? licenseRiskCount)}
-            detail={t("starExplorer.licenseRiskDetail")}
-          />
+          <div onClick={() => setLicenseRiskOpen(true)} className="cursor-pointer">
+            <MetricCard
+              icon={AlertTriangle}
+              label={t("starExplorer.licenseRisk")}
+              value={String(summary?.licenseRiskCount ?? licenseRiskCount)}
+              detail={t("starExplorer.licenseRiskDetail")}
+            />
+          </div>
         </section>
 
         {/* 语言分布 + 主题聚类 */}
@@ -1069,6 +1168,15 @@ export default function StarExplorer() {
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {t("starExplorer.filterSleepStars")}
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={openRemovedStars}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {t("starExplorer.viewRemoved")}
+                </Button>
               </div>
             </div>
 
@@ -1176,10 +1284,40 @@ export default function StarExplorer() {
                           <span className="font-mono text-xs text-muted-foreground">{repo.updatedAt}</span>
                         </TableCell>
                         <TableCell className="hidden xl:table-cell">
-                          <div className="flex flex-wrap gap-1">
-                            {repo.autoTags.slice(0, 3).map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {repo.manualTags.map((tag) => (
+                              <Badge
+                                key={tag}
+                                variant="default"
+                                className="text-[10px] group relative cursor-pointer"
+                                title={t("starExplorer.clickToRemoveTag")}
+                              >
+                                {tag}
+                                <span
+                                  className="ml-0.5 hidden group-hover:inline text-on-primary/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRemoveTag(repo.fullName, tag)
+                                  }}
+                                >
+                                  <X className="h-2.5 w-2.5 inline" />
+                                </span>
+                              </Badge>
                             ))}
+                            {repo.autoTags
+                              .filter((t) => !repo.manualTags.includes(t))
+                              .map((tag) => (
+                                <Badge key={tag} variant="outline" className="text-[10px]">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            <button
+                              className="inline-flex h-5 w-5 items-center justify-center rounded border border-outline-variant/50 text-muted-foreground hover:bg-primary hover:text-on-primary transition-colors"
+                              title={t("starExplorer.addTag")}
+                              onClick={() => openTagEditor(repo.fullName)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -1261,6 +1399,170 @@ export default function StarExplorer() {
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setExportOpen(false)}>{t("starExplorer.cancel")}</Button>
                   <Button onClick={handleConfirmExport}>{t("starExplorer.confirmExport")}</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* 标签编辑弹窗 */}
+        {tagEditOpen && tagEditRepo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Pencil className="h-4 w-4" />
+                  {t("starExplorer.editTags")}
+                </CardTitle>
+                <CardDescription>{tagEditRepo}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="mb-2 text-xs text-muted-foreground">{t("starExplorer.currentTags")}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const repo = allRepos.find((r) => r.fullName === tagEditRepo)
+                      if (!repo) return null
+                      return (
+                        <>
+                          {repo.manualTags.map((tag) => (
+                            <Badge
+                              key={tag}
+                              variant="default"
+                              className="text-[10px] group relative cursor-pointer"
+                            >
+                              {tag}
+                              <span
+                                className="ml-0.5 hidden group-hover:inline text-on-primary/80"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRemoveTag(repo.fullName, tag)
+                                }}
+                              >
+                                <X className="h-2.5 w-2.5 inline" />
+                              </span>
+                            </Badge>
+                          ))}
+                          {repo.autoTags
+                            .filter((t) => !repo.manualTags.includes(t))
+                            .map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-[10px]">
+                                {tag}
+                              </Badge>
+                            ))}
+                          {repo.manualTags.length === 0 && repo.autoTags.length === 0 && (
+                            <span className="text-xs text-muted-foreground">{t("starExplorer.noTags")}</span>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={t("starExplorer.tagPlaceholder")}
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddTag()
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleAddTag} disabled={!tagInput.trim()}>
+                    {t("starExplorer.addTag")}
+                  </Button>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={closeTagEditor}>
+                    {t("starExplorer.close")}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Removed Stars 弹窗 */}
+        {removedOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+            <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <X className="h-5 w-5 text-status-danger" />
+                  {t("starExplorer.removedStarsTitle")}
+                </CardTitle>
+                <CardDescription>
+                  {t("starExplorer.removedStarsDesc", { count: removedRepos.length })}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-auto flex-1 space-y-2">
+                {removedRepos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">{t("starExplorer.noRemovedStars")}</p>
+                ) : (
+                  removedRepos.map((repo) => (
+                    <div key={repo.fullName} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+                      <div className="min-w-0">
+                        <Link to={`/repo/${repo.fullName}`} className="text-sm font-medium text-primary hover:underline truncate block">
+                          {repo.fullName}
+                        </Link>
+                        <p className="text-xs text-muted-foreground truncate">{repo.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <Badge variant="outline" className="text-[10px]">{repo.language || "?"}</Badge>
+                        <span className="text-xs text-muted-foreground font-mono">{repo.stars}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+              <CardContent className="border-t border-outline-variant/50 pt-3">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setRemovedOpen(false)}>{t("starExplorer.close")}</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* License 风险弹窗 */}
+        {licenseRiskOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
+            <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-status-danger" />
+                  {t("starExplorer.licenseRiskTitle")}
+                </CardTitle>
+                <CardDescription>
+                  {t("starExplorer.licenseRiskDesc", { count: licenseRiskRepos.length })}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-auto flex-1 space-y-2">
+                <p className="text-sm text-muted-foreground">{t("starExplorer.licenseRiskExplain")}</p>
+                {licenseRiskRepos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">{t("starExplorer.noLicenseRiskRepos")}</p>
+                ) : (
+                  licenseRiskRepos.map((repo) => (
+                    <div key={repo.fullName} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
+                      <div className="min-w-0">
+                        <Link to={`/repo/${repo.fullName}`} className="text-sm font-medium text-primary hover:underline truncate block">
+                          {repo.fullName}
+                        </Link>
+                        <p className="text-xs text-muted-foreground truncate">{repo.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <Badge variant="outline" className="text-[10px]">{repo.license || "?"}</Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+              <CardContent className="border-t border-outline-variant/50 pt-3">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setLicenseRiskOpen(false)}>{t("starExplorer.close")}</Button>
                 </div>
               </CardContent>
             </Card>

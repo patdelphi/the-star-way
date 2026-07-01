@@ -19,6 +19,7 @@ import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
+import { generateReadmeSummary } from '../ai/client.js'
 
 // ===== 工具函数 =====
 
@@ -277,6 +278,22 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/users/:login/removed-stars =====
+      const removedMatch = matchRoute('/api/users/:login/removed-stars', url.split('?')[0])
+      if (method === 'GET' && removedMatch) {
+        const { login } = removedMatch
+        const repos = db.prepare(`
+          SELECT r.*, s.starred_at, s.removed_at
+          FROM repos r
+          JOIN stars s ON r.full_name = s.repo_full_name
+          WHERE s.user_login = ? AND s.removed_at IS NOT NULL
+          ORDER BY s.removed_at DESC
+        `).all(login)
+
+        json(res, { data: repos })
+        return
+      }
+
       // ===== GET /api/users/:login/sync-runs =====
       const syncRunsMatch = matchRoute('/api/users/:login/sync-runs', url.split('?')[0])
       if (method === 'GET' && syncRunsMatch) {
@@ -338,6 +355,93 @@ export function createRouter(db: Database.Database) {
             error(res, 'SYNC_ERROR', msg, 500)
           }
         }
+        return
+      }
+
+      // ===== GET /api/repos/:fullName/readme-summary =====
+      const readmeMatch = matchRoute('/api/repos/:fullName/readme-summary', url.split('?')[0])
+      if (method === 'GET' && readmeMatch) {
+        const fullName = decodeURIComponent(readmeMatch.fullName)
+
+        // 先查缓存
+        const cached = db.prepare(`
+          SELECT translated_readme_summary FROM translations
+          WHERE repo_full_name = ? AND target_lang = 'zh'
+        `).get(fullName) as { translated_readme_summary: string } | undefined
+
+        if (cached?.translated_readme_summary) {
+          json(res, { data: { summary: cached.translated_readme_summary, cached: true } })
+          return
+        }
+
+        // 获取仓库信息
+        const repo = db.prepare(`
+          SELECT description, language, topics_json FROM repos WHERE full_name = ?
+        `).get(fullName) as { description: string; language: string; topics_json: string } | undefined
+
+        if (!repo) {
+          error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
+          return
+        }
+
+        // 调用 AI 生成摘要
+        try {
+          const topics: string[] = repo.topics_json ? JSON.parse(repo.topics_json) : []
+          const summary = await generateReadmeSummary(fullName, repo.description || '', repo.language || '', topics)
+
+          // 缓存结果
+          const now = new Date().toISOString()
+          db.prepare(`
+            INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+            VALUES (?, 'zh', ?, 'ai', ?)
+            ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+              translated_readme_summary = excluded.translated_readme_summary,
+              provider = excluded.provider,
+              updated_at = excluded.updated_at
+          `).run(fullName, summary, now)
+
+          json(res, { data: { summary, cached: false } })
+        } catch (err: any) {
+          error(res, 'AI_ERROR', err?.message || 'AI 生成摘要失败', 500)
+        }
+        return
+      }
+
+      // ===== POST /api/repos/:fullName/tags =====
+      const addTagMatch = matchRoute('/api/repos/:fullName/tags', url.split('?')[0])
+      if (method === 'POST' && addTagMatch) {
+        const fullName = decodeURIComponent(addTagMatch.fullName)
+        const body = await readBody(req)
+        let payload: { tag?: string }
+        try {
+          payload = JSON.parse(body)
+        } catch {
+          error(res, 'INVALID_JSON', '请求 body 不是有效的 JSON')
+          return
+        }
+        if (!payload.tag || !payload.tag.trim()) {
+          error(res, 'MISSING_TAG', '缺少 tag 字段')
+          return
+        }
+        const tag = payload.tag.trim()
+        db.prepare(`
+          INSERT INTO repo_tags (repo_full_name, tag, tag_source, confidence)
+          VALUES (?, ?, 'manual', 1.0)
+          ON CONFLICT(repo_full_name, tag) DO UPDATE SET
+            tag_source = 'manual',
+            confidence = 1.0
+        `).run(fullName, tag)
+        json(res, { data: { fullName, tag, source: 'manual' } })
+        return
+      }
+
+      // ===== DELETE /api/repos/:fullName/tags/:tag =====
+      const delTagMatch = matchRoute('/api/repos/:fullName/tags/:tag', url.split('?')[0])
+      if (method === 'DELETE' && delTagMatch) {
+        const fullName = decodeURIComponent(delTagMatch.fullName)
+        const tag = decodeURIComponent(delTagMatch.tag)
+        db.prepare(`DELETE FROM repo_tags WHERE repo_full_name = ? AND tag = ?`).run(fullName, tag)
+        json(res, { data: { fullName, tag, deleted: true } })
         return
       }
 

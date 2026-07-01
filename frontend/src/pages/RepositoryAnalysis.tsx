@@ -355,6 +355,9 @@ export default function RepositoryAnalysis() {
               <Badge variant="outline" className="font-mono text-xs uppercase tracking-wider">
                 {t("repoAnalysis.badge")}
               </Badge>
+              <Badge variant="secondary" className="font-mono text-xs uppercase tracking-wider">
+                {t("repoAnalysis.analysisBadge")}
+              </Badge>
               <Badge variant="secondary" className="font-mono text-xs">
                 {apiRepos.length > 0 ? "API 数据" : "静态演示"}
               </Badge>
@@ -622,6 +625,9 @@ export default function RepositoryAnalysis() {
             )}
           </CardContent>
         </Card>
+
+        {/* 底部提示 */}
+        <p className="text-xs text-muted-foreground">{t("repoAnalysis.rawDataHint")}</p>
       </div>
     </div>
   )

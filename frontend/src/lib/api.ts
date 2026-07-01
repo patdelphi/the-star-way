@@ -305,6 +305,37 @@ export async function getSyncRuns(login: string): Promise<{
 }
 
 /**
+ * 获取已移除的星标仓库
+ */
+export async function getRemovedStars(login: string): Promise<Repo[]> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/removed-stars`)
+      const data = await res.json()
+      return (data.data ?? []).map(adaptApiRepo)
+    }
+  } catch { /* 忽略错误 */ }
+  return []
+}
+
+/**
+ * 获取仓库 README 中文摘要
+ */
+export async function getReadmeSummary(fullName: string): Promise<{
+  summary: string
+  cached: boolean
+} | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary`)
+      const data = await res.json()
+      return data.data
+    }
+  } catch { /* 忽略错误 */ }
+  return null
+}
+
+/**
  * 获取后端 GitHub Token 来源
  */
 export async function getTokenSource(): Promise<{
@@ -320,6 +351,38 @@ export async function getTokenSource(): Promise<{
     }
   } catch { /* 忽略错误 */ }
   return null
+}
+
+/**
+ * 为仓库添加手动标签
+ */
+export async function addRepoTag(fullName: string, tag: string): Promise<boolean> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      })
+      return res.ok
+    }
+  } catch { /* 忽略错误 */ }
+  return false
+}
+
+/**
+ * 删除仓库标签
+ */
+export async function removeRepoTag(fullName: string, tag: string): Promise<boolean> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags/${encodeURIComponent(tag)}`, {
+        method: 'DELETE',
+      })
+      return res.ok
+    }
+  } catch { /* 忽略错误 */ }
+  return false
 }
 
 /**

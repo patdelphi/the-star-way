@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { useParams } from "react-router-dom"
+import { useParams, Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,8 +23,9 @@ import {
   Gavel,
   ShieldCheck,
   Network,
+  Sparkles,
 } from "lucide-react"
-import { getRepo, type Repo } from "@/lib/api"
+import { getRepo, getReadmeSummary, type Repo } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // ===== 类型定义 =====
@@ -112,6 +113,7 @@ const RepoDetail: React.FC = () => {
   const [repoData, setRepoData] = useState<RepoDetailData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [readmeSummary, setReadmeSummary] = useState<string | null>(null)
 
   /** 格式化时间差：显示为 "X 天前" */
   const formatTimeAgo = (dateStr: string | null): string => {
@@ -164,6 +166,10 @@ const RepoDetail: React.FC = () => {
 
         if (data) {
           setRepoData(data)
+          // 加载 README 中文摘要
+          getReadmeSummary(`${owner}/${name}`).then((result) => {
+            if (result?.summary) setReadmeSummary(result.summary)
+          }).catch(() => { /* 忽略 */ })
         } else {
           // API 返回 null（不可用或无数据），回退到 Demo 数据并标记提示
           setError(t("repoDetail.apiUnavailable"))
@@ -237,9 +243,14 @@ const RepoDetail: React.FC = () => {
               </Badge>
             ))}
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
-            {displayFullName}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
+              {displayFullName}
+            </h1>
+            <Badge variant="secondary" className="font-mono text-xs uppercase tracking-wider">
+              {t("repoDetail.rawDataBadge")}
+            </Badge>
+          </div>
           <p className="max-w-3xl text-base text-muted-foreground">
             {displayDescription}
           </p>
@@ -272,6 +283,21 @@ const RepoDetail: React.FC = () => {
             </Button>
           </div>
         </section>
+
+        {/* README 中文摘要 */}
+        {readmeSummary && (
+          <Card className="bg-surface-container-low/50 border-primary/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">{t("repoDetail.readmeSummaryTitle")}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-relaxed text-on-surface">{readmeSummary}</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* AI 分析 + 右侧信息 双栏 */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -419,6 +445,13 @@ const RepoDetail: React.FC = () => {
             ))}
           </div>
         </section>
+
+        {/* 跳转到分析页 */}
+        <div className="flex justify-end pt-4">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/analysis">{t("repoDetail.viewAnalysis")}</Link>
+          </Button>
+        </div>
       </div>
     </div>
   )
