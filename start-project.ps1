@@ -1,4 +1,4 @@
-param(
+﻿param(
   [int]$BackendPort = 3210,
   [int]$FrontendPort = 5173,
   [switch]$OpenBrowser
