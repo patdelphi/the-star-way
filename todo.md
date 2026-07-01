@@ -103,15 +103,89 @@
 
 ---
 
-## Phase 4：本地 API 与前端接线（待开始）
+## Phase 4：本地 API 服务 ✅ 已完成
 
-### 待做任务
-- [ ] 实现本地 API 服务（Node.js HTTP）
-- [ ] 用户列表、用户摘要、仓库列表、单仓库详情、标签统计、导出 API
-- [ ] 星标仓库页接入真实列表和统计
-- [ ] 单个仓库页接入真实仓库详情
-- [ ] 开发者页接入真实用户和同步状态
-- [ ] 保留 Demo 模式作为无数据兜底
+### 已完成任务
+- [x] 创建 backend/src/api/ 目录（api-server.ts、routes.ts、index.ts）
+- [x] HTTP 服务端口 3210（Node.js 内置 http 模块，无额外依赖）
+- [x] 路由定义：
+  - [x] GET /api/users — 用户列表
+  - [x] GET /api/users/:login/repos — 仓库列表（支持 q/language/tag/sort/direction/page/pageSize）
+  - [x] GET /api/users/:login/repos/*fullName — 单仓库详情（支持 owner/repo 格式）
+  - [x] GET /api/users/:login/stats — 统计数据
+  - [x] GET /api/users/:login/tags — 标签列表
+  - [x] POST /api/users/:login/classify — 触发规则分类
+  - [x] POST /api/sync — 触发同步
+  - [x] GET /api/export?format=csv|json|markdown&login=xxx — 导出
+- [x] CORS 支持、JSON 错误格式 { error: { code, message } }
+- [x] 全局异常处理
+- [x] 14 个 API 路由测试全部通过
+
+---
+
+## Phase 5：导出功能 ✅ 已完成
+
+### 已完成任务
+- [x] 创建 backend/src/export/ 目录（exporter.ts、index.ts）
+- [x] exportCsv — CSV 导出（UTF-8 BOM、CRLF 换行）
+- [x] exportJson — JSON 导出
+- [x] exportMarkdown — Markdown 表格导出
+- [x] 导出结果与当前筛选条件一致
+- [x] 导出不修改业务数据
+- [x] 12 个导出测试全部通过
+
+---
+
+## Phase 6：多语言 UI ✅ 已完成
+
+### 已完成任务
+- [x] 安装 react-i18next + i18next + i18next-browser-languagedetector
+- [x] 创建 frontend/src/i18n/ 目录
+- [x] i18n 初始化配置（LanguageDetector + localStorage 持久化）
+- [x] 中文语言包 locales/zh-CN.json
+- [x] 英文语言包 locales/en-US.json
+- [x] Sidebar 导航文案抽离到语言包
+- [x] TopBar 搜索/主题切换/语言下拉框文案抽离到语言包
+- [x] 语言偏好保存到 localStorage（starway-lang）
+- [x] 仓库原始数据不翻译，保持原文
+- [x] 前端 TypeScript 编译通过
+
+---
+
+## Phase 7：AI 增强功能框架 ✅ 已完成
+
+### 已完成任务
+- [x] 创建 backend/src/ai/ 目录（config.ts、cache.ts、index.ts）
+- [x] AI Provider 配置类型（openai-compatible，base_url + api_key + model）
+- [x] 环境变量加载配置（STARWAY_AI_BASE_URL / STARWAY_AI_API_KEY / STARWAY_AI_MODEL）
+- [x] AI 翻译结果缓存（translations 表，UPSERT）
+- [x] AI 分析报告缓存（analysis_reports 表，UPSERT）
+- [x] 缓存读取函数（getCachedTranslation / getCachedAnalysisReport）
+- [x] 仅框架定义，不实现具体 AI 调用
+- [x] 8 个 AI 模块测试全部通过
+
+---
+
+## 前端 API 客户端 ✅ 已完成
+
+### 已完成任务
+- [x] 创建 frontend/src/lib/api.ts
+- [x] 封装 fetch 调用后端 API（getUsers / getRepos / getRepo / getStats / getTags / classifyRepos / syncStars / exportData）
+- [x] Demo 模式兜底：API 不可用时返回静态 mock 数据
+- [x] 类型定义（Repo / RepoQueryParams / RepoListResult / UserStats / UserInfo / ApiError）
+- [x] 带超时的 fetch 封装（8 秒超时）
+- [x] API 可用性自动检测
+
+---
+
+## 未完成 / 后续
+
+- [ ] 前端页面接入真实 API（替换 demo 数据）
+- [ ] 前端 i18n 覆盖所有页面（当前仅覆盖导航和顶部栏）
+- [ ] 具体 AI 调用实现（GPT / Claude 等集成）
+- [ ] 导出功能前端对接（下载对话框）
+
+---
 
 ---
 

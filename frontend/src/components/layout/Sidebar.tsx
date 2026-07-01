@@ -3,6 +3,7 @@
  * 桌面端显示固定侧边栏，移动端使用 Sheet 抽屉
  */
 import { Link, useLocation } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import {
   Users,
   Compass,
@@ -23,19 +24,20 @@ import {
 } from "@/components/ui/sheet"
 
 const navItems = [
-  { path: "/developers", label: "开发者", icon: Users },
-  { path: "/explorer", label: "星标仓库", icon: Compass },
-  { path: "/analysis", label: "单个仓库", icon: LineChart },
-  { path: "#", label: "设置", icon: Settings },
+  { path: "/developers", icon: Users, labelKey: "nav.developers" },
+  { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
+  { path: "/analysis", icon: LineChart, labelKey: "nav.repoAnalysis" },
+  { path: "#", icon: Settings, labelKey: "nav.settings" },
 ]
 
 const footerLinks = [
-  { path: "#", label: "帮助文档", icon: FileText },
-  { path: "#", label: "GitHub", icon: Terminal },
+  { path: "#", icon: FileText, labelKey: "nav.helpDocs" },
+  { path: "#", icon: Terminal, labelKey: "nav.github" },
 ]
 
 function SidebarContent() {
   const location = useLocation()
+  const { t } = useTranslation()
 
   return (
     <div className="flex flex-col h-full py-8">
@@ -46,10 +48,10 @@ function SidebarContent() {
         </div>
         <div>
           <h1 className="font-semibold text-lg text-primary tracking-tight leading-tight font-sans">
-            Star Way
+            {t('app.title')}
           </h1>
           <p className="text-sm text-on-surface-variant font-sans">
-            星际领航员
+            {t('app.subtitle')}
           </p>
         </div>
       </div>
@@ -61,7 +63,7 @@ function SidebarContent() {
           const Icon = item.icon
           return (
             <Link
-              key={item.label}
+              key={item.labelKey}
               to={item.path}
               className={cn(
                 "flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors duration-200",
@@ -72,7 +74,7 @@ function SidebarContent() {
             >
               <Icon className="w-5 h-5" />
               <span className="font-sans text-sm tracking-wide">
-                {item.label}
+                {t(item.labelKey)}
               </span>
             </Link>
           )
@@ -86,13 +88,13 @@ function SidebarContent() {
             const Icon = item.icon
             return (
               <Link
-                key={item.label}
+                key={item.labelKey}
                 to={item.path}
                 className="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200"
               >
                 <Icon className="w-4 h-4" />
                 <span className="font-sans text-sm tracking-wider">
-                  {item.label}
+                  {t(item.labelKey)}
                 </span>
               </Link>
             )
