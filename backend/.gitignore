@@ -1,10 +1,20 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Database files
+data/*.db
+data/*.db-wal
+data/*.db-shm
 
 # Environment
 .env
 .env.local
+
+# Logs
+*.log
+
+# IDE
+.vscode/
