@@ -12,7 +12,8 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.1"
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

@@ -278,6 +278,33 @@ export async function getUserSummary(login: string): Promise<{
 }
 
 /**
+ * 获取同步历史记录
+ */
+export async function getSyncRuns(login: string): Promise<{
+  id: number
+  user_login: string
+  started_at: string
+  ended_at: string | null
+  status: string
+  repos_upserted: number
+  stars_upserted: number
+  repos_removed: number
+  pages_fetched: number
+  rate_limit_remaining: number | null
+  rate_limit_reset: string | null
+  error_message: string | null
+}[]> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/sync-runs`)
+      const data = await res.json()
+      return data.data ?? []
+    }
+  } catch { /* 忽略错误 */ }
+  return []
+}
+
+/**
  * 导出数据
  * @param format 导出格式：csv | json | markdown
  * @param login 用户名

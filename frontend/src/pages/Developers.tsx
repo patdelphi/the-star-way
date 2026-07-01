@@ -27,7 +27,7 @@ import {
   GitFork,
   Loader2,
 } from "lucide-react"
-import { getUsers, syncStars, getGitHubToken } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // ===== 类型定义 =====
@@ -39,6 +39,22 @@ interface Developer {
   avatar_url?: string | null
   profile_url?: string | null
   synced_at?: string | null
+}
+
+// 同步历史记录类型
+interface SyncRun {
+  id: number
+  user_login: string
+  started_at: string
+  ended_at: string | null
+  status: string
+  repos_upserted: number
+  stars_upserted: number
+  repos_removed: number
+  pages_fetched: number
+  rate_limit_remaining: number | null
+  rate_limit_reset: string | null
+  error_message: string | null
 }
 
 // ===== Demo 开发者数据（API 不可用时回退） =====
@@ -143,6 +159,7 @@ export default function Developers() {
   // 同步状态以 key 形式存储，便于翻译
   const [syncStatus, setSyncStatus] = useState("pending")
   const [syncError, setSyncError] = useState("")
+  const [syncRuns, setSyncRuns] = useState<SyncRun[]>([])
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -257,6 +274,25 @@ export default function Developers() {
     }
   }
 
+  // 加载同步历史记录
+  const loadSyncRuns = async (name: string) => {
+    try {
+      const runs = await getSyncRuns(name)
+      setSyncRuns(runs)
+    } catch {
+      setSyncRuns([])
+    }
+  }
+
+  // 当前选中开发者变化时，加载同步历史
+  useEffect(() => {
+    if (activeDev) {
+      loadSyncRuns(activeDev.name)
+    } else {
+      setSyncRuns([])
+    }
+  }, [activeDev])
+
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {
     setSyncStatus("syncing")
@@ -267,6 +303,7 @@ export default function Developers() {
       if (result !== null) {
         setSyncStatus(token ? "successToken" : "successAnon")
         setSearchResult(t("developers.starUpdated", { name }))
+        await loadSyncRuns(name)
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
@@ -520,6 +557,46 @@ export default function Developers() {
                 <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}
             </div>
+            {/* 同步历史列表 */}
+            {syncRuns.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  {t("developers.syncHistory")}
+                </h3>
+                <div className="space-y-1.5">
+                  {syncRuns.slice(0, 5).map((run) => (
+                    <div
+                      key={run.id}
+                      className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2"
+                    >
+                      <span className="text-muted-foreground tabular-nums">
+                        {new Date(run.started_at).toLocaleString()}
+                      </span>
+                      <Badge
+                        className={
+                          run.status === "success"
+                            ? "bg-green-600 text-white hover:bg-green-600"
+                            : run.status === "failed"
+                              ? "bg-red-600 text-white hover:bg-red-600"
+                              : "bg-yellow-500 text-white hover:bg-yellow-500"
+                        }
+                      >
+                        {run.status}
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        {t("developers.syncRepos")}: {run.repos_upserted}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {t("developers.syncStars")}: {run.stars_upserted}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {t("developers.syncPages")}: {run.pages_fetched}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex items-baseline gap-2 pt-2">
               <span className="text-4xl font-bold tracking-tight text-primary">
                 {activeDev.stars}

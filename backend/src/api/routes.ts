@@ -266,6 +266,24 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/users/:login/sync-runs =====
+      const syncRunsMatch = matchRoute('/api/users/:login/sync-runs', url.split('?')[0])
+      if (method === 'GET' && syncRunsMatch) {
+        const { login } = syncRunsMatch
+        const runs = db.prepare(`
+          SELECT id, user_login, started_at, ended_at, status,
+                 repos_upserted, stars_upserted, repos_removed, pages_fetched,
+                 rate_limit_remaining, rate_limit_reset, error_message
+          FROM sync_runs
+          WHERE user_login = ?
+          ORDER BY started_at DESC
+          LIMIT 20
+        `).all(login)
+
+        json(res, { data: runs })
+        return
+      }
+
       // ===== POST /api/sync =====
       if (method === 'POST' && url === '/api/sync') {
         const body = await readBody(req)

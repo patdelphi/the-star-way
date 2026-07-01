@@ -58,7 +58,11 @@
     "syncUnknownError": "同步失败，请检查 GitHub 限流、用户名或网络状态",
     "starUpdated": "{{name}} 星标已更新",
     "simulateNotice": "模拟 401/404/限流/网络失败状态，不调用 GitHub API。",
-    "radarCenter": "技术"
+    "radarCenter": "技术",
+    "syncHistory": "同步历史",
+    "syncRepos": "仓库",
+    "syncStars": "星标",
+    "syncPages": "页数"
   },
   "starExplorer": {
     "title": "星标仓库",

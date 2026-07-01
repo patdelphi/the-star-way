@@ -81,6 +81,23 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
   FOREIGN KEY (user_login) REFERENCES users(login)
 );
 
+-- 同步运行记录表
+CREATE TABLE IF NOT EXISTS sync_runs (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_login      TEXT NOT NULL,
+  started_at      TEXT NOT NULL,
+  ended_at        TEXT,
+  status          TEXT NOT NULL DEFAULT 'running',
+  repos_upserted  INTEGER NOT NULL DEFAULT 0,
+  stars_upserted  INTEGER NOT NULL DEFAULT 0,
+  repos_removed   INTEGER NOT NULL DEFAULT 0,
+  pages_fetched   INTEGER NOT NULL DEFAULT 0,
+  rate_limit_remaining INTEGER,
+  rate_limit_reset     TEXT,
+  error_message   TEXT,
+  FOREIGN KEY (user_login) REFERENCES users(login)
+);
+
 -- 索引：加速常见查询
 CREATE INDEX IF NOT EXISTS idx_repos_language   ON repos(language);
 CREATE INDEX IF NOT EXISTS idx_repos_stars       ON repos(stars DESC);
@@ -88,4 +105,5 @@ CREATE INDEX IF NOT EXISTS idx_repos_pushed_at   ON repos(pushed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stars_user_login  ON stars(user_login);
 CREATE INDEX IF NOT EXISTS idx_stars_starred_at   ON stars(starred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_repo_tags_tag      ON repo_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_sync_runs_user     ON sync_runs(user_login, started_at DESC);
 `

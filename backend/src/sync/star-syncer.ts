@@ -37,7 +37,30 @@ export async function syncStars(
 ): Promise<StarSyncResult> {
   const client = new GitHubClient(config)
   const now = new Date().toISOString()
-  const profile = await client.getUserProfile(username)
+
+  // 先确保用户在 users 表中存在（满足 sync_runs 外键约束）
+  db.prepare(`
+    INSERT INTO users (login, synced_at) VALUES (?, ?)
+    ON CONFLICT(login) DO UPDATE SET synced_at = excluded.synced_at
+  `).run(username, now)
+
+  // 创建 sync_runs 记录
+  const insertSyncRun = db.prepare(`
+    INSERT INTO sync_runs (user_login, started_at, status)
+    VALUES (?, ?, 'running')
+  `)
+  const syncRunResult = insertSyncRun.run(username, now)
+  const syncRunId = syncRunResult.lastInsertRowid as number
+
+  let profile
+  try {
+    profile = await client.getUserProfile(username)
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    db.prepare(`UPDATE sync_runs SET status = 'failed', ended_at = ?, error_message = ? WHERE id = ?`)
+      .run(new Date().toISOString(), errorMessage, syncRunId)
+    throw err
+  }
 
   // 用于收集分页信息
   let totalPages = 0
@@ -60,6 +83,7 @@ export async function syncStars(
       VALUES (?, ?, ?, ?)
       ON CONFLICT(login) DO UPDATE SET
         avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
+        profile_url = COALESCE(excluded.profile_url, users.profile_url),
         synced_at = excluded.synced_at
     `)
 
@@ -147,6 +171,30 @@ export async function syncStars(
 
     return { reposUpserted, starsUpserted, reposMarkedRemoved }
   })
+
+  // 更新 sync_runs 为成功状态
+  const endedAt = new Date().toISOString()
+  db.prepare(`
+    UPDATE sync_runs SET
+      status = 'success',
+      ended_at = ?,
+      repos_upserted = ?,
+      stars_upserted = ?,
+      repos_removed = ?,
+      pages_fetched = ?,
+      rate_limit_remaining = ?,
+      rate_limit_reset = ?
+    WHERE id = ?
+  `).run(
+    endedAt,
+    result.reposUpserted,
+    result.starsUpserted,
+    result.reposMarkedRemoved,
+    totalPages,
+    rateLimit?.remaining ?? null,
+    rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
+    syncRunId,
+  )
 
   return {
     username,

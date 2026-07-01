@@ -58,7 +58,11 @@
     "syncUnknownError": "Sync failed. Please check GitHub rate limit, username, or network status.",
     "starUpdated": "{{name}} stars updated",
     "simulateNotice": "Simulating 401/404/rate-limit/network-fail states, not calling GitHub API.",
-    "radarCenter": "Tech"
+    "radarCenter": "Tech",
+    "syncHistory": "Sync History",
+    "syncRepos": "Repos",
+    "syncStars": "Stars",
+    "syncPages": "Pages"
   },
   "starExplorer": {
     "title": "Star Explorer",
