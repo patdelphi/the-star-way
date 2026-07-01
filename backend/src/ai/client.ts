@@ -113,3 +113,51 @@ export async function generateStarDna(
     { role: 'user', content: prompt },
   ])
 }
+
+/**
+ * 生成学习路径推荐
+ * @param login 用户登录名
+ * @param stats 用户统计信息
+ * @returns Markdown 格式的学习路径
+ */
+export async function generateLearningPath(
+  login: string,
+  stats: {
+    repoCount: number
+    languages: { language: string; count: number }[]
+    tags: { tag: string; count: number }[]
+  },
+): Promise<string> {
+  const topLangs = stats.languages.slice(0, 5).map(l => `${l.language}`).join(', ')
+  const topTags = stats.tags.slice(0, 10).map(t => `${t.tag}`).join(', ')
+
+  const prompt = `基于以下 GitHub 用户的星标数据，为其生成一份个性化的技术学习路径推荐。
+
+用户：${login}
+星标仓库总数：${stats.repoCount}
+主要关注语言：${topLangs || '无'}
+主要关注标签：${topTags || '无'}
+
+请按以下 Markdown 格式输出（不要加任何额外说明）：
+
+## 阶段一：巩固基础
+- 建议学习的核心概念
+- 推荐从已星标的项目中选择入门项目
+
+## 阶段二：深入实践
+- 建议深入的技术方向
+- 推荐从已星标的项目中选择进阶项目
+
+## 阶段三：拓展前沿
+- 建议关注的新兴领域
+- 与已星标项目相关的延伸方向
+
+## 学习建议
+- 2-3 条具体可行的学习建议
+`
+
+  return chat([
+    { role: 'system', content: '你是一个技术学习规划师，擅长根据开发者的兴趣标签和星标仓库生成个性化的学习路径。' },
+    { role: 'user', content: prompt },
+  ])
+}

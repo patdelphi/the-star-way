@@ -366,6 +366,23 @@ export function downloadReport(login: string): void {
 }
 
 /**
+ * 获取学习路径推荐
+ */
+export async function getLearningPath(login: string): Promise<{
+  path: string
+  cached: boolean
+} | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path`)
+      const data = await res.json()
+      return data.data
+    }
+  } catch { /* 忽略错误 */ }
+  return null
+}
+
+/**
  * 获取后端 GitHub Token 来源
  */
 export async function getTokenSource(): Promise<{

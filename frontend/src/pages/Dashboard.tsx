@@ -21,8 +21,9 @@ import {
   Compass,
   FileText,
   LineChart,
+  BookOpen,
 } from "lucide-react"
-import { getRepos, getStats, getTags } from "@/lib/api"
+import { getRepos, getStats, getTags, getLearningPath } from "@/lib/api"
 import type { RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -261,6 +262,7 @@ const Dashboard: React.FC = () => {
   const [hotTopics, setHotTopics] = useState<string[]>(demoHotTopics)
   const [gemRepos, setGemRepos] = useState<GemRepo[]>(demoGemRepos)
   const [repoCount, setRepoCount] = useState(691)
+  const [learningPath, setLearningPath] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -319,6 +321,10 @@ const Dashboard: React.FC = () => {
     }
 
     loadData()
+
+    getLearningPath(currentLogin).then((result) => {
+      if (result?.path) setLearningPath(result.path)
+    }).catch(() => {})
 
     return () => {
       cancelled = true
@@ -504,6 +510,23 @@ const Dashboard: React.FC = () => {
             ))}
           </div>
         </section>
+
+        {/* 个性化学习路径 */}
+        {learningPath && (
+          <section>
+            <h2 className="text-lg font-semibold tracking-tight text-on-surface mb-4 flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              {t("dashboard.learningPathTitle")}
+            </h2>
+            <Card className="bg-surface-container-low/50 border-primary/20">
+              <CardContent className="p-5">
+                <div className="prose prose-sm max-w-none dark:prose-invert text-sm leading-relaxed text-on-surface whitespace-pre-line">
+                  {learningPath}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {/* 快速入口 */}
         <section>

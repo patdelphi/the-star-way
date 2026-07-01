@@ -379,6 +379,7 @@
     "jvmEcosystem": "JVM Ecosystem",
     "frontendEcosystem": "Frontend Ecosystem",
     "otherEcosystem": "Other Ecosystem",
+    "learningPathTitle": "Personalized Learning Path",
     "quickAccess": "Quick Access",
     "exploreDesc": "Search, filter and analyze your starred repos",
     "catalogDesc": "Browse all starred projects by tag",
