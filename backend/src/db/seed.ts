@@ -1,10 +1,11 @@
 /**
  * 种子数据导入脚本
  * 用法：pnpm db:seed
- * 将内置 CSV 导入到 SQLite 数据库
+ * 将内置 CSV 导入到 SQLite 数据库，并自动执行规则分类
  */
 import { createConnection, initDatabase } from '../db/connection.js'
 import { importFromCsvFile } from '../import/csv-importer.js'
+import { classifyAllRepos } from '../classification/classifier.js'
 import { join } from 'node:path'
 
 const CSV_PATH = join(import.meta.dirname, '..', '..', '..', 'Docs', 'github_starred_projects_691_COMPLETE.csv')
@@ -17,6 +18,10 @@ async function main() {
   console.log('导入种子数据：', CSV_PATH)
   const count = await importFromCsvFile(db, CSV_PATH)
   console.log(`导入完成：${count} 条仓库数据`)
+
+  console.log('执行规则分类...')
+  const result = classifyAllRepos(db)
+  console.log(`分类完成：${result.tagsCreated} 个标签（${result.repoCount} 个仓库）`)
 
   db.close()
 }

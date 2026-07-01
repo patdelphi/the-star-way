@@ -25,7 +25,7 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, exportData, classifyRepos } from "@/lib/api"
+import { getRepos, getStats, getTags, exportData, classifyRepos } from "@/lib/api"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -358,6 +358,7 @@ export default function StarExplorer() {
   // === API 相关状态 ===
   const [allRepos, setAllRepos] = useState<StarRepo[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usingFallback, setUsingFallback] = useState(false)
@@ -370,9 +371,10 @@ export default function StarExplorer() {
       setLoading(true)
       setError(null)
       try {
-        const [repoResult, statsResult] = await Promise.all([
+        const [repoResult, statsResult, tagsResult] = await Promise.all([
           getRepos(LOGIN, { pageSize: 10000 }),
           getStats(LOGIN),
+          getTags(LOGIN),
         ])
         if (cancelled) return
 
@@ -390,6 +392,7 @@ export default function StarExplorer() {
         if (statsResult) {
           setStats(statsResult)
         }
+        setTags(tagsResult)
       } catch (err) {
         if (cancelled) return
         const msg = err instanceof Error ? err.message : "加载数据失败"
@@ -690,6 +693,54 @@ export default function StarExplorer() {
                   <p className="mt-1 text-xs text-muted-foreground">{item.focus}</p>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* 标签云 */}
+        <section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Tags className="h-5 w-5 text-primary" />
+                标签云
+                {!usingFallback && tags.length > 0 && (
+                  <Badge variant="secondary" className="font-mono text-xs ml-2">{tags.length} 个分类</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                基于 Topic 精确匹配 + 仓库名称/描述模糊匹配生成的规则标签，字号越大表示命中仓库越多
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2.5 items-center justify-center py-2">
+                  {tags.map(({ tag, count }) => {
+                    // 按 count 计算字号/颜色深浅（最小 0.8rem，最大 1.6rem）
+                    const maxCount = tags[0].count
+                    const ratio = count / maxCount
+                    const fontSize = 0.75 + ratio * 0.85
+                    const opacity = 0.5 + ratio * 0.5
+                    return (
+                      <span
+                        key={tag}
+                        className="inline-block rounded-full border border-outline-variant/50 bg-surface-container-low px-3 py-1 text-sm font-medium text-on-surface transition-colors hover:bg-primary hover:text-on-primary hover:border-primary cursor-default"
+                        style={{
+                          fontSize: `${fontSize}rem`,
+                          opacity,
+                        }}
+                      >
+                        {tag}
+                        <span className="ml-1.5 text-[0.7em] font-mono text-muted-foreground">{count}</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {usingFallback ? "演示模式下无标签数据，请连接后端 API 后触发分类。" : "暂无标签数据，请先点击"更新星标仓库分析"触发规则分类。"}
+                </p>
+              )}
             </CardContent>
           </Card>
         </section>
