@@ -12,7 +12,17 @@ import type {
   LicenseStat,
 } from '../db/types.js'
 
-const SYSTEM_DEMO_LOGIN = 'demo-user'
+export const SYSTEM_DEMO_LOGIN = 'demo-user'
+
+// 活跃阈值：90 天（毫秒）
+export const ACTIVE_DAYS_MS = 90 * 24 * 60 * 60 * 1000
+
+// Hidden Gems 阈值
+export const GEM_STARS_MAX = 1000
+
+// Gem 筛选范围
+export const GEM_STARS_MIN = 50
+export const GEM_STARS_UPPER = 10000
 
 // ===== 列表查询 =====
 
@@ -279,7 +289,7 @@ export function queryRepoCount(db: Database.Database, userLogin?: string): numbe
  * 活跃仓库统计（最近 90 天有 pushed_at 更新的仓库）
  */
 export function queryActiveRepoCount(db: Database.Database, userLogin?: string): number {
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
   const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
   const userWhere = userLogin ? 'AND s.user_login = ?' : ''
   const row = db
@@ -307,7 +317,7 @@ export function queryUserSummary(db: Database.Database, userLogin: string): {
   licenseRiskCount: number
   lastSyncedAt: string | null
 } {
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
 
   // 仓库总数
   const repoCount = queryRepoCount(db, userLogin)
@@ -328,8 +338,8 @@ export function queryUserSummary(db: Database.Database, userLogin: string): {
     SELECT COUNT(*) as cnt
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
-    WHERE s.user_login = ? AND r.stars <= 1000 AND r.pushed_at >= ?
-  `).get(userLogin, ninetyDaysAgo) as { cnt: number }
+    WHERE s.user_login = ? AND r.stars <= ? AND r.pushed_at >= ?
+  `).get(userLogin, GEM_STARS_MAX, ninetyDaysAgo) as { cnt: number }
   const hiddenGemsCount = gemRow.cnt
 
   // 沉睡星标：超过 90 天未更新
@@ -436,7 +446,7 @@ export function queryGlobalOverview(db: Database.Database): {
   }>
   starTrend: Array<{ label: string; value: number }>
 } {
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
   const baseWhere = `s.removed_at IS NULL AND s.user_login != ?`
 
   const userRow = db.prepare(`
@@ -469,8 +479,8 @@ export function queryGlobalOverview(db: Database.Database): {
     SELECT COUNT(DISTINCT r.full_name) as cnt
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
-    WHERE ${baseWhere} AND r.stars <= 1000 AND r.pushed_at >= ?
-  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+    WHERE ${baseWhere} AND r.stars <= ? AND r.pushed_at >= ?
+  `).get(SYSTEM_DEMO_LOGIN, GEM_STARS_MAX, ninetyDaysAgo) as { cnt: number }
 
   const sleepRow = db.prepare(`
     SELECT COUNT(DISTINCT r.full_name) as cnt
@@ -546,11 +556,11 @@ export function queryGlobalOverview(db: Database.Database): {
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE ${baseWhere}
-      AND r.stars BETWEEN 50 AND 10000
+      AND r.stars BETWEEN ? AND ?
       AND r.pushed_at >= ?
     ORDER BY r.stars DESC
     LIMIT 3
-  `).all(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as Array<{
+  `).all(SYSTEM_DEMO_LOGIN, GEM_STARS_MIN, GEM_STARS_UPPER, ninetyDaysAgo) as Array<{
     full_name: string
     description: string | null
     html_url: string

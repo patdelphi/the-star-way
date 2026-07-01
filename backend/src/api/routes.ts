@@ -16,6 +16,7 @@ import {
   queryUserSummary,
   queryUserListSummaries,
   queryGlobalOverview,
+  SYSTEM_DEMO_LOGIN,
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
@@ -593,10 +594,10 @@ export function createRouter(db: Database.Database) {
         const format = query.format || 'json'
         const defaultUser = db.prepare(`
           SELECT login FROM users
-          WHERE login != 'demo-user'
+          WHERE login != ?
           ORDER BY synced_at DESC, login
           LIMIT 1
-        `).get() as { login: string } | undefined
+        `).get(SYSTEM_DEMO_LOGIN) as { login: string } | undefined
         const login = query.login || defaultUser?.login || ''
 
         // 验证用户是否存在

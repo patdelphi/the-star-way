@@ -5,6 +5,7 @@
  */
 import type Database from 'better-sqlite3'
 import { queryRepos } from '../repository/repo-queries.js'
+import { ACTIVE_DAYS_MS, GEM_STARS_MAX } from '../repository/repo-queries.js'
 import type { RepoQueryParams } from '../db/types.js'
 
 // 导出查询参数（继承 RepoQueryParams，加上 login）
@@ -23,7 +24,7 @@ export interface ExportParams extends RepoQueryParams {
  */
 export function exportCsv(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
   // 导出时取消分页限制，导出全部筛选结果
-  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
 
   const BOM = '\uFEFF'
   const header = [
@@ -70,7 +71,7 @@ export function exportCsv(db: Database.Database, login: string, params: Omit<Rep
  * @returns JSON 字符串
  */
 export function exportJson(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
-  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
 
   const data = {
     login,
@@ -104,7 +105,7 @@ export function exportJson(db: Database.Database, login: string, params: Omit<Re
  * @returns Markdown 文本（CRLF 换行）
  */
 export function exportMarkdown(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
-  const result = queryRepos(db, { ...params, userLogin: login, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
 
   const lines: string[] = []
 
@@ -159,7 +160,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
   const licenses = queryLicenseStats(db, login)
 
   // 沉睡星标（90天未更新）
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
   const sleepStars = db.prepare(`
     SELECT r.full_name, r.description, r.language, r.stars, r.pushed_at
     FROM repos r
@@ -186,7 +187,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
     SELECT r.full_name, r.description, r.language, r.stars, r.pushed_at
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
-    WHERE s.user_login = ? AND r.stars <= 1000 AND r.pushed_at > ?
+    WHERE s.user_login = ? AND r.stars <= ? AND r.pushed_at > ?
     ORDER BY r.stars DESC
     LIMIT 20
   `).all(login, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
@@ -284,7 +285,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
   }
 
   // 完整列表
-  const result = queryRepos(db, { userLogin: login, limit: 999999, offset: 0 })
+  const result = queryRepos(db, { userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
   lines.push(`## 完整仓库列表`)
   lines.push('')
   lines.push(`共 ${result.total} 个仓库`)

@@ -133,7 +133,7 @@ const RepoDetail: React.FC = () => {
   const handleCopyClone = () => {
     const cloneUrl = repoData
       ? `git clone ${repoData.html_url}.git`
-      : "git clone https://github.com/microsoft/markitdown.git"
+      : `git clone https://github.com/${owner}/${name}.git`
     navigator.clipboard.writeText(cloneUrl)
       .then(() => {
         // eslint-disable-next-line no-console
@@ -198,14 +198,14 @@ const RepoDetail: React.FC = () => {
   const displayRepo = repoData
 
   // 头部展示字段
-  const displayFullName = displayRepo?.full_name ?? (owner && name ? `${owner}/${name}` : "microsoft/markitdown")
-  const displayDescription = displayRepo?.description ?? "用于把文件和办公文档转换为 Markdown 的 Python 工具。"
-  const displayStars = displayRepo?.stars ?? 40200
-  const displayForks = displayRepo?.forks ?? 1800
+  const displayFullName = displayRepo?.full_name ?? (owner && name ? `${owner}/${name}` : "")
+  const displayDescription = displayRepo?.description ?? ""
+  const displayStars = displayRepo?.stars ?? 0
+  const displayForks = displayRepo?.forks ?? 0
   const displayPushedAt = displayRepo?.pushed_at ?? null
   const displayHtmlUrl = displayRepo?.html_url ?? `https://github.com/${owner}/${name}`
-  const displayLanguage = displayRepo?.language ?? "Python"
-  const displayLicense = displayRepo?.license ?? "MIT"
+  const displayLanguage = displayRepo?.language ?? ""
+  const displayLicense = displayRepo?.license ?? ""
   const displayTags = displayRepo?.tags ?? ["AI 工具", displayLanguage].filter(Boolean)
 
   // 协议健康度：根据 API 返回的 license 动态展示

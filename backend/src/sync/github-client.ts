@@ -74,7 +74,7 @@ export class GitHubClient {
   constructor(config: GitHubClientConfig = {}) {
     this.token = config.token
     this.baseUrl = config.baseUrl ?? 'https://api.github.com'
-    this.userAgent = config.userAgent ?? 'the-star-way/0.1.0'
+    this.userAgent = config.userAgent ?? 'the-star-way/1.0.0'
   }
 
   /**

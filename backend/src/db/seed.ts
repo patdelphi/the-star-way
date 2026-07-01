@@ -8,8 +8,9 @@ import { importFromCsvFile } from '../import/csv-importer.js'
 import { classifyAllRepos } from '../classification/classifier.js'
 import { join } from 'node:path'
 
-const CSV_PATH = join(import.meta.dirname, '..', '..', '..', 'Docs', 'github_starred_projects_691_COMPLETE.csv')
-const DEMO_LOGIN = 'patdelphi'
+// 支持通过环境变量覆盖默认值
+const CSV_PATH = process.env.SEED_CSV_PATH || join(import.meta.dirname, '..', '..', '..', 'Docs', 'github_starred_projects_691_COMPLETE.csv')
+const DEMO_LOGIN = process.env.SEED_DEMO_LOGIN || 'patdelphi'
 
 async function main() {
   console.log('初始化数据库...')

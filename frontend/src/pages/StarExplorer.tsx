@@ -219,9 +219,7 @@ const sampleRepos: StarRepo[] = [
   },
 ]
 
-const activeFilters = [
-  { key: "tag", label: "RAG 前置" },
-]
+const activeFilters: Filter[] = []
 
 // 静态 fallback 数据（API 无对应统计时展示）
 const fallbackLanguageStats = [
@@ -332,7 +330,7 @@ export default function StarExplorer() {
   // === 移到组件内部的 i18n 静态数据 ===
   const classificationSources = useMemo(
     () => [
-      { label: t("starExplorer.classificationSourceTopic"), count: 512, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
+      { label: t("starExplorer.classificationSourceTopic"), count: 0, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
       { label: t("starExplorer.classificationSourceName"), count: 96, confidence: "0.85", detail: t("starExplorer.classificationSourceNameDetail") },
       { label: t("starExplorer.classificationSourceDesc"), count: 71, confidence: "0.80", detail: t("starExplorer.classificationSourceDescDetail") },
       { label: t("starExplorer.classificationSourceManual"), count: 12, confidence: "1.00", detail: t("starExplorer.classificationSourceManualDetail") },
@@ -878,7 +876,7 @@ export default function StarExplorer() {
           <MetricCard
             icon={Activity}
             label={t("starExplorer.activeRepos")}
-            value={String(summary?.activeRepoCount ?? stats?.activeRepoCount ?? 512)}
+            value={String(summary?.activeRepoCount ?? stats?.activeRepoCount ?? 0)}
             detail={t("starExplorer.activeReposDetail")}
           />
           <MetricCard
