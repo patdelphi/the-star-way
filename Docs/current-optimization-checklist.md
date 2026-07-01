@@ -105,11 +105,34 @@
 
 ---
 
+## 第四轮开发成果（2026-07-01 续）
+
+### 硬编码扫描与修复（全部完成）
+
+| 状态 | 问题 | 成果 |
+|---|---|---|
+| ✅ | `RepoDetail.tsx` fallback 绑定到 microsoft/markitdown 特定数据 | 全部改为通用空值/零值（stars→0, forks→0, language→'', license→''） |
+| ✅ | `StarExplorer.tsx` 魔法数字 `512` 作为分类统计和活跃仓库 fallback | 改为 `0` |
+| ✅ | `StarExplorer.tsx` `activeFilters` 硬编码 `[{RAG 前置}]` | 改为空数组 `[]` |
+| ✅ | `seed.ts` CSV 路径和 `DEMO_LOGIN` 硬编码 | 支持 `SEED_CSV_PATH` / `SEED_DEMO_LOGIN` 环境变量覆盖 |
+| ✅ | `github-client.ts` User-Agent 版本号 `0.1.0` 硬编码 | 更新为 `1.0.0` |
+| ✅ | `routes.ts` 硬编码 `'demo-user'` 字符串 | 改为引用 `SYSTEM_DEMO_LOGIN` 常量 |
+| ✅ | `repo-queries.ts` 多处魔法数字（90天/1000/50/10000） | 提取为 `ACTIVE_DAYS_MS`/`GEM_STARS_MAX`/`GEM_STARS_MIN`/`GEM_STARS_UPPER` 常量 |
+| ✅ | `exporter.ts` `999999` 作为取消分页的魔法数字 | 替换为 `Number.MAX_SAFE_INTEGER` |
+
+### 前端白屏 Bug 修复
+
+| 状态 | 问题 | 成果 |
+|---|---|---|
+| ✅ | StarExplorer 页面白屏，控制台 `ReferenceError: Sparkles is not defined` | 补全 `Sparkles` 的 lucide-react 导入 |
+
+---
+
 ## 验证状态
 
-- 后端测试：96 测试全部通过
+- 后端测试：**98 测试全部通过**
 - 前端编译：零 TypeScript 错误
-- 总 commit 数：19
+- 总 commit 数：**22**
 
 ---
 
