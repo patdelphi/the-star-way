@@ -4,13 +4,17 @@
     "subtitle": "Stellar Navigator"
   },
   "nav": {
-    "dashboard": "Dashboard",
+    "groupOverview": "Overview",
+    "groupBrowse": "Browse",
+    "groupAnalysis": "Analysis",
+    "groupSystem": "System",
+    "dashboard": "Overview",
     "developers": "Developers",
     "starExplorer": "Star Explorer",
-    "starCatalog": "Catalog",
-    "repoAnalysis": "Repository Analysis",
+    "starCatalog": "Star Catalog",
+    "repoAnalysis": "Repo Analysis",
     "settings": "Settings",
-    "helpDocs": "Help Docs",
+    "helpDocs": "Help",
     "github": "GitHub"
   },
   "topBar": {
@@ -374,7 +378,11 @@
     "jupyterNotes": "Jupyter Notes",
     "jvmEcosystem": "JVM Ecosystem",
     "frontendEcosystem": "Frontend Ecosystem",
-    "otherEcosystem": "Other Ecosystem"
+    "otherEcosystem": "Other Ecosystem",
+    "quickAccess": "Quick Access",
+    "exploreDesc": "Search, filter and analyze your starred repos",
+    "catalogDesc": "Browse all starred projects by tag",
+    "analysisDesc": "Deep analysis of individual repositories"
   },
   "starCatalog": {
     "title": "Star Catalog",

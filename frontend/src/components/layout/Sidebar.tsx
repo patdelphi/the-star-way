@@ -24,13 +24,33 @@ import {
   SheetClose,
 } from "@/components/ui/sheet"
 
-const navItems = [
-  { path: "/dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
-  { path: "/developers", icon: Users, labelKey: "nav.developers" },
-  { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
-  { path: "/catalog", icon: FileText, labelKey: "nav.starCatalog" },
-  { path: "/analysis", icon: LineChart, labelKey: "nav.repoAnalysis" },
-  { path: "/settings", icon: Settings, labelKey: "nav.settings" },
+const navGroups = [
+  {
+    titleKey: "nav.groupOverview",
+    items: [
+      { path: "/dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
+      { path: "/developers", icon: Users, labelKey: "nav.developers" },
+    ],
+  },
+  {
+    titleKey: "nav.groupBrowse",
+    items: [
+      { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
+      { path: "/catalog", icon: FileText, labelKey: "nav.starCatalog" },
+    ],
+  },
+  {
+    titleKey: "nav.groupAnalysis",
+    items: [
+      { path: "/analysis", icon: LineChart, labelKey: "nav.repoAnalysis" },
+    ],
+  },
+  {
+    titleKey: "nav.groupSystem",
+    items: [
+      { path: "/settings", icon: Settings, labelKey: "nav.settings" },
+    ],
+  },
 ]
 
 const footerLinks = [
@@ -60,28 +80,35 @@ function SidebarContent() {
       </div>
 
       {/* Main Nav */}
-      <div className="flex-1 px-4 flex flex-col gap-2">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.labelKey}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors duration-200",
-                isActive
-                  ? "text-primary font-bold border-r-2 border-primary bg-surface-container"
-                  : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
-              )}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="font-sans text-sm tracking-wide">
-                {t(item.labelKey)}
-              </span>
-            </Link>
-          )
-        })}
+      <div className="flex-1 px-4 flex flex-col gap-1">
+        {navGroups.map((group) => (
+          <div key={group.titleKey} className="flex flex-col gap-1 mb-2">
+            <span className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t(group.titleKey)}
+            </span>
+            {group.items.map((item) => {
+              const isActive = location.pathname === item.path
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.labelKey}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors duration-200",
+                    isActive
+                      ? "text-primary font-bold border-r-2 border-primary bg-surface-container"
+                      : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="font-sans text-sm tracking-wide">
+                    {t(item.labelKey)}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Footer */}

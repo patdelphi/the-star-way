@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
+import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,9 @@ import {
   Star,
   GitFork,
   ExternalLink,
+  Compass,
+  FileText,
+  LineChart,
 } from "lucide-react"
 import { getRepos, getStats, getTags } from "@/lib/api"
 import type { RepoListResult } from "@/lib/api"
@@ -498,6 +502,54 @@ const Dashboard: React.FC = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </section>
+
+        {/* 快速入口 */}
+        <section>
+          <h2 className="text-lg font-semibold tracking-tight text-on-surface mb-4">
+            {t("dashboard.quickAccess")}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Link to="/explorer">
+              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Compass className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{t("nav.starExplorer")}</div>
+                    <div className="text-xs text-muted-foreground">{t("dashboard.exploreDesc")}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link to="/catalog">
+              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-domain-backend/10">
+                    <FileText className="h-5 w-5 text-domain-backend" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{t("nav.starCatalog")}</div>
+                    <div className="text-xs text-muted-foreground">{t("dashboard.catalogDesc")}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link to="/analysis">
+              <Card className="h-full hover:bg-surface-container transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-domain-ai/10">
+                    <LineChart className="h-5 w-5 text-domain-ai" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{t("nav.repoAnalysis")}</div>
+                    <div className="text-xs text-muted-foreground">{t("dashboard.analysisDesc")}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </section>
       </div>
