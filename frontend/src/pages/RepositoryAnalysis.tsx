@@ -176,6 +176,7 @@ export default function RepositoryAnalysis() {
   }
 
   /** 初始化：并行加载仓库列表、统计和标签 */
+  const urlRepo = searchParams.get("repo")
   useEffect(() => {
     let cancelled = false
 
@@ -195,7 +196,6 @@ export default function RepositoryAnalysis() {
         setAllTags(tagsResult)
 
         // 优先使用 URL ?repo=xxx，其次 localStorage
-        const urlRepo = searchParams.get("repo")
         const storedRepo = urlRepo || localStorage.getItem("selected-star-repo")
         if (storedRepo) {
           setSelectedRepo(storedRepo)
@@ -216,7 +216,7 @@ export default function RepositoryAnalysis() {
     return () => {
       cancelled = true
     }
-  }, [t, currentLogin, searchParams])
+  }, [t, currentLogin, urlRepo])
 
   /** 下拉选择器的数据源：只使用 API 返回的真实仓库 */
   const selectorOptions = useMemo(() => {
