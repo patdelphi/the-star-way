@@ -242,9 +242,11 @@ export default function RepositoryAnalysis() {
               <LineChart className="h-4 w-4" />
               {t("repoAnalysis.reAnalyze")}
             </Button>
-            <Button className="gap-2" disabled={loading}>
-              <ExternalLink className="h-4 w-4" />
-              {t("repoAnalysis.openGithub")}
+            <Button className="gap-2" asChild disabled={loading || !activeRepo}>
+              <a href={`https://github.com/${activeRepo?.fullName}`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                {t("repoAnalysis.openGithub")}
+              </a>
             </Button>
           </div>
         </section>
