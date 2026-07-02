@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import { getGitHubToken, setGitHubToken, clearGitHubToken, getTokenSource } from "@/lib/api"
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3210"
+const API_BASE = import.meta.env.VITE_API_BASE || ""
 
 export default function Settings() {
   const { t } = useTranslation()

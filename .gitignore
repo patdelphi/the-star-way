@@ -3,6 +3,9 @@ node_modules/
 dependency-backups/
 package-lock.json
 
+# Runtime (后端端口文件)
+.runtime/
+
 # Build output
 dist/
 

@@ -104,7 +104,7 @@ export interface ApiError {
 
 // ===== 配置 =====
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3210'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 const API_TIMEOUT = 8000 // 普通 API 8 秒超时
 const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
 const TOKEN_KEY = 'starway-github-token'
