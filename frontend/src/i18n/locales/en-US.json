@@ -440,6 +440,7 @@
     "radarDesc": "Six-dimensional tech capability distribution",
     "hotTopics": "Hot Topics",
     "gemRepos": "Active Low-Star Repos",
+    "gemReposDesc": "Rule: from starred repos, GitHub stars 50-10000, updated in the last 90 days, sorted by stars descending, top 3.",
     "loading": "Loading...",
     "loadError": "Failed to load data, showing demo data",
     "radarCenter": "Tech",

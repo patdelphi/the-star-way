@@ -440,6 +440,7 @@
     "radarDesc": "六维技术能力分布",
     "hotTopics": "热门主题",
     "gemRepos": "活跃低星项目",
+    "gemReposDesc": "规则：星标中 GitHub stars 50-10000，最近 90 天有更新，按 stars 倒序取前 3。",
     "loading": "加载中...",
     "loadError": "数据加载失败，已显示演示数据",
     "radarCenter": "技术",
