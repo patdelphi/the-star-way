@@ -160,18 +160,11 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== GET /api/repos/*fullName（全局仓库查询，不限定用户） =====
+      // ===== GET /api/repos/*fullName（全局仓库查询，直接查 repos 表） =====
       const globalRepoMatch = matchRoute('/api/repos/*', url.split('?')[0])
       if (method === 'GET' && globalRepoMatch) {
         const fullName = decodeURIComponent(globalRepoMatch['*'] || '')
-        // 先从任意用户的星标中查找
-        const row = db.prepare(`
-          SELECT r.*, s.starred_at, s.user_login
-          FROM repos r
-          JOIN stars s ON r.full_name = s.repo_full_name
-          WHERE r.full_name = ?
-          LIMIT 1
-        `).get(fullName) as any
+        const row = db.prepare(`SELECT * FROM repos WHERE full_name = ?`).get(fullName) as any
         if (!row) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
           return
@@ -199,7 +192,7 @@ export function createRouter(db: Database.Database) {
             archived: row.archived,
             fork: row.fork,
             homepage: row.homepage,
-            starred_at: row.starred_at,
+            starred_at: null,
             tags: tags.map(t => t.tag),
           },
         })
