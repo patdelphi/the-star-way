@@ -499,6 +499,7 @@ export default function Developers() {
   // 加载 Star DNA 画像
   const loadStarDna = async (login: string, force = false) => {
     setDnaLoading(true)
+    setStarDna(null)
     try {
       const result = await getStarDna(login, force)
       if (result?.dna) setStarDna(result.dna)
@@ -509,6 +510,7 @@ export default function Developers() {
   // 加载学习路径
   const loadLearningPath = async (login: string, force = false) => {
     setPathLoading(true)
+    setLearningPath(null)
     try {
       const result = await getLearningPath(login, force)
       if (result?.path) setLearningPath(result.path)
@@ -517,14 +519,15 @@ export default function Developers() {
   }
 
   // 当前选中开发者变化时，加载同步历史和 Star DNA
+  const activeDevName = activeDev?.name
   useEffect(() => {
-    if (activeDev) {
-      loadSyncRuns(activeDev.name)
-      loadStarDna(activeDev.name)
-      loadLearningPath(activeDev.name)
-      getStats(activeDev.name).then(setDeveloperStats).catch(() => setDeveloperStats(null))
-      getTags(activeDev.name).then(setDeveloperTags).catch(() => setDeveloperTags([]))
-      getUserStarTimeline(activeDev.name).then(setStarTimeline).catch(() => setStarTimeline([]))
+    if (activeDevName) {
+      loadSyncRuns(activeDevName)
+      loadStarDna(activeDevName)
+      loadLearningPath(activeDevName)
+      getStats(activeDevName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
+      getTags(activeDevName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
+      getUserStarTimeline(activeDevName).then(setStarTimeline).catch(() => setStarTimeline([]))
     } else {
       setSyncRuns([])
       setStarDna(null)
@@ -533,7 +536,7 @@ export default function Developers() {
       setDeveloperTags([])
       setStarTimeline([])
     }
-  }, [activeDev])
+  }, [activeDevName])
 
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {
