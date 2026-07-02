@@ -106,6 +106,7 @@ export interface ApiError {
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 const API_TIMEOUT = 8000 // 普通 API 8 秒超时
+const AI_TIMEOUT = 60000 // AI 生成接口可能需要 10-30 秒，放宽到 60 秒
 const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
 const TOKEN_KEY = 'starway-github-token'
 
@@ -437,7 +438,7 @@ export async function getReadmeSummary(fullName: string, force = false): Promise
   try {
     if (await checkApiAvailable()) {
       const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary${params}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }
@@ -455,7 +456,7 @@ export async function getStarDna(login: string, force = false): Promise<{
   try {
     if (await checkApiAvailable()) {
       const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna${params}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }
@@ -486,7 +487,7 @@ export async function getLearningPath(login: string, force = false): Promise<{
   try {
     if (await checkApiAvailable()) {
       const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path${params}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }
