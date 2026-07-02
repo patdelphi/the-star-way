@@ -600,7 +600,7 @@ export default function StarExplorer() {
     setAnalysisStatus(t("starExplorer.selectedRepo", { repo: fullName }))
     const [owner, name] = fullName.split("/")
     if (owner && name) {
-      navigate(`/repo/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`)
+      navigate(`/analysis?repo=${encodeURIComponent(fullName)}`)
     }
   }
 
@@ -1036,7 +1036,7 @@ export default function StarExplorer() {
                         <TableCell>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <Link to={`/repo/${repo.fullName}`} className="font-medium text-on-surface hover:text-primary hover:underline">
+                              <Link to={`/analysis?repo=${encodeURIComponent(repo.fullName)}`} className="font-medium text-on-surface hover:text-primary hover:underline">
                                 {repo.fullName}
                               </Link>
                             </div>
@@ -1290,7 +1290,7 @@ export default function StarExplorer() {
                   removedRepos.map((repo) => (
                     <div key={repo.fullName} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
                       <div className="min-w-0">
-                        <Link to={`/repo/${repo.fullName}`} className="text-sm font-medium text-primary hover:underline truncate block">
+                        <Link to={`/analysis?repo=${encodeURIComponent(repo.fullName)}`} className="text-sm font-medium text-primary hover:underline truncate block">
                           {repo.fullName}
                         </Link>
                         <p className="text-xs text-muted-foreground truncate">{repo.description}</p>
@@ -1333,7 +1333,7 @@ export default function StarExplorer() {
                   licenseRiskRepos.map((repo) => (
                     <div key={repo.fullName} className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
                       <div className="min-w-0">
-                        <Link to={`/repo/${repo.fullName}`} className="text-sm font-medium text-primary hover:underline truncate block">
+                        <Link to={`/analysis?repo=${encodeURIComponent(repo.fullName)}`} className="text-sm font-medium text-primary hover:underline truncate block">
                           {repo.fullName}
                         </Link>
                         <p className="text-xs text-muted-foreground truncate">{repo.description}</p>

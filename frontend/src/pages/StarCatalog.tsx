@@ -22,8 +22,7 @@ function formatStars(n: number): string {
 }
 
 function repoDetailPath(repo: Repo): string {
-  const [owner, name] = repo.full_name.split("/")
-  return `/repo/${encodeURIComponent(repo.owner || owner || "")}/${encodeURIComponent(repo.name || name || "")}`
+  return `/analysis?repo=${encodeURIComponent(repo.full_name)}`
 }
 
 // 提取 autoTags 和 topics

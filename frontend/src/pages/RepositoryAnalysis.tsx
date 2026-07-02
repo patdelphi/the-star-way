@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -89,6 +89,7 @@ function formatStars(n: number): string {
 export default function RepositoryAnalysis() {
   const { t } = useTranslation()
   const { currentLogin } = useDeveloper()
+  const [searchParams] = useSearchParams()
   const [selectedRepo, setSelectedRepo] = useState("")
   const [status, setStatus] = useState(t("repoAnalysis.initializing"))
   const [loading, setLoading] = useState(true)
@@ -170,7 +171,9 @@ export default function RepositoryAnalysis() {
         setUserStats(statsResult)
         setAllTags(tagsResult)
 
-          const storedRepo = localStorage.getItem("selected-star-repo")
+        // 优先使用 URL ?repo=xxx，其次 localStorage
+        const urlRepo = searchParams.get("repo")
+        const storedRepo = urlRepo || localStorage.getItem("selected-star-repo")
         if (storedRepo) {
           const existsInApi = reposResult.items.some((r) => r.full_name === storedRepo)
           if (existsInApi) {
@@ -196,7 +199,7 @@ export default function RepositoryAnalysis() {
     return () => {
       cancelled = true
     }
-  }, [t, currentLogin])
+  }, [t, currentLogin, searchParams])
 
   /** 下拉选择器的数据源：只使用 API 返回的真实仓库 */
   const selectorOptions = useMemo(() => {

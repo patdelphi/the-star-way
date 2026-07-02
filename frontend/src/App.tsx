@@ -4,7 +4,6 @@ import { TopBar } from "./components/layout/TopBar"
 import Developers from "./pages/Developers"
 import StarExplorer from "./pages/StarExplorer"
 import RepositoryAnalysis from "./pages/RepositoryAnalysis"
-import RepoDetail from "./pages/RepoDetail"
 import Settings from "./pages/Settings"
 import Dashboard from "./pages/Dashboard"
 import StarCatalog from "./pages/StarCatalog"
@@ -23,7 +22,6 @@ function App() {
               <Route path="/explorer" element={<StarExplorer />} />
               <Route path="/catalog" element={<StarCatalog />} />
               <Route path="/analysis" element={<RepositoryAnalysis />} />
-              <Route path="/repo/:owner/:name" element={<RepoDetail />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/" element={<Navigate to="/developers" replace />} />
