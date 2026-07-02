@@ -229,10 +229,8 @@ export async function getRepo(login: string, fullName: string): Promise<(Repo & 
   return null
 }
 
-/**
- * 获取相似项目推荐
- */
-export async function getSimilarRepos(fullName: string): Promise<Array<{
+/** 相似项目推荐类型 */
+export interface SimilarRepo {
   full_name: string
   description: string | null
   language: string | null
@@ -240,21 +238,18 @@ export async function getSimilarRepos(fullName: string): Promise<Array<{
   html_url: string
   reason: string
   score: number
-}> {
+}
+
+/**
+ * 获取相似项目推荐
+ */
+export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> {
   try {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/repos/${fullName}/similar`)
       if (res.ok) {
         const data = await res.json()
-        return data.data as Array<{
-          full_name: string
-          description: string | null
-          language: string | null
-          stars: number
-          html_url: string
-          reason: string
-          score: number
-        }>
+        return data.data as SimilarRepo[]
       }
     }
   } catch { /* 忽略 */ }

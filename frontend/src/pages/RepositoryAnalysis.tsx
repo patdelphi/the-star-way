@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
-import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos } from "@/lib/api"
+import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos, type SimilarRepo } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -119,15 +119,7 @@ export default function RepositoryAnalysis() {
   const [apiRepos, setApiRepos] = useState<(Repo & { starred_at: string; tags: string[] })[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [allTags, setAllTags] = useState<{ tag: string; count: number }[]>([])
-  const [similarRepos, setSimilarRepos] = useState<Array<{
-    full_name: string
-    description: string | null
-    language: string | null
-    stars: number
-    html_url: string
-    reason: string
-    score: number
-  }>>([])
+  const [similarRepos, setSimilarRepos] = useState<SimilarRepo[]>([])
 
   /** 从 ISO 日期字符串提取 YYYY-MM-DD */
   const formatDate = (dateStr: string | null): string => {
