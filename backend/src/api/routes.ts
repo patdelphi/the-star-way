@@ -462,12 +462,15 @@ export function createRouter(db: Database.Database) {
       const starDnaMatch = matchRoute('/api/users/:login/star-dna', url.split('?')[0])
       if (method === 'GET' && starDnaMatch) {
         const { login } = starDnaMatch
+        const force = parseQuery(url).force === '1'
 
-        // 查缓存
-        const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'dna'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
-        if (cached?.translated_readme_summary) {
-          json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
-          return
+        // 查缓存（非强制刷新时）
+        if (!force) {
+          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'dna'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
+          if (cached?.translated_readme_summary) {
+            json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
+            return
+          }
         }
 
         // 收集统计
@@ -486,12 +489,21 @@ export function createRouter(db: Database.Database) {
         const repoCount = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
         const activeRepoCount = queryActiveRepoCount(db, login)
 
+        // 获取代表性星标项目（按 stars 排序取前 5）
+        const topRepos = db.prepare(`
+          SELECT r.full_name, r.description, r.stars
+          FROM repos r JOIN stars s ON r.full_name = s.repo_full_name
+          WHERE s.user_login = ? AND r.description IS NOT NULL
+          ORDER BY r.stars DESC LIMIT 5
+        `).all(login) as { full_name: string; description: string; stars: number }[]
+
         try {
           const dna = await generateStarDna(login, {
             repoCount: repoCount.cnt,
             activeRepoCount,
             languages,
             tags,
+            topRepos,
           })
 
           // 缓存
@@ -529,6 +541,14 @@ export function createRouter(db: Database.Database) {
 
         const map: Record<string, string> = {}
         for (const r of rows) {
+          // 兼容新格式（JSON）和旧格式（纯文本）
+          try {
+            const parsed = JSON.parse(r.translated_readme_summary)
+            if (parsed.summary) {
+              map[r.repo_full_name] = parsed.summary
+              continue
+            }
+          } catch { /* 旧格式纯文本 */ }
           map[r.repo_full_name] = r.translated_readme_summary
         }
         json(res, { data: map })
@@ -539,12 +559,15 @@ export function createRouter(db: Database.Database) {
       const learningMatch = matchRoute('/api/users/:login/learning-path', url.split('?')[0])
       if (method === 'GET' && learningMatch) {
         const { login } = learningMatch
+        const force = parseQuery(url).force === '1'
 
-        // 查缓存
-        const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'learning'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
-        if (cached?.translated_readme_summary) {
-          json(res, { data: { path: cached.translated_readme_summary, cached: true } })
-          return
+        // 查缓存（非强制刷新时）
+        if (!force) {
+          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'learning'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
+          if (cached?.translated_readme_summary) {
+            json(res, { data: { path: cached.translated_readme_summary, cached: true } })
+            return
+          }
         }
 
         // 收集统计
@@ -562,11 +585,20 @@ export function createRouter(db: Database.Database) {
 
         const repoCount = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
 
+        // 获取代表性星标项目（按 stars 排序取前 8）
+        const topRepos = db.prepare(`
+          SELECT r.full_name, r.description, r.stars
+          FROM repos r JOIN stars s ON r.full_name = s.repo_full_name
+          WHERE s.user_login = ? AND r.description IS NOT NULL
+          ORDER BY r.stars DESC LIMIT 8
+        `).all(login) as { full_name: string; description: string; stars: number }[]
+
         try {
           const path = await generateLearningPath(login, {
             repoCount: repoCount.cnt,
             languages,
             tags,
+            topRepos,
           })
 
           // 缓存

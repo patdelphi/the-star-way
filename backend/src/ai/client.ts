@@ -130,23 +130,28 @@ export async function generateStarDna(
     activeRepoCount: number
     languages: { language: string; count: number }[]
     tags: { tag: string; count: number }[]
+    topRepos?: { full_name: string; description: string; stars: number }[]
   },
 ): Promise<string> {
   const topLangs = stats.languages.slice(0, 5).map(l => `${l.language}(${l.count})`).join(', ')
   const topTags = stats.tags.slice(0, 8).map(t => `${t.tag}(${t.count})`).join(', ')
+  const topRepoNames = (stats.topRepos || []).slice(0, 5).map(r => `- ${r.full_name}: ${r.description || ''}`).join('\n')
 
-  const prompt = `基于以下 GitHub 用户的星标数据，生成一段简短的中文开发者技术画像（100-150 字），风格轻松有趣，像是一个技术标签云的个人简介。
+  const prompt = `基于以下 GitHub 用户的星标数据，生成一段中文开发者技术画像（100-150 字）。
+要有洞察力，分析用户的技术偏好、关注方向和可能的职业背景，不要只罗列数据。
 
 用户：${login}
 星标仓库总数：${stats.repoCount}
 活跃仓库数：${stats.activeRepoCount}
 主要关注语言：${topLangs || '无'}
 主要关注标签：${topTags || '无'}
+代表性星标项目：
+${topRepoNames || '无'}
 
 请直接输出画像描述，不要加任何前缀或格式标记。`
 
   return chat([
-    { role: 'system', content: '你是一个开发者社区分析师，擅长根据 GitHub 星标数据描绘开发者的技术画像。' },
+    { role: 'system', content: '你是一个资深开发者社区分析师，擅长根据 GitHub 星标数据给出有洞察力的技术画像。' },
     { role: 'user', content: prompt },
   ])
 }
@@ -163,17 +168,22 @@ export async function generateLearningPath(
     repoCount: number
     languages: { language: string; count: number }[]
     tags: { tag: string; count: number }[]
+    topRepos?: { full_name: string; description: string; stars: number }[]
   },
 ): Promise<string> {
   const topLangs = stats.languages.slice(0, 5).map(l => `${l.language}`).join(', ')
   const topTags = stats.tags.slice(0, 10).map(t => `${t.tag}`).join(', ')
+  const topRepoNames = (stats.topRepos || []).slice(0, 8).map(r => `- ${r.full_name}: ${r.description || ''}`).join('\n')
 
   const prompt = `基于以下 GitHub 用户的星标数据，为其生成一份个性化的技术学习路径推荐。
+请结合用户已星标的具体项目给出针对性建议，引用实际仓库名。
 
 用户：${login}
 星标仓库总数：${stats.repoCount}
 主要关注语言：${topLangs || '无'}
 主要关注标签：${topTags || '无'}
+代表性星标项目：
+${topRepoNames || '无'}
 
 请按以下 Markdown 格式输出（不要加任何额外说明）：
 
@@ -194,7 +204,7 @@ export async function generateLearningPath(
 `
 
   return chat([
-    { role: 'system', content: '你是一个技术学习规划师，擅长根据开发者的兴趣标签和星标仓库生成个性化的学习路径。' },
+    { role: 'system', content: '你是一个资深技术学习规划师，擅长根据开发者的兴趣标签和星标仓库生成个性化的学习路径。请引用具体项目名称给出有针对性的建议。' },
     { role: 'user', content: prompt },
   ])
 }

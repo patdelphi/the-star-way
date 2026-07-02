@@ -281,6 +281,7 @@
     "mainLang": "主语言",
     "conclusion": "当前结论",
     "conclusionValue": "值得继续追踪",
+    "conclusionScore": "综合评分 {{avg}}/100",
     "techStack": "技术栈解析",
     "techStackDesc": "用于后续学习路线和复用建议的基础维度",
     "identified": "已识别",

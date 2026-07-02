@@ -281,6 +281,7 @@
     "mainLang": "Main Language",
     "conclusion": "Current Conclusion",
     "conclusionValue": "Worth tracking",
+    "conclusionScore": "Score {{avg}}/100",
     "techStack": "Tech Stack Analysis",
     "techStackDesc": "Basic dimensions for learning paths and reuse recommendations",
     "identified": "Identified",

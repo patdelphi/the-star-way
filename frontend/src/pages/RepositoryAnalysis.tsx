@@ -331,13 +331,15 @@ export default function RepositoryAnalysis() {
     ? Array.from(new Set([activeRepo.language, ...activeRepo.tags].filter(Boolean))).slice(0, 3)
     : []
 
-  // 系统雷达柱状图数据（4 维度，数值为规则占位）
-  const systemRadar = [
-    { label: t("repoAnalysis.radarActivity"), value: 85, color: "bg-primary" },
-    { label: t("repoAnalysis.radarCommunity"), value: 72, color: "bg-domain-frontend" },
-    { label: t("repoAnalysis.radarDocs"), value: 90, color: "bg-domain-backend" },
-    { label: t("repoAnalysis.radarStability"), value: 78, color: "bg-domain-ai" },
-  ]
+  // 系统雷达柱状图数据（基于真实评分数据）
+  const systemRadar = activeRepo
+    ? [
+        { label: t("repoAnalysis.radarActivity"), value: activeRepo.scores.find(s => s.label === t("repoAnalysis.maintainActive"))?.value ?? 50, color: "bg-primary" },
+        { label: t("repoAnalysis.radarCommunity"), value: Math.min(100, Math.round((activeRepo.scores.find(s => s.label === t("repoAnalysis.learningValue"))?.value ?? 50) * 0.8 + 10)), color: "bg-domain-frontend" },
+        { label: t("repoAnalysis.radarDocs"), value: readmeSummary ? 85 : 30, color: "bg-domain-backend" },
+        { label: t("repoAnalysis.radarStability"), value: activeRepo.scores.find(s => s.label === t("repoAnalysis.reuseValue"))?.value ?? 50, color: "bg-domain-ai" },
+      ]
+    : []
 
   // 协议分析派生数据：根据 license 类型生成建议、注意事项、风险
   const licenseInfo = useMemo(() => {
@@ -597,7 +599,11 @@ export default function RepositoryAnalysis() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniFact icon={FileText} label={t("repoAnalysis.suitableFor")} value={activeRepo.category} />
                 <MiniFact icon={Layers3} label={t("repoAnalysis.mainLang")} value={activeRepo.language} />
-                <MiniFact icon={CheckCircle2} label={t("repoAnalysis.conclusion")} value={t("repoAnalysis.conclusionValue")} />
+                <MiniFact icon={CheckCircle2} label={t("repoAnalysis.conclusion")} value={
+                  activeRepo.scores.length > 0
+                    ? t("repoAnalysis.conclusionScore", { avg: Math.round(activeRepo.scores.reduce((a, s) => a + s.value, 0) / activeRepo.scores.length) })
+                    : t("repoAnalysis.conclusionValue")
+                } />
               </div>
             </CardContent>
           </Card>
