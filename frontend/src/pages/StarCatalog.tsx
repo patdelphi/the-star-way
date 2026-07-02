@@ -26,18 +26,19 @@ function repoDetailPath(repo: Repo): string {
   return `/repo/${encodeURIComponent(repo.owner || owner || "")}/${encodeURIComponent(repo.name || name || "")}`
 }
 
-// 合并 autoTags + GitHub topics
-function buildAllTags(apiRepo: Repo & { tags: string[] }): string[] {
+// 提取 autoTags 和 topics
+function extractTags(apiRepo: Repo & { tags: string[] }): { autoTags: string[]; topics: string[] } {
   const autoTags = apiRepo.tags || []
   let topics: string[] = []
   try {
     topics = (apiRepo as any).topics_json ? JSON.parse((apiRepo as any).topics_json) : []
   } catch { /* ignore */ }
-  return [...new Set([...autoTags, ...topics.map((t: string) => t.toLowerCase())])]
+  return { autoTags, topics: topics.map((t: string) => t.toLowerCase()) }
 }
 
 interface CatalogRepo extends Repo {
   tags: string[]
+  autoTags: string[]
   allTags: string[]
 }
 
@@ -67,10 +68,10 @@ const StarCatalog: React.FC = () => {
 
         const hasRepos = reposRes.items && reposRes.items.length > 0
         if (hasRepos) {
-          const enriched = reposRes.items.map((r) => ({
-            ...r,
-            allTags: buildAllTags(r),
-          }))
+          const enriched: CatalogRepo[] = reposRes.items.map((r) => {
+            const { autoTags, topics } = extractTags(r)
+            return { ...r, autoTags, allTags: [...new Set([...autoTags, ...topics])] }
+          })
           setRepos(enriched)
           setIsDemoMode(false)
         } else {
@@ -91,16 +92,36 @@ const StarCatalog: React.FC = () => {
     return () => { cancelled = true }
   }, [currentLogin])
 
-  // 统一标签云：基于 allTags 统计（autoTags 优先，补充 topics）
+  // 统一标签云：autoTags 全部保留 + topics 按数量取前 64
   const tagCounts = useMemo(() => {
-    const counts = new Map<string, number>()
+    const autoTagCounts = new Map<string, number>()
+    const topicCounts = new Map<string, number>()
+
     for (const repo of repos) {
-      for (const tag of repo.allTags) {
-        counts.set(tag, (counts.get(tag) || 0) + 1)
+      for (const tag of repo.autoTags) {
+        autoTagCounts.set(tag, (autoTagCounts.get(tag) || 0) + 1)
       }
     }
-    // 按数量降序排列
-    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+
+    // 统计 topics 数量（排除已是 autoTags 的）
+    for (const repo of repos) {
+      const { topics } = extractTags(repo)
+      for (const t of topics) {
+        // 跳过和 autoTag 同名的（忽略大小写）
+        const isAutoTag = [...autoTagCounts.keys()].some(at => at.toLowerCase() === t)
+        if (isAutoTag) continue
+        topicCounts.set(t, (topicCounts.get(t) || 0) + 1)
+      }
+    }
+
+    // topics 按数量降序取前 64
+    const topTopics = [...topicCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 64)
+
+    // 合并：autoTags + topTopics，按数量降序
+    const merged = [...autoTagCounts.entries(), ...topTopics]
+    return merged.sort((a, b) => b[1] - a[1])
   }, [repos])
 
   // 搜索 + 标签过滤
