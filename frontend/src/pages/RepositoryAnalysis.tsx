@@ -109,7 +109,7 @@ type LicenseRisk = "safe" | "caution" | "danger"
 
 /* ========== 主组件 ========== */
 export default function RepositoryAnalysis() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentLogin } = useDeveloper()
   const [searchParams] = useSearchParams()
   const [selectedRepo, setSelectedRepo] = useState("")
@@ -281,6 +281,17 @@ export default function RepositoryAnalysis() {
       .catch(() => { /* 忽略错误 */ })
       .finally(() => setSummaryLoading(false))
   }, [])
+
+  // 语言切换时清空前端缓存，重新加载
+  useEffect(() => {
+    summaryCache.current = {}
+    if (selectedRepo) {
+      setReadmeSummary(null)
+      setStarReason(null)
+      setReuseAdvice(null)
+      loadSummary(selectedRepo)
+    }
+  }, [i18n.language])
 
   useEffect(() => {
     if (!selectedRepo) {

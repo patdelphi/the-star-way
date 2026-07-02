@@ -52,6 +52,42 @@ export async function chat(messages: AiMessage[]): Promise<string> {
 }
 
 /**
+ * 将中文文本翻译为英文
+ * @param text 中文文本
+ * @returns 英文文本
+ */
+export async function translateToEnglish(text: string): Promise<string> {
+  if (!text.trim()) return text
+
+  const prompt = `将以下中文文本翻译为英文。保持原有格式（如 Markdown 标记、JSON 结构），只翻译内容，不要加任何前缀或说明。
+
+${text}`
+
+  return chat([
+    { role: 'system', content: 'You are a professional translator. Translate Chinese text to natural, fluent English. Preserve all formatting (Markdown, JSON). Output only the translation.' },
+    { role: 'user', content: prompt },
+  ])
+}
+
+export interface RepoAnalysisResult {
+  summary: string
+  starReason: string
+  reuseAdvice: string
+}
+
+/**
+ * 将仓库分析结果翻译为英文（逐字段翻译）
+ */
+export async function translateRepoAnalysisToEnglish(analysis: RepoAnalysisResult): Promise<RepoAnalysisResult> {
+  const [summary, starReason, reuseAdvice] = await Promise.all([
+    translateToEnglish(analysis.summary),
+    translateToEnglish(analysis.starReason),
+    translateToEnglish(analysis.reuseAdvice),
+  ])
+  return { summary, starReason, reuseAdvice }
+}
+
+/**
  * 生成仓库深度分析（摘要 + 星标原因 + 复用建议）
  * @param fullName 仓库全名
  * @param description 仓库描述
@@ -59,12 +95,6 @@ export async function chat(messages: AiMessage[]): Promise<string> {
  * @param topics 标签列表
  * @returns 结构化分析结果
  */
-export interface RepoAnalysisResult {
-  summary: string
-  starReason: string
-  reuseAdvice: string
-}
-
 export async function generateReadmeSummary(
   fullName: string,
   description: string,

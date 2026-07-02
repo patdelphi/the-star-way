@@ -296,7 +296,7 @@ function CompactStatGrid({
 }
 
 export default function Developers() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentLogin, setCurrentLogin } = useDeveloper()
 
   // 开发者列表状态（初始为空，由 useEffect 加载）
@@ -537,6 +537,14 @@ export default function Developers() {
       setStarTimeline([])
     }
   }, [activeDevName])
+
+  // 语言切换时重新加载 DNA 和学习路径
+  useEffect(() => {
+    if (activeDevName) {
+      loadStarDna(activeDevName)
+      loadLearningPath(activeDevName)
+    }
+  }, [i18n.language])
 
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {

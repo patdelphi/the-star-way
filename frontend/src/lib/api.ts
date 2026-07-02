@@ -110,6 +110,15 @@ const AI_TIMEOUT = 60000 // AI 生成接口可能需要 10-30 秒，放宽到 60
 const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
 const TOKEN_KEY = 'starway-github-token'
 
+/**
+ * 获取当前 i18n 语言对应的后端 lang 参数
+ */
+function getLangParam(): string {
+  // 从 localStorage 读取语言偏好（与 i18n detection 配置一致）
+  const lang = typeof window !== 'undefined' ? localStorage.getItem('starway-lang') : null
+  return lang && lang.startsWith('en') ? 'en' : 'zh'
+}
+
 // ===== Token 管理 =====
 
 export function getGitHubToken(): string | null {
@@ -437,8 +446,10 @@ export interface RepoSummaryResult {
 export async function getReadmeSummary(fullName: string, force = false): Promise<RepoSummaryResult | null> {
   try {
     if (await checkApiAvailable()) {
-      const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary${params}`, undefined, AI_TIMEOUT)
+      const params = new URLSearchParams()
+      if (force) params.set('force', '1')
+      params.set('lang', getLangParam())
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary?${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }
@@ -455,8 +466,10 @@ export async function getStarDna(login: string, force = false): Promise<{
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna${params}`, undefined, AI_TIMEOUT)
+      const params = new URLSearchParams()
+      if (force) params.set('force', '1')
+      params.set('lang', getLangParam())
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna?${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }
@@ -486,8 +499,10 @@ export async function getLearningPath(login: string, force = false): Promise<{
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const params = force ? '?force=1' : ''
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path${params}`, undefined, AI_TIMEOUT)
+      const params = new URLSearchParams()
+      if (force) params.set('force', '1')
+      params.set('lang', getLangParam())
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path?${params}`, undefined, AI_TIMEOUT)
       const data = await res.json()
       return data.data
     }

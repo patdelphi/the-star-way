@@ -23,7 +23,7 @@ import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
-import { generateReadmeSummary, generateRepoAnalysis, generateStarDna, generateLearningPath } from '../ai/client.js'
+import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
 
 // ===== 工具函数 =====
 
@@ -463,10 +463,11 @@ export function createRouter(db: Database.Database) {
       if (method === 'GET' && starDnaMatch) {
         const { login } = starDnaMatch
         const force = parseQuery(url).force === '1'
+        const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
 
         // 查缓存（非强制刷新时）
         if (!force) {
-          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'dna'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
+          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `dna-${lang}`) as { translated_readme_summary: string } | undefined
           if (cached?.translated_readme_summary) {
             json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
             return
@@ -498,7 +499,8 @@ export function createRouter(db: Database.Database) {
         `).all(login) as { full_name: string; description: string; stars: number }[]
 
         try {
-          const dna = await generateStarDna(login, {
+          // 先生成中文
+          const dnaZh = await generateStarDna(login, {
             repoCount: repoCount.cnt,
             activeRepoCount,
             languages,
@@ -506,18 +508,33 @@ export function createRouter(db: Database.Database) {
             topRepos,
           })
 
-          // 缓存
           const now = new Date().toISOString()
+
+          // 缓存中文
           db.prepare(`
             INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-            VALUES (?, 'dna', ?, 'ai', ?)
+            VALUES (?, 'dna-zh', ?, 'ai', ?)
             ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
               translated_readme_summary = excluded.translated_readme_summary,
               provider = excluded.provider,
               updated_at = excluded.updated_at
-          `).run(`user:${login}`, dna, now)
+          `).run(`user:${login}`, dnaZh, now)
 
-          json(res, { data: { dna, cached: false } })
+          // 自动翻译英文
+          let dnaEn = ''
+          try {
+            dnaEn = await translateToEnglish(dnaZh)
+            db.prepare(`
+              INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+              VALUES (?, 'dna-en', ?, 'ai', ?)
+              ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+                translated_readme_summary = excluded.translated_readme_summary,
+                provider = excluded.provider,
+                updated_at = excluded.updated_at
+            `).run(`user:${login}`, dnaEn, now)
+          } catch { /* 翻译失败不阻塞 */ }
+
+          json(res, { data: { dna: lang === 'en' ? (dnaEn || dnaZh) : dnaZh, cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成画像失败', 500)
         }
@@ -560,10 +577,11 @@ export function createRouter(db: Database.Database) {
       if (method === 'GET' && learningMatch) {
         const { login } = learningMatch
         const force = parseQuery(url).force === '1'
+        const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
 
         // 查缓存（非强制刷新时）
         if (!force) {
-          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = 'learning'`).get(`user:${login}`) as { translated_readme_summary: string } | undefined
+          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `learning-${lang}`) as { translated_readme_summary: string } | undefined
           if (cached?.translated_readme_summary) {
             json(res, { data: { path: cached.translated_readme_summary, cached: true } })
             return
@@ -594,25 +612,41 @@ export function createRouter(db: Database.Database) {
         `).all(login) as { full_name: string; description: string; stars: number }[]
 
         try {
-          const path = await generateLearningPath(login, {
+          // 先生成中文
+          const pathZh = await generateLearningPath(login, {
             repoCount: repoCount.cnt,
             languages,
             tags,
             topRepos,
           })
 
-          // 缓存
           const now = new Date().toISOString()
+
+          // 缓存中文
           db.prepare(`
             INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-            VALUES (?, 'learning', ?, 'ai', ?)
+            VALUES (?, 'learning-zh', ?, 'ai', ?)
             ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
               translated_readme_summary = excluded.translated_readme_summary,
               provider = excluded.provider,
               updated_at = excluded.updated_at
-          `).run(`user:${login}`, path, now)
+          `).run(`user:${login}`, pathZh, now)
 
-          json(res, { data: { path, cached: false } })
+          // 自动翻译英文
+          let pathEn = ''
+          try {
+            pathEn = await translateToEnglish(pathZh)
+            db.prepare(`
+              INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+              VALUES (?, 'learning-en', ?, 'ai', ?)
+              ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+                translated_readme_summary = excluded.translated_readme_summary,
+                provider = excluded.provider,
+                updated_at = excluded.updated_at
+            `).run(`user:${login}`, pathEn, now)
+          } catch { /* 翻译失败不阻塞 */ }
+
+          json(res, { data: { path: lang === 'en' ? (pathEn || pathZh) : pathZh, cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成学习路径失败', 500)
         }
@@ -705,13 +739,14 @@ export function createRouter(db: Database.Database) {
         const fullName = decodeURIComponent(readmeMatch['*'] || '')
         const query = parseQuery(url)
         const force = query.force === '1'
+        const lang = query.lang === 'en' ? 'en' : 'zh'
 
         // 先查缓存（非强制刷新时）
         if (!force) {
           const cached = db.prepare(`
             SELECT translated_readme_summary FROM translations
-            WHERE repo_full_name = ? AND target_lang = 'zh'
-          `).get(fullName) as { translated_readme_summary: string } | undefined
+            WHERE repo_full_name = ? AND target_lang = ?
+          `).get(fullName, lang) as { translated_readme_summary: string } | undefined
 
           if (cached?.translated_readme_summary) {
             try {
@@ -739,11 +774,12 @@ export function createRouter(db: Database.Database) {
         // 调用 AI 生成分析
         try {
           const topics: string[] = repo.topics_json ? JSON.parse(repo.topics_json) : []
-          const analysis = await generateRepoAnalysis(fullName, repo.description || '', repo.language || '', topics)
+          const analysisZh = await generateRepoAnalysis(fullName, repo.description || '', repo.language || '', topics)
 
-          // 缓存结果（整体存为 JSON）
           const now = new Date().toISOString()
-          const cacheJson = JSON.stringify(analysis)
+          const cacheJsonZh = JSON.stringify(analysisZh)
+
+          // 缓存中文
           db.prepare(`
             INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
             VALUES (?, 'zh', ?, 'ai', ?)
@@ -751,9 +787,23 @@ export function createRouter(db: Database.Database) {
               translated_readme_summary = excluded.translated_readme_summary,
               provider = excluded.provider,
               updated_at = excluded.updated_at
-          `).run(fullName, cacheJson, now)
+          `).run(fullName, cacheJsonZh, now)
 
-          json(res, { data: { ...analysis, cached: false } })
+          // 自动翻译英文
+          let analysisEn: RepoAnalysisResult | null = null
+          try {
+            analysisEn = await translateRepoAnalysisToEnglish(analysisZh)
+            db.prepare(`
+              INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+              VALUES (?, 'en', ?, 'ai', ?)
+              ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+                translated_readme_summary = excluded.translated_readme_summary,
+                provider = excluded.provider,
+                updated_at = excluded.updated_at
+            `).run(fullName, JSON.stringify(analysisEn), now)
+          } catch { /* 翻译失败不阻塞 */ }
+
+          json(res, { data: { ...(lang === 'en' && analysisEn ? analysisEn : analysisZh), cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成摘要失败', 500)
         }
