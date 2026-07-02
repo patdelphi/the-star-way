@@ -135,7 +135,7 @@ export default function RepositoryAnalysis() {
       stars: formatStars(repo.stars),
       forks: String(repo.forks),
       updatedAt: formatDate(repo.pushed_at),
-      license: repo.license && repo.license !== "NOASSERTION" ? repo.license : t("repoAnalysis.licenseUnknown"),
+      license: repo.license ?? "",
       category: t("repoAnalysis.unknown"),
       summary: t("repoAnalysis.noDeepSummary", { name: repo.full_name }),
       stack: repo.language ? [repo.language] : [],
