@@ -299,6 +299,7 @@
     "unknown": "Unknown",
     "noDesc": "No description",
     "noDeepSummary": "[{{name}}] No deep analysis summary.",
+    "summaryLoading": "Generating AI summary...",
     "initializing": "Initializing...",
     "importedFromStarred": "Imported {{repo}} from starred repo list.",
     "apiUnavailable": "API unavailable, fallback to Demo data.",

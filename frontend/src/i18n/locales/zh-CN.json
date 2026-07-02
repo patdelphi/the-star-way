@@ -299,6 +299,7 @@
     "unknown": "未知",
     "noDesc": "暂无描述",
     "noDeepSummary": "【{{name}}】暂无深度分析摘要。",
+    "summaryLoading": "正在生成 AI 摘要...",
     "initializing": "正在初始化...",
     "importedFromStarred": "已从星标仓库列表带入 {{repo}}。",
     "apiUnavailable": "API 不可用，已回退到 Demo 数据。",

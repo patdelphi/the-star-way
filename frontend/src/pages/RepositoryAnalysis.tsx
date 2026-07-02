@@ -544,7 +544,11 @@ export default function RepositoryAnalysis() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="text-sm leading-7 text-on-surface-variant">{activeRepo.summary}</p>
+              {readmeSummary ? (
+                <p className="text-sm leading-7 text-on-surface">{readmeSummary}</p>
+              ) : (
+                <p className="text-sm leading-7 text-muted-foreground">{t("repoAnalysis.summaryLoading")}</p>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniFact icon={FileText} label={t("repoAnalysis.suitableFor")} value={activeRepo.category} />
                 <MiniFact icon={Layers3} label={t("repoAnalysis.mainLang")} value={activeRepo.language} />
@@ -607,21 +611,6 @@ export default function RepositoryAnalysis() {
             </CardContent>
           </Card>
         </section>}
-
-        {/* README 中文摘要（AI 接口生成，有值才展示） */}
-        {activeRepo && readmeSummary && (
-          <Card className="border-primary/20 bg-surface-container-low/50">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">{t("repoAnalysis.readmeAiSummary")}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed text-on-surface">{readmeSummary}</p>
-            </CardContent>
-          </Card>
-        )}
 
         {/* AI 智能分析 + 右侧信息（协议健康度 / 系统雷达） */}
         {activeRepo && (
