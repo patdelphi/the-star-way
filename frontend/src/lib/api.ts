@@ -19,6 +19,10 @@ export interface Repo {
   open_issues: number
   pushed_at: string | null
   created_at: string | null
+  topics_json: string | null
+  archived: number
+  fork: number
+  homepage: string | null
 }
 
 // 仓库查询参数

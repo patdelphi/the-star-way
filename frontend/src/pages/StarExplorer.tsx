@@ -12,17 +12,14 @@ import {
   ArrowDownUp,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   FileText,
   Filter,
   Flame,
   GitFork,
-  Layers3,
   LineChart,
   Pencil,
   Plus,
-  Radar,
   Search,
   Sparkles,
   Star,
@@ -61,6 +58,7 @@ type StarRepo = {
   topics: string[]
   autoTags: string[]
   manualTags: string[]
+  allTags: string[]
   category: string
   score: number
   health: RepoHealth
@@ -124,8 +122,12 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number], fallback: { unkn
     }
   }
 
-  const tags = apiRepo.tags || []
-  const topics = tags.map((t) => t.toLowerCase())
+  const autoTags = apiRepo.tags || []
+  let topics: string[] = []
+  try {
+    topics = apiRepo.topics_json ? JSON.parse(apiRepo.topics_json) : []
+  } catch { /* ignore */ }
+  const allTags = [...new Set([...autoTags, ...topics.map(t => t.toLowerCase())])]
 
   return {
     fullName: apiRepo.full_name,
@@ -137,10 +139,11 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number], fallback: { unkn
     license: apiRepo.license || fallback.unknown,
     starredAt: apiRepo.starred_at ? apiRepo.starred_at.slice(0, 10) : "",
     updatedAt: apiRepo.pushed_at ? apiRepo.pushed_at.slice(0, 10) : "",
-    topics,
-    autoTags: tags,
+    topics: topics.map(t => t.toLowerCase()),
+    autoTags,
     manualTags: [],
-    category: tags[0] || fallback.uncategorized,
+    allTags,
+    category: autoTags[0] || fallback.uncategorized,
     score,
     health,
     whyStarred: "",
@@ -180,6 +183,7 @@ export default function StarExplorer() {
   const [pageSize, setPageSize] = useState(20)
   const [selectedLanguage, setSelectedLanguage] = useState("")
   const [selectedTopic, setSelectedTopic] = useState("")
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedLicense, setSelectedLicense] = useState("")
   const [sortKey, setSortKey] = useState("starred_at")
   const [quickFilter, setQuickFilter] = useState<"none" | "hiddenGems" | "sleepStars">("none")
@@ -219,7 +223,7 @@ export default function StarExplorer() {
 
   const classificationSources = useMemo(
     () => [
-      { label: t("starExplorer.classificationSourceTopic"), count: tags.length, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
+      { label: t("starExplorer.classificationSourceTopic"), count: allRepos.filter((repo) => repo.topics.length > 0).length, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
       { label: t("starExplorer.classificationSourceName"), count: allRepos.filter((repo) => repo.autoTags.length > 0).length, confidence: "0.85", detail: t("starExplorer.classificationSourceNameDetail") },
       { label: t("starExplorer.classificationSourceDesc"), count: allRepos.filter((repo) => repo.description.trim().length > 0).length, confidence: "0.80", detail: t("starExplorer.classificationSourceDescDetail") },
       { label: t("starExplorer.classificationSourceManual"), count: allRepos.filter((repo) => repo.manualTags.length > 0).length, confidence: "1.00", detail: t("starExplorer.classificationSourceManualDetail") },
@@ -303,7 +307,7 @@ export default function StarExplorer() {
           .toLowerCase()
           .includes(query)
       const matchesLanguage = !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
-      const matchesTopic = !selectedTopic || repo.topics.some((t) => t.toLowerCase().includes(selectedTopic.toLowerCase()))
+      const matchesTopic = selectedTags.length === 0 || selectedTags.some(tag => repo.allTags.includes(tag))
       const matchesLicense = !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
       // 快捷筛选：隐藏宝石 / 沉睡星标
       let matchesQuick = true
@@ -329,7 +333,7 @@ export default function StarExplorer() {
       if (sortKey === "updated_at") return b.updatedAt.localeCompare(a.updatedAt)
       return b.starredAt.localeCompare(a.starredAt)
     })
-  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, sortKey, allRepos, quickFilter])
+  }, [searchQuery, selectedLanguage, selectedTags, selectedLicense, sortKey, allRepos, quickFilter])
 
   // === 筛选项命中数量（基于当前其他筛选条件）===
   const filterCounts = useMemo(() => {
@@ -345,7 +349,7 @@ export default function StarExplorer() {
           .toLowerCase()
           .includes(query)
       const matchesLanguage = exclude === 'language' || !selectedLanguage || repo.language.toLowerCase() === selectedLanguage
-      const matchesTopic = exclude === 'topic' || !selectedTopic || repo.topics.some((t) => t.toLowerCase().includes(selectedTopic.toLowerCase()))
+      const matchesTopic = exclude === 'topic' || selectedTags.length === 0 || selectedTags.some(tag => repo.allTags.includes(tag))
       const matchesLicense = exclude === 'license' || !selectedLicense || repo.license.toLowerCase().includes(selectedLicense)
       let matchesQuick = true
       if (quickFilter === "hiddenGems") {
@@ -369,7 +373,7 @@ export default function StarExplorer() {
         langCounts[lang] = (langCounts[lang] || 0) + 1
       }
       if (baseFilter(repo, 'topic')) {
-        for (const t of repo.topics) {
+        for (const t of repo.autoTags) {
           topicCounts[t] = (topicCounts[t] || 0) + 1
         }
       }
@@ -384,7 +388,7 @@ export default function StarExplorer() {
       topics: Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 20),
       licenses: Object.entries(licenseCounts).sort((a, b) => b[1] - a[1]).slice(0, 10),
     }
-  }, [searchQuery, selectedLanguage, selectedTopic, selectedLicense, allRepos, quickFilter])
+  }, [searchQuery, selectedLanguage, selectedTags, selectedLicense, allRepos, quickFilter])
 
   // === 分页 ===
   const totalPages = Math.max(1, Math.ceil(filteredRepos.length / pageSize))
@@ -470,13 +474,14 @@ export default function StarExplorer() {
   }, [allRepos, usingFallback])
   const licenseRiskCount = licenseRiskRepos.length
 
-  // 自动标签覆盖率 = tags 数 / repoCount
+  // 标签覆盖率 = 有 allTags 的仓库数 / repoCount
   const tagCoveragePercent = useMemo(() => {
     if (usingFallback) return "0%"
     const total = stats?.repoCount ?? allRepos.length
     if (total === 0) return "0%"
-    return `${Math.round((tags.length / total) * 100)}%`
-  }, [tags, stats, allRepos, usingFallback])
+    const coveredCount = allRepos.filter((r) => r.allTags.length > 0).length
+    return `${Math.round((coveredCount / total) * 100)}%`
+  }, [allRepos, stats, usingFallback])
 
   const starTimelineData = useMemo(() => {
     const counts = new Map<string, { count: number; languages: Map<string, number> }>()
@@ -530,7 +535,7 @@ export default function StarExplorer() {
     const params = {
       q: searchQuery || undefined,
       language: selectedLanguage || undefined,
-      tag: selectedTopic || undefined,
+      tag: selectedTags[0] || undefined,
       sort: sortKey || undefined,
       direction: "desc" as const,
     }
@@ -577,6 +582,9 @@ export default function StarExplorer() {
   const handleRemoveFilter = (filterKey: string) => {
     if (filterKey === "quickFilter") {
       setQuickFilter("none")
+    } else if (filterKey.startsWith("tag-")) {
+      const tag = filterKey.slice(4)
+      setSelectedTags(prev => prev.filter(t => t !== tag))
     }
     setAnalysisStatus(t("starExplorer.filterRemoved", { filter: filterKey }))
   }
@@ -659,7 +667,7 @@ export default function StarExplorer() {
 
   const visibleFilters = [
     selectedLanguage && { key: "lang", label: selectedLanguage },
-    selectedTopic && { key: "topic", label: selectedTopic },
+    ...selectedTags.map(tag => ({ key: `tag-${tag}`, label: tag })),
     selectedLicense && { key: "license", label: selectedLicense },
     quickFilter === "hiddenGems" && { key: "quickFilter", label: t("starExplorer.filterHiddenGems") },
     quickFilter === "sleepStars" && { key: "quickFilter", label: t("starExplorer.filterSleepStars") },
@@ -748,116 +756,6 @@ export default function StarExplorer() {
           </div>
         </section>
 
-        {/* 语言分布 + 主题聚类 */}
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <Card className="xl:col-span-5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Radar className="h-5 w-5 text-primary" />
-                {t("starExplorer.languageDist")}
-              </CardTitle>
-              <CardDescription>{t("starExplorer.languageDistDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {languageStats.slice(0, 12).map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
-                      <span className="truncate text-sm text-on-surface">{item.label}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-mono text-xs text-on-surface">{item.count}</div>
-                      <div className="font-mono text-[10px] text-muted-foreground">
-                        {totalLanguageCount > 0 ? Math.round((item.count / totalLanguageCount) * 100) : 0}%
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="xl:col-span-7">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Layers3 className="h-5 w-5 text-primary" />
-                {t("starExplorer.topicClusters")}
-              </CardTitle>
-              <CardDescription>{t("starExplorer.topicClustersDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {topicClusters.map((cluster) => (
-                <div key={cluster.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-on-surface">{cluster.label}</h3>
-                    <Badge variant="secondary" className="font-mono text-xs">{cluster.count}</Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {cluster.topics.map((topic) => (
-                      <Badge key={topic} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
-                        {topic}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* 规则分类覆盖 + 兴趣时间线 */}
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <Card className="xl:col-span-7">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Tags className="h-5 w-5 text-primary" />
-                {t("starExplorer.classificationCov")}
-              </CardTitle>
-              <CardDescription>{t("starExplorer.classificationCovDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {classificationSources.map((source) => (
-                <div key={source.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-on-surface">{source.label}</span>
-                    <Badge variant="secondary" className="font-mono text-xs">{source.count}</Badge>
-                  </div>
-                  <div className="mb-2 text-xs text-muted-foreground">{t("starExplorer.classificationConfidence", { confidence: source.confidence })}</div>
-                  <p className="text-xs leading-5 text-muted-foreground">{source.detail}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="xl:col-span-5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Clock className="h-5 w-5 text-primary" />
-                {t("starExplorer.timeline")}
-              </CardTitle>
-              <CardDescription>{t("starExplorer.timelineDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {starTimelineData.map((item) => (
-                <div key={item.period} className="rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-sm font-semibold text-on-surface">{item.period}</span>
-                    <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.focus}</p>
-                </div>
-              ))}
-              {starTimelineData.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t("starExplorer.noTimelineData")}</p>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-
         {/* 标签云 */}
         <section>
           <Card>
@@ -874,18 +772,22 @@ export default function StarExplorer() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {tags.length > 0 ? (
+              {filterCounts.topics.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {tags.slice(0, 24).map(({ tag, count }) => (
+                  {filterCounts.topics.slice(0, 32).map(([tag, count]) => (
                     <button
                       key={tag}
                       className={`flex min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
-                        selectedTopic === tag
+                        selectedTags.includes(tag)
                           ? "border-primary bg-primary text-on-primary"
                           : "border-outline-variant/60 bg-surface-container-low hover:bg-surface-container"
                       }`}
                       onClick={() => {
-                        setSelectedTopic(selectedTopic === tag ? "" : tag)
+                        setSelectedTags(prev =>
+                          prev.includes(tag)
+                            ? prev.filter(t => t !== tag)
+                            : [...prev, tag]
+                        )
                         setCurrentPage(1)
                       }}
                     >
@@ -1075,7 +977,7 @@ export default function StarExplorer() {
                 className="h-6 gap-1 text-xs text-muted-foreground"
                 onClick={() => {
                   setSelectedLanguage("")
-                  setSelectedTopic("")
+                  setSelectedTags([])
                   setSelectedLicense("")
                   setSearchQuery("")
                   setQuickFilter("none")
@@ -1124,7 +1026,7 @@ export default function StarExplorer() {
                       <TableHead className="hidden sm:table-cell">{t("starExplorer.languageCol")}</TableHead>
                       <TableHead className="hidden lg:table-cell">{t("starExplorer.licenseCol")}</TableHead>
                       <TableHead className="hidden xl:table-cell">{t("starExplorer.lastUpdate")}</TableHead>
-                      <TableHead className="hidden xl:table-cell">{t("starExplorer.autoTags")}</TableHead>
+                      <TableHead className="hidden xl:table-cell">{t("starExplorer.tags")}</TableHead>
                       <TableHead className="text-right">{t("starExplorer.action")}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1149,7 +1051,14 @@ export default function StarExplorer() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="space-y-1">
-                            <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{repo.category}</Badge>
+                            <div className="flex flex-wrap gap-1">
+                              {repo.allTags.slice(0, 3).map((tag) => (
+                                <Badge key={tag} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{tag}</Badge>
+                              ))}
+                              {repo.allTags.length > 3 && (
+                                <span className="text-[10px] text-muted-foreground">+{repo.allTags.length - 3}</span>
+                              )}
+                            </div>
                             <p className="line-clamp-1 text-sm text-muted-foreground">{repo.description}</p>
                           </div>
                         </TableCell>
@@ -1188,13 +1097,17 @@ export default function StarExplorer() {
                             ))}
                             {repo.autoTags
                               .filter((t) => !repo.manualTags.includes(t))
+                              .slice(0, 3)
                               .map((tag) => (
                                 <Badge key={tag} variant="outline" className="text-[10px]">
                                   {tag}
                                 </Badge>
                               ))}
+                            {repo.autoTags.filter((t) => !repo.manualTags.includes(t)).length > 3 && (
+                              <span className="text-[10px] text-muted-foreground">+{repo.autoTags.filter((t) => !repo.manualTags.includes(t)).length - 3}</span>
+                            )}
                             <button
-                              className="inline-flex h-5 w-5 items-center justify-center rounded border border-outline-variant/50 text-muted-foreground hover:bg-primary hover:text-on-primary transition-colors"
+                              className="inline-flex h-5 w-5 items-center justify-center rounded border border-outline-variant/50 text-muted-foreground hover:bg-primary hover:text-on-primary transition-colors shrink-0"
                               title={t("starExplorer.addTag")}
                               onClick={() => openTagEditor(repo.fullName)}
                             >
