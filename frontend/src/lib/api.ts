@@ -212,13 +212,13 @@ export async function getRepo(login: string, fullName: string): Promise<(Repo & 
   try {
     if (await checkApiAvailable()) {
       // 先尝试从当前用户获取
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/repos/${fullName}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/repos/${encodeURIComponent(fullName)}`)
       if (res.ok) {
         const data = await res.json()
         return data.data as (Repo & { starred_at: string; tags: string[] })
       }
       // 回退到全局仓库查询
-      const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${fullName}`)
+      const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}`)
       if (globalRes.ok) {
         const data = await globalRes.json()
         return data.data as (Repo & { starred_at: string; tags: string[] })
@@ -246,7 +246,7 @@ export interface SimilarRepo {
 export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${fullName}/similar`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/similar`)
       if (res.ok) {
         const data = await res.json()
         return data.data as SimilarRepo[]
