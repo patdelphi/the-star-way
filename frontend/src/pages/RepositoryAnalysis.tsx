@@ -254,13 +254,18 @@ export default function RepositoryAnalysis() {
 
   // README 中文摘要（来自 AI 接口）
   const [readmeSummary, setReadmeSummary] = useState<string | null>(null)
+  const [starReason, setStarReason] = useState<string | null>(null)
+  const [reuseAdvice, setReuseAdvice] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   // 已加载过摘要的仓库缓存，避免重复请求
-  const summaryCache = useRef<Record<string, string>>({})
+  const summaryCache = useRef<Record<string, { summary: string; starReason?: string; reuseAdvice?: string }>>({})
 
   const loadSummary = useCallback((repo: string, force = false) => {
     if (!force && summaryCache.current[repo]) {
-      setReadmeSummary(summaryCache.current[repo])
+      const cached = summaryCache.current[repo]
+      setReadmeSummary(cached.summary)
+      setStarReason(cached.starReason || null)
+      setReuseAdvice(cached.reuseAdvice || null)
       return
     }
     setSummaryLoading(true)
@@ -268,7 +273,9 @@ export default function RepositoryAnalysis() {
       .then((result) => {
         if (result?.summary) {
           setReadmeSummary(result.summary)
-          summaryCache.current[repo] = result.summary
+          setStarReason(result.starReason || null)
+          setReuseAdvice(result.reuseAdvice || null)
+          summaryCache.current[repo] = { summary: result.summary, starReason: result.starReason, reuseAdvice: result.reuseAdvice }
         }
       })
       .catch(() => { /* 忽略错误 */ })
@@ -278,9 +285,13 @@ export default function RepositoryAnalysis() {
   useEffect(() => {
     if (!selectedRepo) {
       setReadmeSummary(null)
+      setStarReason(null)
+      setReuseAdvice(null)
       return
     }
     setReadmeSummary(null)
+    setStarReason(null)
+    setReuseAdvice(null)
     loadSummary(selectedRepo)
   }, [selectedRepo, loadSummary])
 
@@ -666,13 +677,16 @@ export default function RepositoryAnalysis() {
                     <Star className="h-4 w-4 text-primary" />
                     <span>{t("repoAnalysis.whyStarred")}</span>
                   </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {t("repoAnalysis.aiReasonText", {
-                      name: activeRepo.fullName,
-                      language: activeRepo.language,
-                      license: activeRepo.license,
-                    })}
-                  </p>
+                  {summaryLoading && !starReason ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      {t("repoAnalysis.summaryLoading")}
+                    </div>
+                  ) : starReason ? (
+                    <p className="text-sm leading-relaxed text-muted-foreground">{starReason}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("repoAnalysis.summaryEmpty")}</p>
+                  )}
                 </div>
 
                 {/* 学习价值标签 */}
@@ -700,12 +714,16 @@ export default function RepositoryAnalysis() {
                     <Puzzle className="h-4 w-4 text-domain-backend" />
                     <span>{t("repoAnalysis.reuseAdvice")}</span>
                   </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {t("repoAnalysis.aiReuseAdvice", {
-                      name: activeRepo.fullName,
-                      license: activeRepo.license,
-                    })}
-                  </p>
+                  {summaryLoading && !reuseAdvice ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      {t("repoAnalysis.summaryLoading")}
+                    </div>
+                  ) : reuseAdvice ? (
+                    <p className="text-sm leading-relaxed text-muted-foreground">{reuseAdvice}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("repoAnalysis.summaryEmpty")}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

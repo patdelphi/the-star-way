@@ -426,10 +426,14 @@ export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
  * 获取仓库 README 中文摘要
  * @param force 为 true 时强制重新生成（忽略缓存）
  */
-export async function getReadmeSummary(fullName: string, force = false): Promise<{
+export interface RepoSummaryResult {
   summary: string
+  starReason?: string
+  reuseAdvice?: string
   cached: boolean
-} | null> {
+}
+
+export async function getReadmeSummary(fullName: string, force = false): Promise<RepoSummaryResult | null> {
   try {
     if (await checkApiAvailable()) {
       const params = force ? '?force=1' : ''

@@ -23,7 +23,7 @@ import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
-import { generateReadmeSummary, generateStarDna, generateLearningPath } from '../ai/client.js'
+import { generateReadmeSummary, generateRepoAnalysis, generateStarDna, generateLearningPath } from '../ai/client.js'
 
 // ===== 工具函数 =====
 
@@ -682,7 +682,14 @@ export function createRouter(db: Database.Database) {
           `).get(fullName) as { translated_readme_summary: string } | undefined
 
           if (cached?.translated_readme_summary) {
-            json(res, { data: { summary: cached.translated_readme_summary, cached: true } })
+            try {
+              const parsed = JSON.parse(cached.translated_readme_summary)
+              if (parsed.summary) {
+                json(res, { data: { ...parsed, cached: true } })
+                return
+              }
+            } catch { /* 旧格式，按纯文本处理 */ }
+            json(res, { data: { summary: cached.translated_readme_summary, starReason: '', reuseAdvice: '', cached: true } })
             return
           }
         }
@@ -697,13 +704,14 @@ export function createRouter(db: Database.Database) {
           return
         }
 
-        // 调用 AI 生成摘要
+        // 调用 AI 生成分析
         try {
           const topics: string[] = repo.topics_json ? JSON.parse(repo.topics_json) : []
-          const summary = await generateReadmeSummary(fullName, repo.description || '', repo.language || '', topics)
+          const analysis = await generateRepoAnalysis(fullName, repo.description || '', repo.language || '', topics)
 
-          // 缓存结果
+          // 缓存结果（整体存为 JSON）
           const now = new Date().toISOString()
+          const cacheJson = JSON.stringify(analysis)
           db.prepare(`
             INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
             VALUES (?, 'zh', ?, 'ai', ?)
@@ -711,9 +719,9 @@ export function createRouter(db: Database.Database) {
               translated_readme_summary = excluded.translated_readme_summary,
               provider = excluded.provider,
               updated_at = excluded.updated_at
-          `).run(fullName, summary, now)
+          `).run(fullName, cacheJson, now)
 
-          json(res, { data: { summary, cached: false } })
+          json(res, { data: { ...analysis, cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成摘要失败', 500)
         }

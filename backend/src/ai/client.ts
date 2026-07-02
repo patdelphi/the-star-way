@@ -52,32 +52,69 @@ export async function chat(messages: AiMessage[]): Promise<string> {
 }
 
 /**
- * 生成 README 摘要
+ * 生成仓库深度分析（摘要 + 星标原因 + 复用建议）
  * @param fullName 仓库全名
  * @param description 仓库描述
  * @param language 主语言
  * @param topics 标签列表
- * @returns 中文摘要
+ * @returns 结构化分析结果
  */
+export interface RepoAnalysisResult {
+  summary: string
+  starReason: string
+  reuseAdvice: string
+}
+
 export async function generateReadmeSummary(
   fullName: string,
   description: string,
   language: string,
   topics: string[],
 ): Promise<string> {
-  const prompt = `请为以下 GitHub 仓库生成一段简短的中文摘要（100-200 字），说明这个项目的用途、技术特点和适用场景。
+  const result = await generateRepoAnalysis(fullName, description, language, topics)
+  return result.summary
+}
+
+export async function generateRepoAnalysis(
+  fullName: string,
+  description: string,
+  language: string,
+  topics: string[],
+): Promise<RepoAnalysisResult> {
+  const prompt = `请分析以下 GitHub 仓库，输出 JSON 格式的分析结果。
 
 仓库：${fullName}
 描述：${description || '无'}
 语言：${language || '未知'}
 标签：${topics.join(', ') || '无'}
 
-请直接输出摘要，不要加任何前缀或格式标记。`
+请输出严格的 JSON（不要加 markdown 代码块标记），包含三个字段：
+- summary: 100-200字中文摘要，说明项目用途、技术特点和适用场景，要有具体洞察而非泛泛而谈
+- starReason: 50-100字，说明为什么值得 star 这个项目，给出具体的亮点和价值点，不要只重复语言和协议
+- reuseAdvice: 50-100字，给出复用建议，包括集成难度、注意事项、适合的复用场景，不要只说"参考架构"
 
-  return chat([
-    { role: 'system', content: '你是一个技术文档摘要专家，擅长用简洁的中文概括开源项目。' },
+示例输出格式：
+{"summary":"...","starReason":"...","reuseAdvice":"..."}`
+
+  const raw = await chat([
+    { role: 'system', content: '你是一个资深开源项目分析师，擅长给出有洞察力的技术分析。你的回复必须是纯 JSON，不要加任何 markdown 标记。' },
     { role: 'user', content: prompt },
   ])
+
+  // 尝试解析 JSON
+  try {
+    // 去除可能的 markdown 代码块标记
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+    const parsed = JSON.parse(cleaned)
+    return {
+      summary: parsed.summary || '',
+      starReason: parsed.starReason || '',
+      reuseAdvice: parsed.reuseAdvice || '',
+    }
+  } catch {
+    // JSON 解析失败，把整段作为 summary
+    return { summary: raw, starReason: '', reuseAdvice: '' }
+  }
 }
 
 /**
