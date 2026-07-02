@@ -28,10 +28,18 @@ import {
   Tags,
   Code2,
   FolderGit2,
+  ArrowUpDown,
 } from "lucide-react"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
+import { Select, SelectOption } from "@/components/ui/select"
+
+// ===== 排序类型定义 =====
+type SortField = "name" | "synced_at" | "stars"
+type SortOrder = "asc" | "desc"
+
+const SORT_OPTIONS: SortField[] = ["name", "synced_at", "stars"]
 
 // ===== 类型定义 =====
 interface Developer {
@@ -92,6 +100,9 @@ export default function Developers() {
   const [searchInput, setSearchInput] = useState("")
   const [searchResult, setSearchResult] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  // 排序状态：排序字段和排序方向
+  const [sortField, setSortField] = useState<SortField>("name")
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc")
   // 同步状态以 key 形式存储，便于翻译
   const [syncStatus, setSyncStatus] = useState("pending")
   const [syncError, setSyncError] = useState("")
@@ -109,60 +120,84 @@ export default function Developers() {
 
   // 页面加载时调用真实 API 获取用户列表
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    getUsers()
-      .then((users) => {
-        if (cancelled) return
-        // 判断 API 是否返回了有效数据；本地 fallback 没有 synced_at
-        const realUsers = users.filter((user) => user.login !== "demo-user")
-        const isValidApiData = realUsers.some((user) => Boolean(user.synced_at))
-        if (isValidApiData) {
-          const activeLogin = realUsers.some((user) => user.login === currentLogin)
-            ? currentLogin
-            : realUsers[0]?.login
-          const mapped: Developer[] = realUsers.map((u, i) => ({
-            id: String(i + 1),
-            name: u.login,
-            stars: u.repoCount,
-            isActive: u.login === activeLogin,
-            avatar_url: u.avatar_url,
-            profile_url: u.profile_url,
-            synced_at: u.synced_at,
-          }))
-          if (activeLogin && activeLogin !== currentLogin) {
-            setCurrentLogin(activeLogin)
-          }
-          setDevelopers(mapped)
-          setIsApiMode(true)
-        } else {
-          setDevelopers([])
-          setIsApiMode(false)
-        }
-      })
-      .catch(() => {
-        if (cancelled) return
-        setError(t("developers.loadError"))
-        setDevelopers([])
-        setIsApiMode(false)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
+    refreshDevelopers()
   }, [t, currentLogin])
 
-  // 分页数据
-  const totalPages = Math.ceil(developers.length / ITEMS_PER_PAGE)
+  // 刷新开发者列表数据（从 API 加载并映射）
+  const refreshDevelopers = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const users = await getUsers()
+      const realUsers = users.filter((user) => user.login !== "demo-user")
+      const isValidApiData = realUsers.some((user) => Boolean(user.synced_at))
+      if (isValidApiData) {
+        const activeLogin = realUsers.some((user) => user.login === currentLogin)
+          ? currentLogin
+          : realUsers[0]?.login
+        const mapped: Developer[] = realUsers.map((u, i) => ({
+          id: String(i + 1),
+          name: u.login,
+          stars: u.repoCount,
+          isActive: u.login === activeLogin,
+          avatar_url: u.avatar_url,
+          profile_url: u.profile_url,
+          synced_at: u.synced_at,
+        }))
+        if (activeLogin && activeLogin !== currentLogin) {
+          setCurrentLogin(activeLogin)
+        }
+        setDevelopers(mapped)
+        setIsApiMode(true)
+      } else {
+        setDevelopers([])
+        setIsApiMode(false)
+      }
+    } catch {
+      setError(t("developers.loadError"))
+      setDevelopers([])
+      setIsApiMode(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 排序 + 分页数据
+  const sortedDevelopers = useMemo(() => {
+    const sorted = [...developers].sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case "name":
+          cmp = a.name.localeCompare(b.name)
+          break
+        case "synced_at":
+          // 同步时间：空的排在最后
+          const aTime = a.synced_at ? new Date(a.synced_at).getTime() : 0
+          const bTime = b.synced_at ? new Date(b.synced_at).getTime() : 0
+          if (aTime === 0 && bTime === 0) cmp = 0
+          else if (aTime === 0) cmp = 1
+          else if (bTime === 0) cmp = -1
+          else cmp = aTime - bTime
+          break
+        case "stars":
+          cmp = a.stars - b.stars
+          break
+      }
+      return sortOrder === "asc" ? cmp : -cmp
+    })
+    return sorted
+  }, [developers, sortField, sortOrder])
+
+  // 排序变化时重置到第1页
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [sortField, sortOrder])
+
+  const totalPages = Math.ceil(sortedDevelopers.length / ITEMS_PER_PAGE)
   const paginatedDevs = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return developers.slice(start, start + ITEMS_PER_PAGE)
-  }, [developers, currentPage])
+    return sortedDevelopers.slice(start, start + ITEMS_PER_PAGE)
+  }, [sortedDevelopers, currentPage])
 
   // 当前选中的开发者
   const activeDev = developers.find((d) => d.isActive)
@@ -262,6 +297,11 @@ export default function Developers() {
         setSearchResult(t("developers.starUpdated", { name }))
         await loadSyncRuns(name)
         await loadStarDna(name)
+        // 同步成功后刷新开发者列表，更新星标数
+        await refreshDevelopers()
+        // 刷新统计和标签
+        getStats(name).then(setDeveloperStats).catch(() => setDeveloperStats(null))
+        getTags(name).then(setDeveloperTags).catch(() => setDeveloperTags([]))
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
@@ -361,6 +401,35 @@ export default function Developers() {
       )}
 
       {/* 开发者列表：一页 20 个，桌面端 5 列 x 4 行 */}
+      {!loading && developers.length > 0 && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-on-surface-variant">
+            {t("developers.totalDevs", { count: developers.length })}
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-on-surface-variant" />
+            <Select
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value as SortField)}
+              className="h-8 w-auto text-xs"
+            >
+              {SORT_OPTIONS.map((field) => (
+                <SelectOption key={field} value={field}>
+                  {t(`developers.sortField.${field}`)}
+                </SelectOption>
+              ))}
+            </Select>
+            <Select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className="h-8 w-auto text-xs"
+            >
+              <SelectOption value="asc">{t("developers.sortOrder.asc")}</SelectOption>
+              <SelectOption value="desc">{t("developers.sortOrder.desc")}</SelectOption>
+            </Select>
+          </div>
+        </div>
+      )}
       {!loading && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 mb-6">
           {paginatedDevs.map((dev) => (

@@ -76,7 +76,16 @@
     "personalityEvidenceDesc": "基于当前开发者已同步仓库的主语言统计，数量表示仓库数。",
     "radarEvidenceDesc": "基于当前开发者已生成的规则标签统计，数量表示命中仓库数。",
     "noLanguageStats": "暂无语言统计。请先同步该用户星标。",
-    "noTagStats": "暂无标签统计。请在星标仓库页触发规则分类。"
+    "noTagStats": "暂无标签统计。请在星标仓库页触发规则分类。",
+    "sortField": {
+      "name": "按用户名",
+      "synced_at": "按加入时间",
+      "stars": "按星标数"
+    },
+    "sortOrder": {
+      "asc": "正序 ↑",
+      "desc": "倒序 ↓"
+    }
   },
   "starExplorer": {
     "title": "星标仓库",

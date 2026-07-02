@@ -76,7 +76,16 @@
     "personalityEvidenceDesc": "Based on the current developer's synced repository language counts. Counts mean repositories.",
     "radarEvidenceDesc": "Based on rule tags generated for the current developer. Counts mean matched repositories.",
     "noLanguageStats": "No language stats yet. Sync this developer's stars first.",
-    "noTagStats": "No tag stats yet. Run rule classification in Star Explorer first."
+    "noTagStats": "No tag stats yet. Run rule classification in Star Explorer first.",
+    "sortField": {
+      "name": "By Name",
+      "synced_at": "By Join Time",
+      "stars": "By Star Count"
+    },
+    "sortOrder": {
+      "asc": "Ascending ↑",
+      "desc": "Descending ↓"
+    }
   },
   "starExplorer": {
     "title": "Star Explorer",

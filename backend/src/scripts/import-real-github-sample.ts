@@ -49,7 +49,7 @@ type RateInfo = {
 const TARGET_USERS = Number(process.env.STARWAY_REAL_USER_COUNT || 30)
 const REPOS_PER_USER = Number(process.env.STARWAY_REAL_REPOS_PER_USER || 20)
 const API_BASE = 'https://api.github.com'
-const token = process.env.STARWAY_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+const token = process.env.STARWAY_GITHUB_TOKEN
 
 function headers(extra: Record<string, string> = {}) {
   return {
