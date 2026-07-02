@@ -36,10 +36,12 @@ import {
   PieChart as PieChartIcon,
   Radar as RadarIcon,
   Clock,
+  RefreshCw,
+  GraduationCap,
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags, getUserStarTimeline } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Select, SelectOption } from "@/components/ui/select"
@@ -317,6 +319,9 @@ export default function Developers() {
   const [syncError, setSyncError] = useState("")
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([])
   const [starDna, setStarDna] = useState<string | null>(null)
+  const [dnaLoading, setDnaLoading] = useState(false)
+  const [learningPath, setLearningPath] = useState<string | null>(null)
+  const [pathLoading, setPathLoading] = useState(false)
   const [developerStats, setDeveloperStats] = useState<UserStats | null>(null)
   const [developerTags, setDeveloperTags] = useState<{ tag: string; count: number }[]>([])
   const [starTimeline, setStarTimeline] = useState<Array<{ month: string; count: number }>>([])
@@ -492,9 +497,23 @@ export default function Developers() {
   }
 
   // 加载 Star DNA 画像
-  const loadStarDna = async (login: string) => {
-    const result = await getStarDna(login)
-    if (result?.dna) setStarDna(result.dna)
+  const loadStarDna = async (login: string, force = false) => {
+    setDnaLoading(true)
+    try {
+      const result = await getStarDna(login, force)
+      if (result?.dna) setStarDna(result.dna)
+    } catch { /* 忽略 */ }
+    finally { setDnaLoading(false) }
+  }
+
+  // 加载学习路径
+  const loadLearningPath = async (login: string, force = false) => {
+    setPathLoading(true)
+    try {
+      const result = await getLearningPath(login, force)
+      if (result?.path) setLearningPath(result.path)
+    } catch { /* 忽略 */ }
+    finally { setPathLoading(false) }
   }
 
   // 当前选中开发者变化时，加载同步历史和 Star DNA
@@ -502,12 +521,14 @@ export default function Developers() {
     if (activeDev) {
       loadSyncRuns(activeDev.name)
       loadStarDna(activeDev.name)
+      loadLearningPath(activeDev.name)
       getStats(activeDev.name).then(setDeveloperStats).catch(() => setDeveloperStats(null))
       getTags(activeDev.name).then(setDeveloperTags).catch(() => setDeveloperTags([]))
       getUserStarTimeline(activeDev.name).then(setStarTimeline).catch(() => setStarTimeline([]))
     } else {
       setSyncRuns([])
       setStarDna(null)
+      setLearningPath(null)
       setDeveloperStats(null)
       setDeveloperTags([])
       setStarTimeline([])
@@ -951,20 +972,82 @@ export default function Developers() {
               )}
             </div>
             {/* Star DNA 画像卡片 */}
-            {starDna && (
+            {activeDev && (
               <Card className="bg-surface-container-low/50 border-primary/20 mt-3">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    {t("developers.starDnaTitle")}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      {t("developers.starDnaTitle")}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-xs shrink-0"
+                      disabled={dnaLoading}
+                      onClick={() => loadStarDna(activeDev.name, true)}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${dnaLoading ? "animate-spin" : ""}`} />
+                      {dnaLoading ? t("developers.dnaLoading") : t("developers.regenerateDna")}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm leading-relaxed text-on-surface">{starDna}</p>
+                  {dnaLoading && !starDna ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      {t("developers.dnaLoading")}
+                    </div>
+                  ) : starDna ? (
+                    <p className="text-sm leading-relaxed text-on-surface">{starDna}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("developers.dnaEmpty")}</p>
+                  )}
                 </CardContent>
               </Card>
             )}
-            {/* 同步历史列表 */}
+            {/* 学习路径推荐卡片 */}
+            {activeDev && (
+              <Card className="bg-surface-container-low/50 border-primary/20 mt-3">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <GraduationCap className="h-4 w-4 text-primary" />
+                      {t("developers.learningPathTitle")}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-xs shrink-0"
+                      disabled={pathLoading}
+                      onClick={() => loadLearningPath(activeDev.name, true)}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${pathLoading ? "animate-spin" : ""}`} />
+                      {pathLoading ? t("developers.pathLoading") : t("developers.regeneratePath")}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {pathLoading && !learningPath ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      {t("developers.pathLoading")}
+                    </div>
+                  ) : learningPath ? (
+                    <div className="text-sm leading-relaxed text-on-surface space-y-2">
+                      {learningPath.split('\n').map((line, i) => {
+                        if (line.startsWith('## ')) return <h2 key={i} className="text-base font-semibold mt-3 mb-1">{line.slice(3)}</h2>
+                        if (line.startsWith('- ')) return <div key={i} className="ml-4">• {line.slice(2)}</div>
+                        if (line.trim() === '') return null
+                        return <p key={i}>{line}</p>
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("developers.pathEmpty")}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             {syncRuns.length > 0 && (
               <div className="mt-4 space-y-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">

@@ -448,13 +448,14 @@ export async function getReadmeSummary(fullName: string, force = false): Promise
 /**
  * 获取开发者 Star DNA 画像
  */
-export async function getStarDna(login: string): Promise<{
+export async function getStarDna(login: string, force = false): Promise<{
   dna: string
   cached: boolean
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna`)
+      const params = force ? '?force=1' : ''
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna${params}`)
       const data = await res.json()
       return data.data
     }
@@ -478,13 +479,14 @@ export function downloadReport(login: string): void {
 /**
  * 获取学习路径推荐
  */
-export async function getLearningPath(login: string): Promise<{
+export async function getLearningPath(login: string, force = false): Promise<{
   path: string
   cached: boolean
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path`)
+      const params = force ? '?force=1' : ''
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path${params}`)
       const data = await res.json()
       return data.data
     }
