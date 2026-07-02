@@ -10,8 +10,16 @@ CREATE TABLE IF NOT EXISTS users (
   login         TEXT PRIMARY KEY,
   avatar_url    TEXT,
   profile_url   TEXT,
-  synced_at     TEXT
+  synced_at     TEXT,
+  name          TEXT,
+  bio           TEXT,
+  company       TEXT,
+  location      TEXT,
+  followers     INTEGER,
+  public_repos  INTEGER
 );
+
+
 
 -- 仓库表
 CREATE TABLE IF NOT EXISTS repos (

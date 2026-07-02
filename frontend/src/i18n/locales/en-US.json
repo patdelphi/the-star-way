@@ -77,6 +77,9 @@
     "radarEvidenceDesc": "Based on rule tags generated for the current developer. Counts mean matched repositories.",
     "noLanguageStats": "No language stats yet. Sync this developer's stars first.",
     "noTagStats": "No tag stats yet. Run rule classification in Star Explorer first.",
+    "starCountShort": "stars",
+    "followers": "followers",
+    "publicRepos": "repos",
     "sortField": {
       "name": "By Name",
       "synced_at": "By Join Time",

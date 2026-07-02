@@ -29,6 +29,10 @@ import {
   Code2,
   FolderGit2,
   ArrowUpDown,
+  Users,
+  GitBranch,
+  MapPin,
+  Building2,
 } from "lucide-react"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
@@ -45,6 +49,12 @@ const SORT_OPTIONS: SortField[] = ["name", "synced_at", "stars"]
 interface Developer {
   id: string
   name: string
+  displayName: string | null
+  bio: string | null
+  company: string | null
+  location: string | null
+  followers: number | null
+  publicRepos: number | null
   stars: number
   isActive: boolean
   avatar_url?: string | null
@@ -138,6 +148,12 @@ export default function Developers() {
         const mapped: Developer[] = realUsers.map((u, i) => ({
           id: String(i + 1),
           name: u.login,
+          displayName: u.name,
+          bio: u.bio,
+          company: u.company,
+          location: u.location,
+          followers: u.followers,
+          publicRepos: u.public_repos,
           stars: u.repoCount,
           isActive: u.login === activeLogin,
           avatar_url: u.avatar_url,
@@ -442,10 +458,10 @@ export default function Developers() {
               }`}
               onClick={() => selectDeveloper(dev.id)}
             >
-              <CardContent className="flex items-center gap-3 py-3 px-4">
+              <CardContent className="flex items-start gap-3 py-3 px-4">
                 {/* 选中指示器 */}
                 <div
-                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${
                     dev.isActive ? "bg-primary" : "bg-outline-variant"
                   }`}
                 />
@@ -467,17 +483,55 @@ export default function Developers() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-on-surface-variant">
-                    <Star className="w-3 h-3" />
-                    <span>{dev.stars}</span>
+                  {/* 显示名称 */}
+                  {dev.displayName && (
+                    <div className="text-xs text-on-surface-variant truncate">
+                      {dev.displayName}
+                    </div>
+                  )}
+                  {/* 统计行：星标 / 关注者 / 公开仓库 */}
+                  <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-0.5">
+                    <span className="flex items-center gap-0.5" title={t("developers.starCountShort")}>
+                      <Star className="w-3 h-3" />
+                      {dev.stars}
+                    </span>
+                    {dev.followers !== null && dev.followers !== undefined && (
+                      <span className="flex items-center gap-0.5" title={t("developers.followers")}>
+                        <Users className="w-3 h-3" />
+                        {dev.followers}
+                      </span>
+                    )}
+                    {dev.publicRepos !== null && dev.publicRepos !== undefined && (
+                      <span className="flex items-center gap-0.5" title={t("developers.publicRepos")}>
+                        <GitBranch className="w-3 h-3" />
+                        {dev.publicRepos}
+                      </span>
+                    )}
                   </div>
+                  {/* 公司 / 所在地 */}
+                  {(dev.company || dev.location) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant/70 mt-0.5 truncate">
+                      {dev.company && (
+                        <span className="flex items-center gap-0.5">
+                          <Building2 className="w-3 h-3" />
+                          {dev.company}
+                        </span>
+                      )}
+                      {dev.location && (
+                        <span className="flex items-center gap-0.5">
+                          <MapPin className="w-3 h-3" />
+                          {dev.location}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 删除按钮 */}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-on-surface-variant hover:text-error shrink-0"
+                  className="h-7 w-7 text-on-surface-variant hover:text-error shrink-0 mt-0.5"
                   onClick={(e) => {
                     e.stopPropagation()
                     removeDeveloper(dev.id)
@@ -561,9 +615,48 @@ export default function Developers() {
                   <h2 className="text-2xl font-semibold tracking-tight text-on-surface">
                     @{activeDev.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {t("developers.syncReady")}
-                  </p>
+                  {/* 显示名称 + Bio */}
+                  {activeDev.displayName && (
+                    <p className="text-sm text-on-surface font-medium">
+                      {activeDev.displayName}
+                    </p>
+                  )}
+                  {activeDev.bio && (
+                    <p className="text-sm text-muted-foreground truncate max-w-md">
+                      {activeDev.bio}
+                    </p>
+                  )}
+                  {/* 统计标签行 */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
+                    <span className="flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5" />
+                      {activeDev.stars} {t("developers.starCountShort")}
+                    </span>
+                    {activeDev.followers !== null && activeDev.followers !== undefined && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {activeDev.followers} {t("developers.followers")}
+                      </span>
+                    )}
+                    {activeDev.publicRepos !== null && activeDev.publicRepos !== undefined && (
+                      <span className="flex items-center gap-1">
+                        <GitBranch className="w-3.5 h-3.5" />
+                        {activeDev.publicRepos} {t("developers.publicRepos")}
+                      </span>
+                    )}
+                    {activeDev.company && (
+                      <span className="flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        {activeDev.company}
+                      </span>
+                    )}
+                    {activeDev.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {activeDev.location}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">

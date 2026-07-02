@@ -77,17 +77,34 @@ export async function syncStars(
 
   // 在事务中执行 upsert 和 removed 标记
   const result = withTransaction(db, () => {
-    // upsert 用户
+    // upsert 用户（保存 GitHub 公开资料扩展字段）
     const upsertUser = db.prepare(`
-      INSERT INTO users (login, avatar_url, profile_url, synced_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO users (login, avatar_url, profile_url, synced_at, name, bio, company, location, followers, public_repos)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(login) DO UPDATE SET
         avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
         profile_url = COALESCE(excluded.profile_url, users.profile_url),
-        synced_at = excluded.synced_at
+        synced_at = excluded.synced_at,
+        name = COALESCE(excluded.name, users.name),
+        bio = COALESCE(excluded.bio, users.bio),
+        company = COALESCE(excluded.company, users.company),
+        location = COALESCE(excluded.location, users.location),
+        followers = COALESCE(excluded.followers, users.followers),
+        public_repos = COALESCE(excluded.public_repos, users.public_repos)
     `)
 
-    upsertUser.run(profile.login, profile.avatar_url, profile.html_url, now)
+    upsertUser.run(
+      profile.login,
+      profile.avatar_url,
+      profile.html_url,
+      now,
+      profile.name,
+      profile.bio,
+      profile.company,
+      profile.location,
+      profile.followers,
+      profile.public_repos,
+    )
 
     // upsert 仓库
     const upsertRepo = db.prepare(`

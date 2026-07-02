@@ -33,6 +33,12 @@ export interface GitHubUserProfile {
   login: string
   avatar_url: string | null
   html_url: string
+  name: string | null
+  bio: string | null
+  company: string | null
+  location: string | null
+  followers: number
+  public_repos: number
 }
 
 // GitHub rate limit 响应头

@@ -80,6 +80,12 @@ export interface UserInfo {
   avatar_url: string | null
   profile_url: string | null
   synced_at: string | null
+  name: string | null
+  bio: string | null
+  company: string | null
+  location: string | null
+  followers: number | null
+  public_repos: number | null
   repoCount: number
   tagCount: number
 }

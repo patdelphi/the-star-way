@@ -387,6 +387,12 @@ export function queryUserListSummaries(db: Database.Database): Array<{
   avatar_url: string | null
   profile_url: string | null
   synced_at: string | null
+  name: string | null
+  bio: string | null
+  company: string | null
+  location: string | null
+  followers: number | null
+  public_repos: number | null
   repoCount: number
   tagCount: number
 }> {
@@ -396,19 +402,31 @@ export function queryUserListSummaries(db: Database.Database): Array<{
       u.avatar_url,
       u.profile_url,
       u.synced_at,
+      u.name,
+      u.bio,
+      u.company,
+      u.location,
+      u.followers,
+      u.public_repos,
       COUNT(DISTINCT CASE WHEN s.removed_at IS NULL THEN s.repo_full_name END) as repoCount,
       COUNT(DISTINCT rt.tag) as tagCount
     FROM users u
     LEFT JOIN stars s ON s.user_login = u.login
     LEFT JOIN repo_tags rt ON rt.repo_full_name = s.repo_full_name AND s.removed_at IS NULL
     WHERE u.login != ?
-    GROUP BY u.login, u.avatar_url, u.profile_url, u.synced_at
+    GROUP BY u.login, u.avatar_url, u.profile_url, u.synced_at, u.name, u.bio, u.company, u.location, u.followers, u.public_repos
     ORDER BY u.login
   `).all(SYSTEM_DEMO_LOGIN) as Array<{
     login: string
     avatar_url: string | null
     profile_url: string | null
     synced_at: string | null
+    name: string | null
+    bio: string | null
+    company: string | null
+    location: string | null
+    followers: number | null
+    public_repos: number | null
     repoCount: number
     tagCount: number
   }>

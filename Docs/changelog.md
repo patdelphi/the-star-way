@@ -30,3 +30,4 @@
 - 修复后端 GitHub Token 加载问题：后端从 `backend` 目录启动时会同时加载 `backend/.env` 与项目根目录 `.env`，确保 `/api/sync` 使用 `STARWAY_GITHUB_TOKEN` 等环境变量。
 - 当前本地真实数据验证样本：34 个真实用户、3632 个真实仓库、3779 条星标关系、64 个标签分类。
 - 验证通过：后端 99 个测试、后端 TypeScript 构建、前端 40 项 UI 静态校验、前端生产构建。
+- 新增 `troubleshooting.md`，记录 `better-sqlite3` native ABI 不匹配、系统 Node/Corepack pnpm 修复方式，以及 GitHub token 未加载导致匿名限流的排查步骤。

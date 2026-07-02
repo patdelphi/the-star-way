@@ -62,6 +62,17 @@ function Resolve-RequiredCommand {
   return $cmd.Source
 }
 
+function Resolve-PnpmCommand {
+  param([string]$NodeDir)
+  $corepack = Join-Path $NodeDir "corepack.cmd"
+  if (Test-Path $corepack) {
+    return @{ Command = $corepack; PrefixArgs = @("pnpm") }
+  }
+
+  $pnpm = Resolve-RequiredCommand "pnpm"
+  return @{ Command = $pnpm; PrefixArgs = @() }
+}
+
 function Initialize-LogFile {
   param([string]$Path, [string]$Prefix)
   try {
@@ -85,8 +96,10 @@ try {
   if (-not (Test-Path $BackendDir)) { throw "Missing backend dir: $BackendDir" }
   if (-not (Test-Path $FrontendDir)) { throw "Missing frontend dir: $FrontendDir" }
   $NodeCmd = Resolve-RequiredCommand "node"
-  $PnpmCmd = Resolve-RequiredCommand "pnpm"
   $NodeDir = Split-Path -Parent $NodeCmd
+  $PnpmRuntime = Resolve-PnpmCommand $NodeDir
+  $PnpmCmd = $PnpmRuntime.Command
+  $PnpmArgsPrefix = $PnpmRuntime.PrefixArgs
   $env:PATH = "$NodeDir;$env:PATH"
   $env:STARWAY_NODE_CMD = $NodeCmd
   $env:STARWAY_PNPM_CMD = $PnpmCmd
@@ -108,12 +121,17 @@ try {
   # 检查 native 模块：用后续启动后端的同一个 Node ABI 进行加载验证。
   Write-Host "Checking native modules..."
   Push-Location $BackendDir
-  & $NodeCmd -e "const Database = require('better-sqlite3'); new Database(':memory:').close()" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
+  $nativeCheckOutput = & $NodeCmd -e "const Database = require('better-sqlite3'); new Database(':memory:').close()" 2>&1
+  $nativeCheckExit = $LASTEXITCODE
+  if ($nativeCheckExit -ne 0) {
     Write-Host "Rebuilding better-sqlite3 for Node.js $((& $NodeCmd -v).Trim()) ..."
-    & $PnpmCmd rebuild better-sqlite3 2>&1 | Out-Null
+    $rebuildOutput = & $PnpmCmd @PnpmArgsPrefix rebuild better-sqlite3 2>&1
     if ($LASTEXITCODE -ne 0) {
-      throw "better-sqlite3 rebuild failed. Try manually: cd backend && pnpm rebuild better-sqlite3"
+      Write-Host "--- native check error ---" -ForegroundColor Yellow
+      $nativeCheckOutput | Select-Object -Last 20
+      Write-Host "--- rebuild error ---" -ForegroundColor Yellow
+      $rebuildOutput | Select-Object -Last 40
+      throw "better-sqlite3 rebuild failed. Try manually: cd backend && corepack pnpm rebuild better-sqlite3"
     }
     Write-Host "Rebuild done."
   }

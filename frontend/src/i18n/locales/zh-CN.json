@@ -77,6 +77,9 @@
     "radarEvidenceDesc": "基于当前开发者已生成的规则标签统计，数量表示命中仓库数。",
     "noLanguageStats": "暂无语言统计。请先同步该用户星标。",
     "noTagStats": "暂无标签统计。请在星标仓库页触发规则分类。",
+    "starCountShort": "星标",
+    "followers": "关注者",
+    "publicRepos": "仓库",
     "sortField": {
       "name": "按用户名",
       "synced_at": "按加入时间",

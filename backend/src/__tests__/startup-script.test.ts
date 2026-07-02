@@ -9,9 +9,13 @@ describe("start-project.ps1", () => {
   it("passes resolved node and pnpm paths into child processes", () => {
     expect(script).toContain("$NodeCmd");
     expect(script).toContain("$PnpmCmd");
+    expect(script).toContain("Resolve-PnpmCommand");
+    expect(script).toContain("corepack.cmd");
+    expect(script).toContain("$PnpmArgsPrefix");
     expect(script).toContain("$env:STARWAY_NODE_CMD");
     expect(script).toContain("$env:STARWAY_PNPM_CMD");
     expect(script).toContain("new Database(':memory:').close()");
+    expect(script).toContain("& $PnpmCmd @PnpmArgsPrefix rebuild better-sqlite3");
     expect(script).toContain("$BackendTsx");
     expect(script).toContain("$FrontendVite");
     expect(script).toContain("& `$env:STARWAY_NODE_CMD '$BackendTsx' src/api/start.ts");
