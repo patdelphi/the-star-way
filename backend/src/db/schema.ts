@@ -74,8 +74,7 @@ CREATE TABLE IF NOT EXISTS translations (
   translated_readme_summary TEXT,
   provider                TEXT,
   updated_at              TEXT NOT NULL,
-  PRIMARY KEY (repo_full_name, target_lang),
-  FOREIGN KEY (repo_full_name) REFERENCES repos(full_name)
+  PRIMARY KEY (repo_full_name, target_lang)
 );
 
 -- 分析报告表

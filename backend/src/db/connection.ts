@@ -36,6 +36,8 @@ export function createConnection(dbPath?: string): Database.Database {
   // 必须启用 WAL 模式，减少 IO 开销
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL')
+  // 关闭外键约束：translations 表存储 user:xxx 等非仓库键，不需要外键
+  db.pragma('foreign_keys = OFF')
 
   return db
 }
