@@ -1130,16 +1130,6 @@ export default function StarExplorer() {
           </Card>
         )}
 
-        {/* 列表数据状态提示 */}
-        <Card className={`border-outline-variant/60 bg-surface-container-low ${error ? "border-status-danger/40" : ""}`}>
-          <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              {error ? `${t("starExplorer.errorPrefix")}${error}` : usingFallback ? t("starExplorer.fallbackNotice") : t("starExplorer.syncedNotice")}
-            </span>
-            <Badge variant="outline" className="w-fit">{error ? t("starExplorer.demoErrorStatus") : usingFallback ? t("starExplorer.demoMode") : t("starExplorer.connected")}</Badge>
-          </CardContent>
-        </Card>
-
         {/* 分页 */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">{analysisStatus}</p>
