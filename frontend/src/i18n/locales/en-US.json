@@ -300,7 +300,7 @@
     "noDesc": "No description",
     "noDeepSummary": "[{{name}}] No deep analysis summary.",
     "summaryLoading": "Generating AI summary...",
-    "summaryEmpty": "No summary yet. Click the button above to regenerate.",
+    "summaryEmpty": "No summary yet. Click the \"Regenerate\" button above.",
     "regenerateSummary": "Regenerate",
     "initializing": "Initializing...",
     "importedFromStarred": "Imported {{repo}} from starred repo list.",

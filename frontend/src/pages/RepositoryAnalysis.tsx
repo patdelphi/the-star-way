@@ -571,18 +571,16 @@ export default function RepositoryAnalysis() {
                       : t("repoAnalysis.readmeSummaryDesc")}
                   </CardDescription>
                 </div>
-                {readmeSummary && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-xs shrink-0"
-                    disabled={summaryLoading}
-                    onClick={() => loadSummary(selectedRepo, true)}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? "animate-spin" : ""}`} />
-                    {t("repoAnalysis.regenerateSummary")}
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs shrink-0"
+                  disabled={summaryLoading || !selectedRepo}
+                  onClick={() => loadSummary(selectedRepo, true)}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? "animate-spin" : ""}`} />
+                  {summaryLoading ? t("repoAnalysis.summaryLoading") : t("repoAnalysis.regenerateSummary")}
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">

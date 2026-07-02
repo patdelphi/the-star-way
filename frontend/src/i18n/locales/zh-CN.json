@@ -300,7 +300,7 @@
     "noDesc": "暂无描述",
     "noDeepSummary": "【{{name}}】暂无深度分析摘要。",
     "summaryLoading": "正在生成 AI 摘要...",
-    "summaryEmpty": "暂无摘要，点击右上角按钮重新生成。",
+    "summaryEmpty": "暂无摘要，点击右上角「重新生成」按钮生成。",
     "regenerateSummary": "重新生成",
     "initializing": "正在初始化...",
     "importedFromStarred": "已从星标仓库列表带入 {{repo}}。",
