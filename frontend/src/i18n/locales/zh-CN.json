@@ -310,6 +310,7 @@
     "loading": "加载中...",
     "noTags": "暂无标签",
     "globalTagCount": "全局 {{count}} 个",
+    "repoTagCount": "当前仓库 {{count}} 个 / 全局 {{total}} 个",
     "noStack": "暂无技术栈数据",
     "languageDistTitle": "语言分布",
     "noSimilar": "暂无相似项目推荐",

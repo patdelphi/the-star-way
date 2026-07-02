@@ -134,7 +134,7 @@ export default function RepositoryAnalysis() {
       stars: formatStars(repo.stars),
       forks: String(repo.forks),
       updatedAt: formatDate(repo.pushed_at),
-      license: repo.license ?? t("repoAnalysis.unknown"),
+      license: repo.license && repo.license !== "NOASSERTION" ? repo.license : t("repoAnalysis.licenseUnknown"),
       category: t("repoAnalysis.unknown"),
       summary: t("repoAnalysis.noDeepSummary", { name: repo.full_name }),
       stack: repo.language ? [repo.language] : [],
@@ -146,10 +146,10 @@ export default function RepositoryAnalysis() {
         { label: t("repoAnalysis.signalApiStability"), value: t("repoAnalysis.unknown"), tone: "warning" },
       ],
       scores: [
-        { label: t("repoAnalysis.learningValue"), value: 50 },
-        { label: t("repoAnalysis.reuseValue"), value: 50 },
-        { label: t("repoAnalysis.maintainActive"), value: 50 },
-        { label: t("repoAnalysis.integrationDifficulty"), value: 50 },
+        { label: t("repoAnalysis.learningValue"), value: Math.min(100, Math.round(Math.log10(repo.stars + 10) * 25)) },
+        { label: t("repoAnalysis.reuseValue"), value: Math.min(100, Math.round(Math.log10(repo.forks + 10) * 30)) },
+        { label: t("repoAnalysis.maintainActive"), value: repo.pushed_at ? Math.max(10, Math.round(100 - Math.min(100, (Date.now() - new Date(repo.pushed_at).getTime()) / (1000 * 60 * 60 * 24 * 30) * 5))) : 10 },
+        { label: t("repoAnalysis.integrationDifficulty"), value: Math.min(100, Math.round(Math.log10(repo.open_issues + 10) * 20)) },
       ],
       risks: [
         {
@@ -474,9 +474,9 @@ export default function RepositoryAnalysis() {
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Tags className="h-5 w-5 text-primary" />
                 {t("repoAnalysis.autoTags")}
-                {allTags.length > 0 && (
+                {activeRepo.tags.length > 0 && (
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    ({t("repoAnalysis.globalTagCount", { count: allTags.length })})
+                    {t("repoAnalysis.repoTagCount", { count: activeRepo.tags.length, total: allTags.length })}
                   </span>
                 )}
               </CardTitle>

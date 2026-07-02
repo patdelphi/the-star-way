@@ -2,12 +2,14 @@
  * TopBar 组件 - 顶部应用栏
  * 玻璃态效果，包含搜索、导航和右侧开发者信息/主题切换/语言下拉框
  */
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router-dom"
 import { Search, Sun, Moon, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useDeveloper } from "@/contexts/DeveloperContext"
+import { getRepos, type Repo } from "@/lib/api"
 
 function useTheme() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -38,14 +40,59 @@ export function TopBar() {
   const { theme, toggleTheme } = useTheme()
   const { t, i18n } = useTranslation()
   const { currentLogin } = useDeveloper()
+  const navigate = useNavigate()
   const [langOpen, setLangOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<Repo[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // 搜索防抖
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    setSearchLoading(true)
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await getRepos(currentLogin, { q: searchQuery.trim(), pageSize: 8 })
+        setSearchResults(result.items)
+      } catch {
+        setSearchResults([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 300)
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [searchQuery, currentLogin])
+
+  // 点击外部关闭搜索结果
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchFocused(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const handleSelectRepo = (repo: Repo) => {
+    navigate(`/analysis?repo=${encodeURIComponent(repo.full_name)}`)
+    setSearchQuery("")
+    setSearchResults([])
+    setSearchFocused(false)
+  }
 
   // 从 i18n 当前语言映射到下拉选项
   const currentLangCode = i18n.language?.startsWith('zh') ? 'zh-CN' : 'en-US'
   const currentLang = languages.find((l) => l.code === currentLangCode) ?? languages[0]
-
-  const searchResults: { name: string; meta: string }[] = []
 
   const handleLangChange = (code: string) => {
     i18n.changeLanguage(code)
@@ -61,22 +108,29 @@ export function TopBar() {
         </div>
 
         {/* Search */}
-        <div className="relative hidden sm:block">
+        <div className="relative hidden sm:block" ref={searchContainerRef}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <Input
             placeholder={t('topBar.searchPlaceholder')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onFocus={() => setSearchFocused(true)}
             className="pl-10 w-64 bg-surface-container-lowest border-outline-variant text-sm font-sans"
           />
-          {searchQuery && (
+          {searchFocused && searchQuery.trim() && (
             <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-lg border border-outline-variant bg-surface-container-lowest p-2 shadow-lg">
               <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">{t('topBar.searchResults')}</div>
-              {searchResults.length > 0 ? (
-                searchResults.map((item) => (
-                  <button key={item.name} className="block w-full rounded-md px-2 py-2 text-left hover:bg-surface-container">
-                    <div className="text-sm font-medium text-on-surface">{item.name}</div>
-                    <div className="text-xs text-muted-foreground">{item.meta}</div>
+              {searchLoading ? (
+                <div className="px-2 py-3 text-sm text-muted-foreground">...</div>
+              ) : searchResults.length > 0 ? (
+                searchResults.map((repo) => (
+                  <button
+                    key={repo.full_name}
+                    className="block w-full rounded-md px-2 py-2 text-left hover:bg-surface-container"
+                    onClick={() => handleSelectRepo(repo)}
+                  >
+                    <div className="text-sm font-medium text-on-surface truncate">{repo.full_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{repo.description ?? repo.language ?? ''}</div>
                   </button>
                 ))
               ) : (

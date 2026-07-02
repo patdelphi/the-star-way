@@ -310,6 +310,7 @@
     "loading": "Loading...",
     "noTags": "No tags",
     "globalTagCount": "{{count}} global",
+    "repoTagCount": "{{count}} for this repo / {{total}} global",
     "noStack": "No tech stack data",
     "languageDistTitle": "Language Distribution",
     "noSimilar": "No similar repo recommendations",

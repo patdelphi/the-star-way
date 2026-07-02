@@ -380,6 +380,22 @@ const Dashboard: React.FC = () => {
     return `conic-gradient(${segments.join(', ')})`
   }, [radarData])
 
+  const languageGradient = useMemo(() => {
+    const data = languageStats.slice(0, 8)
+    const total = data.reduce((sum, l) => sum + l.count, 0)
+    if (total === 0) return ''
+    let start = 0
+    const segments = data.map((l, i) => {
+      const segStart = start
+      const segEnd = start + (l.count / total) * 360
+      start = segEnd
+      return `${LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]} ${segStart}deg ${segEnd}deg`
+    })
+    return `conic-gradient(${segments.join(', ')})`
+  }, [languageStats])
+
+  const languageTotal = useMemo(() => languageStats.slice(0, 8).reduce((sum, l) => sum + l.count, 0), [languageStats])
+
   return (
     <div className="min-h-screen bg-grid-pattern p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -503,7 +519,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* 语言分布饼图 */}
+        {/* 语言分布（conic-gradient 圆形） */}
         {languageStats.length > 0 && (
           <Card>
             <CardHeader>
@@ -512,29 +528,37 @@ const Dashboard: React.FC = () => {
                 <CardTitle className="text-xl">{t("dashboard.languageDistribution")}</CardTitle>
               </div>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={240}>
-                <RechartsPie>
-                  <Pie
-                    data={languageStats.slice(0, 8).map((l, i) => ({
-                      name: l.language || "Unknown",
-                      value: l.count,
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {languageStats.slice(0, 8).map((_, i) => (
-                      <Cell key={i} fill={LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<ThemedChartTooltip />} />
-                  <Legend />
-                </RechartsPie>
-              </ResponsiveContainer>
+            <CardContent className="space-y-4">
+              {/* 圆形 conic-gradient 图 */}
+              <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full"
+                style={{ background: languageGradient }}
+              >
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
+                  <span className="text-lg font-bold text-primary">{languageStats.length}</span>
+                </div>
+              </div>
+
+              {/* 语言列表带百分比 */}
+              <div className="space-y-2">
+                {languageStats.slice(0, 8).map((l, i) => {
+                  const pct = languageTotal > 0 ? Math.round((l.count / languageTotal) * 100) : 0
+                  return (
+                    <div key={l.language} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] }}
+                        />
+                        <span className="text-on-surface-variant">{l.language || "Unknown"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{l.count}</span>
+                        <span className="font-mono font-medium text-on-surface">{pct}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </CardContent>
           </Card>
         )}
