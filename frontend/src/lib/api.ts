@@ -230,6 +230,38 @@ export async function getRepo(login: string, fullName: string): Promise<(Repo & 
 }
 
 /**
+ * 获取相似项目推荐
+ */
+export async function getSimilarRepos(fullName: string): Promise<Array<{
+  full_name: string
+  description: string | null
+  language: string | null
+  stars: number
+  html_url: string
+  reason: string
+  score: number
+}> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${fullName}/similar`)
+      if (res.ok) {
+        const data = await res.json()
+        return data.data as Array<{
+          full_name: string
+          description: string | null
+          language: string | null
+          stars: number
+          html_url: string
+          reason: string
+          score: number
+        }>
+      }
+    }
+  } catch { /* 忽略 */ }
+  return []
+}
+
+/**
  * 获取统计数据
  */
 export async function getStats(login: string): Promise<UserStats | null> {

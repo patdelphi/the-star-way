@@ -160,6 +160,102 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/repos/*fullName/similar（相似项目推荐，必须在通配路由之前匹配） =====
+      const similarMatch = matchRoute('/api/repos/*/similar', url.split('?')[0])
+      if (method === 'GET' && similarMatch) {
+        const fullNameWithSimilar = decodeURIComponent(similarMatch['*'] || '')
+        const repoFullName = fullNameWithSimilar.replace(/\/similar$/, '')
+        const repo = db.prepare(`SELECT * FROM repos WHERE full_name = ?`).get(repoFullName) as any
+        if (!repo) {
+          error(res, 'REPO_NOT_FOUND', `仓库 ${repoFullName} 不存在`, 404)
+          return
+        }
+
+        let currentTopics: string[] = []
+        try {
+          currentTopics = repo.topics_json ? JSON.parse(repo.topics_json) : []
+        } catch { /* 忽略 */ }
+
+        let candidates: Array<{
+          full_name: string
+          description: string | null
+          language: string | null
+          stars: number
+          html_url: string
+          shared_topics: number
+          score: number
+        }> = []
+
+        if (currentTopics.length > 0) {
+          const topicRows = db.prepare(`
+            SELECT r.full_name, r.description, r.language, r.stars, r.html_url, r.topics_json
+            FROM repos r
+            WHERE r.full_name != ?
+              AND r.language IS NOT NULL
+              AND r.topics_json IS NOT NULL
+              AND r.topics_json != '[]'
+            LIMIT 5000
+          `).all(repoFullName) as Array<any>
+
+          for (const r of topicRows) {
+            let rTopics: string[] = []
+            try { rTopics = JSON.parse(r.topics_json) } catch { continue }
+            const shared = rTopics.filter((t: string) => currentTopics.includes(t))
+            if (shared.length === 0) continue
+            const sameLang = r.language === repo.language ? 2 : 0
+            const starsSimilarity = Math.max(0, 1 - Math.abs(Math.log10(r.stars + 1) - Math.log10(repo.stars + 1)) / 3)
+            const score = shared.length * 3 + sameLang + Math.round(starsSimilarity)
+            candidates.push({
+              full_name: r.full_name,
+              description: r.description,
+              language: r.language,
+              stars: r.stars,
+              html_url: r.html_url,
+              shared_topics: shared.length,
+              score,
+            })
+          }
+        } else if (repo.language) {
+          const langRows = db.prepare(`
+            SELECT r.full_name, r.description, r.language, r.stars, r.html_url
+            FROM repos r
+            WHERE r.full_name != ?
+              AND r.language = ?
+            ORDER BY ABS(r.stars - ?) ASC
+            LIMIT 10
+          `).all(repoFullName, repo.language, repo.stars) as Array<any>
+
+          for (const r of langRows) {
+            const starsSimilarity = Math.max(0, 1 - Math.abs(Math.log10(r.stars + 1) - Math.log10(repo.stars + 1)) / 3)
+            candidates.push({
+              full_name: r.full_name,
+              description: r.description,
+              language: r.language,
+              stars: r.stars,
+              html_url: r.html_url,
+              shared_topics: 0,
+              score: 2 + Math.round(starsSimilarity),
+            })
+          }
+        }
+
+        candidates.sort((a, b) => b.score - a.score)
+        const result = candidates.slice(0, 6).map(c => ({
+          full_name: c.full_name,
+          description: c.description,
+          language: c.language,
+          stars: c.stars,
+          html_url: c.html_url,
+          reason: c.shared_topics > 0
+            ? `共享 ${c.shared_topics} 个主题${c.language === repo.language ? ' + 同语言' : ''}`
+            : '同语言 + 星标相近',
+          score: c.score,
+        }))
+
+        json(res, { data: result })
+        return
+      }
+
       // ===== GET /api/repos/*fullName（全局仓库查询，直接查 repos 表） =====
       const globalRepoMatch = matchRoute('/api/repos/*', url.split('?')[0])
       if (method === 'GET' && globalRepoMatch) {

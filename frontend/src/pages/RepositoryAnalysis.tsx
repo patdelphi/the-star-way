@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
-import { getRepos, getRepo, getStats, getTags, getReadmeSummary } from "@/lib/api"
+import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -119,6 +119,15 @@ export default function RepositoryAnalysis() {
   const [apiRepos, setApiRepos] = useState<(Repo & { starred_at: string; tags: string[] })[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [allTags, setAllTags] = useState<{ tag: string; count: number }[]>([])
+  const [similarRepos, setSimilarRepos] = useState<Array<{
+    full_name: string
+    description: string | null
+    language: string | null
+    stars: number
+    html_url: string
+    reason: string
+    score: number
+  }>>([])
 
   /** 从 ISO 日期字符串提取 YYYY-MM-DD */
   const formatDate = (dateStr: string | null): string => {
@@ -265,6 +274,18 @@ export default function RepositoryAnalysis() {
       .catch(() => {
         /* 忽略错误，摘要为可选内容 */
       })
+  }, [selectedRepo])
+
+  // 加载相似项目
+  useEffect(() => {
+    if (!selectedRepo) {
+      setSimilarRepos([])
+      return
+    }
+    setSimilarRepos([])
+    getSimilarRepos(selectedRepo)
+      .then(setSimilarRepos)
+      .catch(() => setSimilarRepos([]))
   }, [selectedRepo])
 
   /** 复制克隆地址到剪贴板 */
@@ -783,17 +804,24 @@ export default function RepositoryAnalysis() {
             <CardDescription>{t("repoAnalysis.similarReposDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {activeRepo.similar.length > 0 ? (
-              activeRepo.similar.map((repo) => (
-                <div key={repo.fullName} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+            {similarRepos.length > 0 ? (
+              similarRepos.map((repo) => (
+                <a
+                  key={repo.full_name}
+                  href={`?repo=${encodeURIComponent(repo.full_name)}`}
+                  className="block rounded-lg border border-outline-variant/50 bg-surface-container-low p-4 transition-colors hover:bg-surface-container hover:border-primary/30"
+                >
                   <div className="mb-2 flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-on-surface">{repo.fullName}</h3>
+                    <h3 className="text-sm font-semibold text-on-surface truncate">{repo.full_name}</h3>
                     <Badge variant="outline" className="shrink-0 font-mono text-xs">
-                      {repo.stars}
+                      {formatStars(repo.stars)}
                     </Badge>
                   </div>
-                  <p className="text-xs leading-5 text-muted-foreground">{repo.reason}</p>
-                </div>
+                  {repo.description && (
+                    <p className="mb-2 text-xs leading-5 text-muted-foreground line-clamp-2">{repo.description}</p>
+                  )}
+                  <p className="text-xs leading-5 text-primary">{repo.reason}</p>
+                </a>
               ))
             ) : (
               <div className="col-span-3 text-sm text-muted-foreground">{t("repoAnalysis.noSimilar")}</div>
