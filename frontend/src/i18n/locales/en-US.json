@@ -81,6 +81,9 @@
     "followers": "followers",
     "publicRepos": "repos",
     "starTimeline": "Starred Repos Timeline",
+    "starTimelineTotal": "Total",
+    "starTimelinePeakMonth": "Peak Month",
+    "starTimelinePeakValue": "Peak Value",
     "sortField": {
       "name": "By Name",
       "synced_at": "By Join Time",

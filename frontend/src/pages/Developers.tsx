@@ -35,7 +35,7 @@ import {
   Building2,
   BarChart3,
 } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags, getUserStarTimeline } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
@@ -772,32 +772,46 @@ export default function Developers() {
           </section>
 
           {/* Star 数量月度时间轴 */}
-          {starTimeline.length > 0 && (
-            <section className="space-y-2">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">{t("developers.starTimeline")}</h3>
-              </div>
-              <Card className="p-4">
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={starTimeline} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value: string) => value.slice(5)}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 12 }}
-                      allowDecimals={false}
-                    />
-                    <Tooltip content={<ThemedChartTooltip />} />
-                    <Bar dataKey="count" fill="var(--color-primary)" fillOpacity={0.85} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </section>
-          )}
+          {starTimeline.length > 0 && (() => {
+            const total = starTimeline.reduce((sum, item) => sum + item.count, 0)
+            const peak = starTimeline.reduce((best, item) => item.count > best.count ? item : best, starTimeline[0])
+            const chartData = starTimeline.map(item => ({ label: item.month.slice(5), value: item.count }))
+            return (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold">{t("developers.starTimeline")}</h3>
+                </div>
+                <Card className="p-4">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+                        <div className="text-xs text-muted-foreground">{total}</div>
+                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelineTotal")}</div>
+                      </div>
+                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+                        <div className="text-xs text-muted-foreground">{peak?.month || "-"}</div>
+                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelinePeakMonth")}</div>
+                      </div>
+                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+                        <div className="text-xs text-muted-foreground">{peak?.count || 0}</div>
+                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelinePeakValue")}</div>
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip content={<ThemedChartTooltip />} />
+                        <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              </section>
+            )
+          })()}
 
           {/* 真实统计说明 */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
