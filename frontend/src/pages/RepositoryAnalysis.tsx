@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
-import { getRepos, getStats, getTags, getReadmeSummary } from "@/lib/api"
+import { getRepos, getRepo, getStats, getTags, getReadmeSummary } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -195,14 +195,8 @@ export default function RepositoryAnalysis() {
         const urlRepo = searchParams.get("repo")
         const storedRepo = urlRepo || localStorage.getItem("selected-star-repo")
         if (storedRepo) {
-          const existsInApi = reposResult.items.some((r) => r.full_name === storedRepo)
-          if (existsInApi) {
-            setSelectedRepo(storedRepo)
-            setStatus(t("repoAnalysis.importedFromStarred", { repo: storedRepo }))
-          } else {
-            setSelectedRepo(reposResult.items[0]?.full_name ?? "")
-            setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
-          }
+          setSelectedRepo(storedRepo)
+          setStatus(t("repoAnalysis.importedFromStarred", { repo: storedRepo }))
         } else {
           setSelectedRepo(reposResult.items[0]?.full_name ?? "")
           setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
@@ -226,11 +220,33 @@ export default function RepositoryAnalysis() {
     return apiRepos.map((r) => ({ fullName: r.full_name, description: r.description ?? "" }))
   }, [apiRepos])
 
-  /** 当前激活的仓库：由 API 基础字段生成 */
+  /** 当前激活的仓库：优先从 apiRepos 列表匹配，否则通过 getRepo 单独获取 */
+  const [extraRepo, setExtraRepo] = useState<(Repo & { starred_at: string; tags: string[] }) | null>(null)
+
   const activeRepo = useMemo<RepoAnalysis | null>(() => {
     const apiRepo = apiRepos.find((r) => r.full_name === selectedRepo)
-    return apiRepo ? buildDefaultAnalysis(apiRepo) : null
-  }, [selectedRepo, apiRepos])
+    if (apiRepo) return buildDefaultAnalysis(apiRepo)
+    if (extraRepo) return buildDefaultAnalysis(extraRepo)
+    return null
+  }, [selectedRepo, apiRepos, extraRepo])
+
+  // 当 selectedRepo 不在 apiRepos 中时，通过 API 单独获取
+  useEffect(() => {
+    if (!selectedRepo) {
+      setExtraRepo(null)
+      return
+    }
+    const exists = apiRepos.some((r) => r.full_name === selectedRepo)
+    if (exists) {
+      setExtraRepo(null)
+      return
+    }
+    let cancelled = false
+    getRepo(currentLogin, selectedRepo).then((data) => {
+      if (!cancelled && data) setExtraRepo(data)
+    }).catch(() => { /* 忽略 */ })
+    return () => { cancelled = true }
+  }, [selectedRepo, apiRepos, currentLogin])
 
   // README 中文摘要（来自 AI 接口），随选中仓库变化重新获取
   const [readmeSummary, setReadmeSummary] = useState<string | null>(null)
