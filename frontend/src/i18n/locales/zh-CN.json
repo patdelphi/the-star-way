@@ -360,7 +360,7 @@
     "licenseType_gpl": "强 Copyleft 协议（GPL）",
     "licenseType_agpl": "网络强 Copyleft 协议（AGPL）",
     "licenseType_unlicense": "公共领域（Unlicense）",
-    "licenseType_noassertion": "协议待确认（NOASSERTION）",
+    "licenseType_noassertion": "非 GitHub 默认协议",
     "licenseType_unknown": "协议未识别",
     "licenseAdvice_mit": "可自由商用、修改、分发和私有化使用。只需在副本中保留版权声明和协议文本即可。适合闭源商业项目引用。",
     "licenseAdvice_apache": "可自由商用、修改和分发。需保留版权声明和协议文本。包含专利授权条款，适合企业级项目使用。",

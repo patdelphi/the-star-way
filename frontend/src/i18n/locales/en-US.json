@@ -360,7 +360,7 @@
     "licenseType_gpl": "Strong Copyleft (GPL)",
     "licenseType_agpl": "Network Strong Copyleft (AGPL)",
     "licenseType_unlicense": "Public Domain (Unlicense)",
-    "licenseType_noassertion": "License Pending (NOASSERTION)",
+    "licenseType_noassertion": "Non-GitHub Default License",
     "licenseType_unknown": "Unrecognized License",
     "licenseAdvice_mit": "Free to use commercially, modify, distribute and privatize. Only requires retaining copyright notice and license text in copies. Suitable for closed-source commercial projects.",
     "licenseAdvice_apache": "Free to use commercially, modify and distribute. Must retain copyright notice and license text. Includes patent grant clause, suitable for enterprise projects.",
