@@ -14,16 +14,23 @@ import {
   CheckCircle2,
   Clock,
   Code2,
+  Copy,
+  Cpu,
   ExternalLink,
   FileText,
+  Gavel,
   GitFork,
   Info,
   Layers3,
   LineChart,
   Network,
   PackageCheck,
+  Puzzle,
+  School,
   Search,
   ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   Star,
   Tags,
 } from "lucide-react"
@@ -32,7 +39,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
-import { getRepos, getStats, getTags } from "@/lib/api"
+import { getRepos, getStats, getTags, getReadmeSummary } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
@@ -202,10 +209,55 @@ export default function RepositoryAnalysis() {
     return apiRepo ? buildDefaultAnalysis(apiRepo) : null
   }, [selectedRepo, apiRepos])
 
+  // README 中文摘要（来自 AI 接口），随选中仓库变化重新获取
+  const [readmeSummary, setReadmeSummary] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!selectedRepo) {
+      setReadmeSummary(null)
+      return
+    }
+    setReadmeSummary(null)
+    getReadmeSummary(selectedRepo)
+      .then((result) => {
+        if (result?.summary) setReadmeSummary(result.summary)
+      })
+      .catch(() => {
+        /* 忽略错误，摘要为可选内容 */
+      })
+  }, [selectedRepo])
+
+  /** 复制克隆地址到剪贴板 */
+  const handleCopyClone = () => {
+    if (!activeRepo) return
+    navigator.clipboard
+      .writeText(`git clone https://github.com/${activeRepo.fullName}.git`)
+      .then(() => {
+        // eslint-disable-next-line no-console
+        console.log(t("repoAnalysis.cloneCopied"))
+      })
+      .catch(() => {
+        /* 忽略剪贴板写入失败 */
+      })
+  }
+
   /** 重新读取当前仓库基础状态 */
   const refreshAnalysisStatus = () => {
     if (activeRepo) setStatus(t("repoAnalysis.importedFromStarred", { repo: activeRepo.fullName }))
   }
+
+  // AI 智能分析派生数据：学习价值标签（语言 + 标签去重取前 3）
+  const aiLearningValues = activeRepo
+    ? Array.from(new Set([activeRepo.language, ...activeRepo.tags].filter(Boolean))).slice(0, 3)
+    : []
+
+  // 系统雷达柱状图数据（4 维度，数值为规则占位）
+  const systemRadar = [
+    { label: t("repoAnalysis.radarActivity"), value: 85, color: "bg-primary" },
+    { label: t("repoAnalysis.radarCommunity"), value: 72, color: "bg-domain-frontend" },
+    { label: t("repoAnalysis.radarDocs"), value: 90, color: "bg-domain-backend" },
+    { label: t("repoAnalysis.radarStability"), value: 78, color: "bg-domain-ai" },
+  ]
 
   return (
     <div className="min-h-[calc(100vh-8rem)] bg-grid-pattern">
@@ -247,6 +299,10 @@ export default function RepositoryAnalysis() {
                 <ExternalLink className="h-4 w-4" />
                 {t("repoAnalysis.openGithub")}
               </a>
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleCopyClone} disabled={loading || !activeRepo}>
+              <Copy className="h-4 w-4" />
+              {t("repoAnalysis.copyClone")}
             </Button>
           </div>
         </section>
@@ -293,12 +349,6 @@ export default function RepositoryAnalysis() {
                 ))}
               </Select>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" asChild>
-              <Link to={`/repo/${activeRepo.fullName}`}>
-                <ExternalLink className="h-4 w-4" />
-                {t("repoAnalysis.viewDetail")}
-              </Link>
-            </Button>
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -438,9 +488,9 @@ export default function RepositoryAnalysis() {
           </Card>
         </section>}
 
-        {/* 活跃度 / 协议风险 */}
-        {activeRepo && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <Card className="lg:col-span-5">
+        {/* 活跃度分析 */}
+        {activeRepo && <section>
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <LineChart className="h-5 w-5 text-primary" />
@@ -466,33 +516,157 @@ export default function RepositoryAnalysis() {
               ))}
             </CardContent>
           </Card>
+        </section>}
 
-          <Card className="lg:col-span-7">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <ShieldAlert className="h-5 w-5 text-primary" />
-                {t("repoAnalysis.licenseRisk")}
-              </CardTitle>
-              <CardDescription>{t("repoAnalysis.licenseRiskDesc")}</CardDescription>
+        {/* README 中文摘要（AI 接口生成，有值才展示） */}
+        {activeRepo && readmeSummary && (
+          <Card className="border-primary/20 bg-surface-container-low/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">{t("repoAnalysis.readmeAiSummary")}</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {activeRepo.risks.map((risk) => (
-                <div key={risk.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    {risk.tone === "safe" ? (
-                      <CheckCircle2 className={`h-4 w-4 ${toneClass[risk.tone]}`} />
-                    ) : (
-                      <AlertTriangle className={`h-4 w-4 ${toneClass[risk.tone]}`} />
-                    )}
-                    <h3 className="text-sm font-semibold text-on-surface">{risk.label}</h3>
-                  </div>
-                  <div className={`mb-3 h-1 rounded-full ${barClass[risk.tone]}`} />
-                  <p className="text-xs leading-5 text-muted-foreground">{risk.detail}</p>
-                </div>
-              ))}
+            <CardContent>
+              <p className="text-sm leading-relaxed text-on-surface">{readmeSummary}</p>
             </CardContent>
           </Card>
-        </section>}
+        )}
+
+        {/* AI 智能分析 + 右侧信息（协议健康度 / 系统雷达） */}
+        {activeRepo && (
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* 左侧：AI 智能分析卡片 */}
+            <Card className="lg:col-span-8">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl">{t("repoAnalysis.aiAnalysis")}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* 星标原因 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
+                    <Star className="h-4 w-4 text-primary" />
+                    <span>{t("repoAnalysis.whyStarred")}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {t("repoAnalysis.aiReasonText", {
+                      name: activeRepo.fullName,
+                      language: activeRepo.language,
+                      license: activeRepo.license,
+                    })}
+                  </p>
+                </div>
+
+                {/* 学习价值标签 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
+                    <School className="h-4 w-4 text-domain-frontend" />
+                    <span>{t("repoAnalysis.learningValues")}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {aiLearningValues.length > 0 ? (
+                      aiLearningValues.map((tag) => (
+                        <Badge key={tag} variant="default" className="font-mono text-xs uppercase tracking-wider">
+                          {tag}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">{t("repoAnalysis.noTags")}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 复用建议 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-on-surface">
+                    <Puzzle className="h-4 w-4 text-domain-backend" />
+                    <span>{t("repoAnalysis.reuseAdvice")}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {t("repoAnalysis.aiReuseAdvice", {
+                      name: activeRepo.fullName,
+                      license: activeRepo.license,
+                    })}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 右侧：系统雷达 */}
+            <div className="space-y-6 lg:col-span-4">
+              {/* 系统雷达柱状图 */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Network className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg">{t("repoAnalysis.systemRadar")}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {systemRadar.map((item) => (
+                    <div key={item.label} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <span className="font-mono font-medium text-on-surface">{item.value}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-surface-container-high">
+                        <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
+
+        {/* 协议分析（合并协议风险 + 协议健康度） */}
+        {activeRepo && (
+          <section>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Gavel className="h-5 w-5 text-primary" />
+                  {t("repoAnalysis.licenseAnalysis")}
+                </CardTitle>
+                <CardDescription>{t("repoAnalysis.licenseAnalysisDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {/* 左：协议健康度摘要 */}
+                <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-status-safe" />
+                    <span className="font-medium text-on-surface">{activeRepo.license}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-status-safe">{t("repoAnalysis.lowRisk")}</span>
+                    <span className="text-xs text-muted-foreground">{t("repoAnalysis.licenseFreeDesc")}</span>
+                  </div>
+                </div>
+                {/* 右：协议风险详情（占2列） */}
+                <div className="lg:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {activeRepo.risks.map((risk) => (
+                    <div key={risk.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        {risk.tone === "safe" ? (
+                          <CheckCircle2 className={`h-4 w-4 ${toneClass[risk.tone]}`} />
+                        ) : (
+                          <AlertTriangle className={`h-4 w-4 ${toneClass[risk.tone]}`} />
+                        )}
+                        <h3 className="text-sm font-semibold text-on-surface">{risk.label}</h3>
+                      </div>
+                      <div className={`mb-3 h-1 rounded-full ${barClass[risk.tone]}`} />
+                      <p className="text-xs leading-5 text-muted-foreground">{risk.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {/* 相似项目 */}
         {activeRepo && <Card>
