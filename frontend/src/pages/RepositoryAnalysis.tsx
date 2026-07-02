@@ -86,7 +86,7 @@ function formatStars(n: number): string {
 }
 
 /** 协议类型识别 */
-type LicenseType = "mit" | "apache" | "bsd" | "gpl" | "lgpl" | "mpl" | "agpl" | "unlicense" | "unknown"
+type LicenseType = "mit" | "apache" | "bsd" | "gpl" | "lgpl" | "mpl" | "agpl" | "unlicense" | "noassertion" | "unknown"
 
 /** 从 license 字符串识别协议类型 */
 function detectLicenseType(license: string): LicenseType {
@@ -99,6 +99,7 @@ function detectLicenseType(license: string): LicenseType {
   if (lower.includes("bsd")) return "bsd"
   if (lower.includes("mpl")) return "mpl"
   if (lower.includes("unlicense")) return "unlicense"
+  if (lower === "noassertion" || lower === "other" || lower === "") return "noassertion"
   return "unknown"
 }
 
@@ -312,6 +313,7 @@ export default function RepositoryAnalysis() {
       lgpl: "caution",
       gpl: "danger",
       agpl: "danger",
+      noassertion: "caution",
       unknown: "danger",
     }
 
@@ -719,6 +721,16 @@ export default function RepositoryAnalysis() {
                     {licenseInfo.riskLabel}
                   </Badge>
                   <span className="text-sm text-muted-foreground">{licenseInfo.typeName}</span>
+                  {licenseInfo.type === "noassertion" && activeRepo && (
+                    <a
+                      href={`https://github.com/${activeRepo.fullName}/blob/HEAD/LICENSE`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-xs font-medium text-primary hover:underline"
+                    >
+                      {t("repoAnalysis.viewLicenseFile")}
+                    </a>
+                  )}
                 </div>
 
                 {/* 三栏：使用建议 / 注意事项 / 风险提示 */}
