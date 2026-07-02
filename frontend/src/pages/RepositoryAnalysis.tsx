@@ -128,7 +128,8 @@ export default function RepositoryAnalysis() {
   }
 
   /** 为 API 仓库生成基础分析结构 */
-  const buildDefaultAnalysis = (repo: Repo & { tags: string[] }): RepoAnalysis => {
+  const buildDefaultAnalysis = (repo: Repo & { tags?: string[] }): RepoAnalysis => {
+    const safeTags = repo.tags ?? []
     return {
       fullName: repo.full_name,
       description: repo.description ?? t("repoAnalysis.noDesc"),
@@ -140,7 +141,7 @@ export default function RepositoryAnalysis() {
       category: t("repoAnalysis.unknown"),
       summary: t("repoAnalysis.noDeepSummary", { name: repo.full_name }),
       stack: repo.language ? [repo.language] : [],
-      tags: repo.tags.length > 0 ? repo.tags : [],
+      tags: safeTags.length > 0 ? safeTags : [],
       maintainSignals: [
         { label: t("repoAnalysis.signalLastUpdate"), value: formatDate(repo.pushed_at), tone: "safe" },
         { label: t("repoAnalysis.signalIssuePressure"), value: repo.open_issues > 50 ? t("repoAnalysis.issuePressureHigh") : t("repoAnalysis.issuePressureMedium"), tone: repo.open_issues > 50 ? "warning" : "safe" },
