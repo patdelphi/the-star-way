@@ -106,6 +106,13 @@ function matchRoute(pattern: string, pathname: string): Record<string, string> |
       // 通配段：匹配剩余所有路径部分，合并为 fullName（含 /）
       const remaining = pathParts.slice(si).join('/')
       params['*'] = remaining
+      // 如果 pattern 在 * 之后还有段（如 /similar），检查路径是否以该段结尾
+      const afterStar = patternParts.slice(pi + 1)
+      if (afterStar.length > 0) {
+        const suffix = '/' + afterStar.join('/')
+        if (!remaining.endsWith(suffix)) return null
+        params['*'] = remaining.slice(0, -suffix.length)
+      }
       return params
     }
 
@@ -163,8 +170,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/repos/*fullName/similar（相似项目推荐，必须在通配路由之前匹配） =====
       const similarMatch = matchRoute('/api/repos/*/similar', url.split('?')[0])
       if (method === 'GET' && similarMatch) {
-        const fullNameWithSimilar = decodeURIComponent(similarMatch['*'] || '')
-        const repoFullName = fullNameWithSimilar.replace(/\/similar$/, '')
+        const repoFullName = decodeURIComponent(similarMatch['*'] || '')
         const repo = db.prepare(`SELECT * FROM repos WHERE full_name = ?`).get(repoFullName) as any
         if (!repo) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${repoFullName} 不存在`, 404)
