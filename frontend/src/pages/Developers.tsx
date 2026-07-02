@@ -1015,45 +1015,45 @@ export default function Developers() {
             </div>
           </section>
 
-          {/* 技术人格 + 技术雷达 双栏（与 Dashboard 风格对齐） */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* 技术人格卡片（占 8/12）- Bento Grid 生态归类 */}
-            <Card className="lg:col-span-8">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Diamond className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl">{t("developers.personality")}</CardTitle>
-                </div>
-                <CardDescription>
-                  {t("developers.personalityDesc")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {personalityData.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    {personalityData.map((item) => (
-                      <div
-                        key={item.nameKey}
-                        className="rounded-xl border border-outline-variant/50 bg-surface-container-high p-4 transition-colors hover:bg-surface-container"
-                      >
-                        <div className={`mb-3 h-2 w-full rounded-full ${item.color}`} />
-                        <div className="text-2xl font-bold tracking-tight text-on-surface">
-                          {item.count}
-                        </div>
-                        <div className="text-xs font-medium text-muted-foreground">
-                          {t(`developers.${item.nameKey}`)}
-                        </div>
+          {/* 技术人格（通栏）- Bento Grid 生态归类 */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Diamond className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{t("developers.personality")}</CardTitle>
+              </div>
+              <CardDescription>
+                {t("developers.personalityDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {personalityData.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  {personalityData.map((item) => (
+                    <div
+                      key={item.nameKey}
+                      className="rounded-xl border border-outline-variant/50 bg-surface-container-high p-4 transition-colors hover:bg-surface-container"
+                    >
+                      <div className={`mb-3 h-2 w-full rounded-full ${item.color}`} />
+                      <div className="text-2xl font-bold tracking-tight text-on-surface">
+                        {item.count}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">{t("developers.noLanguageStats")}</p>
-                )}
-              </CardContent>
-            </Card>
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {t(`developers.${item.nameKey}`)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t("developers.noLanguageStats")}</p>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* 技术雷达卡片（占 4/12）- 圆形 conic-gradient 雷达图 */}
-            <Card className="lg:col-span-4">
+          {/* 技术雷达 + 语言分布（左右分布） */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* 技术雷达卡片 - 圆形 conic-gradient 雷达图 */}
+            <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <RadarIcon className="h-5 w-5 text-primary" />
@@ -1095,51 +1095,51 @@ export default function Developers() {
                 )}
               </CardContent>
             </Card>
-          </div>
 
-          {/* 语言分布（conic-gradient 圆形） */}
-          {developerStats?.languages?.length > 0 && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-xl">{t("developers.languageDistribution")}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 圆形 conic-gradient 图 */}
-                <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full"
-                  style={{ background: languageGradient }}
-                >
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
-                    <span className="text-lg font-bold text-primary">{developerStats.languages.length}</span>
+            {/* 语言分布（conic-gradient 圆形） */}
+            {developerStats?.languages?.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <PieChartIcon className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-xl">{t("developers.languageDistribution")}</CardTitle>
                   </div>
-                </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* 圆形 conic-gradient 图 */}
+                  <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full"
+                    style={{ background: languageGradient }}
+                  >
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
+                      <span className="text-lg font-bold text-primary">{developerStats.languages.length}</span>
+                    </div>
+                  </div>
 
-                {/* 语言列表带百分比 */}
-                <div className="space-y-2">
-                  {developerStats.languages.slice(0, 8).map((l, i) => {
-                    const pct = languageTotal > 0 ? Math.round((l.count / languageTotal) * 100) : 0
-                    return (
-                      <div key={l.language} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] }}
-                          />
-                          <span className="text-on-surface-variant">{l.language || "Unknown"}</span>
+                  {/* 语言列表带百分比 */}
+                  <div className="space-y-2">
+                    {developerStats.languages.slice(0, 8).map((l, i) => {
+                      const pct = languageTotal > 0 ? Math.round((l.count / languageTotal) * 100) : 0
+                      return (
+                        <div key={l.language} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] }}
+                            />
+                            <span className="text-on-surface-variant">{l.language || "Unknown"}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{l.count}</span>
+                            <span className="font-mono font-medium text-on-surface">{pct}%</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{l.count}</span>
-                          <span className="font-mono font-medium text-on-surface">{pct}%</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           {/* 星标时间趋势（TrendBars 组件） */}
           {starTimeline.length > 0 && (
