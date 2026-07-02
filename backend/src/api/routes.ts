@@ -103,15 +103,28 @@ function matchRoute(pattern: string, pathname: string): Record<string, string> |
     const v = pathParts[si]
 
     if (p === '*') {
-      // 通配段：匹配剩余所有路径部分，合并为 fullName（含 /）
-      const remaining = pathParts.slice(si).join('/')
-      params['*'] = remaining
-      // 如果 pattern 在 * 之后还有段（如 /similar），检查路径是否以该段结尾
+      // 通配段：匹配剩余路径中除后续 pattern 段之外的部分
       const afterStar = patternParts.slice(pi + 1)
-      if (afterStar.length > 0) {
-        const suffix = '/' + afterStar.join('/')
-        if (!remaining.endsWith(suffix)) return null
-        params['*'] = remaining.slice(0, -suffix.length)
+      if (afterStar.length === 0) {
+        // * 后无更多段：匹配剩余所有部分（含 /）
+        params['*'] = pathParts.slice(si).join('/')
+        return params
+      }
+      // * 后有段：从路径末尾倒推，保留足够的段给后续 pattern
+      const remainingParts = pathParts.slice(si)
+      if (remainingParts.length <= afterStar.length) return null
+      // * 匹配除最后 afterStar.length 段之外的部分
+      const starParts = remainingParts.slice(0, remainingParts.length - afterStar.length)
+      params['*'] = starParts.join('/')
+      // 继续匹配后续段
+      for (let j = 0; j < afterStar.length; j++) {
+        const ap = afterStar[j]
+        const av = remainingParts[starParts.length + j]
+        if (ap.startsWith(':')) {
+          params[ap.slice(1)] = av
+        } else if (ap !== av) {
+          return null
+        }
       }
       return params
     }
@@ -263,9 +276,14 @@ export function createRouter(db: Database.Database) {
       }
 
       // ===== GET /api/repos/*fullName（全局仓库查询，直接查 repos 表） =====
+      // 排除 /similar、/readme-summary、/tags 等子路由（它们有自己的处理逻辑）
       const globalRepoMatch = matchRoute('/api/repos/*', url.split('?')[0])
       if (method === 'GET' && globalRepoMatch) {
         const fullName = decodeURIComponent(globalRepoMatch['*'] || '')
+        // 如果路径包含子路由后缀，跳过此路由
+        if (fullName.endsWith('/similar') || fullName.endsWith('/readme-summary') || fullName.includes('/tags/')) {
+          // 不处理，继续后续路由
+        } else {
         const row = db.prepare(`SELECT * FROM repos WHERE full_name = ?`).get(fullName) as any
         if (!row) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
@@ -299,6 +317,7 @@ export function createRouter(db: Database.Database) {
           },
         })
         return
+        }
       }
 
       // ===== GET /api/users/:login/repos =====
@@ -648,10 +667,10 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== GET /api/repos/:fullName/readme-summary =====
-      const readmeMatch = matchRoute('/api/repos/:fullName/readme-summary', url.split('?')[0])
+      // ===== GET /api/repos/*fullName/readme-summary =====
+      const readmeMatch = matchRoute('/api/repos/*/readme-summary', url.split('?')[0])
       if (method === 'GET' && readmeMatch) {
-        const fullName = decodeURIComponent(readmeMatch.fullName)
+        const fullName = decodeURIComponent(readmeMatch['*'] || '')
 
         // 先查缓存
         const cached = db.prepare(`
@@ -697,10 +716,10 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== POST /api/repos/:fullName/tags =====
-      const addTagMatch = matchRoute('/api/repos/:fullName/tags', url.split('?')[0])
+      // ===== POST /api/repos/*fullName/tags =====
+      const addTagMatch = matchRoute('/api/repos/*/tags', url.split('?')[0])
       if (method === 'POST' && addTagMatch) {
-        const fullName = decodeURIComponent(addTagMatch.fullName)
+        const fullName = decodeURIComponent(addTagMatch['*'] || '')
         const body = await readBody(req)
         let payload: { tag?: string }
         try {
@@ -728,10 +747,10 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== DELETE /api/repos/:fullName/tags/:tag =====
-      const delTagMatch = matchRoute('/api/repos/:fullName/tags/:tag', url.split('?')[0])
+      // ===== DELETE /api/repos/*fullName/tags/:tag =====
+      const delTagMatch = matchRoute('/api/repos/*/tags/:tag', url.split('?')[0])
       if (method === 'DELETE' && delTagMatch) {
-        const fullName = decodeURIComponent(delTagMatch.fullName)
+        const fullName = decodeURIComponent(delTagMatch['*'] || '')
         const tag = decodeURIComponent(delTagMatch.tag)
         const deleteTag = db.transaction((repoFullName: string, tagName: string) => {
           db.prepare(`DELETE FROM repo_tags WHERE repo_full_name = ? AND tag = ?`).run(repoFullName, tagName)
