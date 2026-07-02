@@ -246,8 +246,8 @@ export default function Developers() {
     setCurrentPage((p) => Math.min(p, newTotal || 1))
   }
 
-  // 添加开发者
-  const addDeveloper = () => {
+  // 添加开发者（补全默认值，添加后自动同步星标）
+  const addDeveloper = async () => {
     const name = searchInput.trim().startsWith("@")
       ? searchInput.trim().slice(1)
       : searchInput.trim()
@@ -256,12 +256,23 @@ export default function Developers() {
     const newDev: Developer = {
       id: Date.now().toString(),
       name,
+      displayName: null,
+      bio: null,
+      company: null,
+      location: null,
+      followers: null,
+      publicRepos: null,
       stars: 0,
       isActive: false,
+      avatar_url: null,
+      profile_url: null,
+      synced_at: null,
     }
     setDevelopers((prev) => [...prev, newDev])
     setSearchInput("")
     setSearchResult("")
+    // 自动同步一次星标，获取用户公开资料和星标列表
+    await runSync(name)
   }
 
   const handleSearch = () => {
