@@ -85,6 +85,26 @@ function formatStars(n: number): string {
   return String(n)
 }
 
+/** 协议类型识别 */
+type LicenseType = "mit" | "apache" | "bsd" | "gpl" | "lgpl" | "mpl" | "agpl" | "unlicense" | "unknown"
+
+/** 从 license 字符串识别协议类型 */
+function detectLicenseType(license: string): LicenseType {
+  const lower = license.toLowerCase()
+  if (lower.includes("agpl")) return "agpl"
+  if (lower.includes("lgpl")) return "lgpl"
+  if (lower.includes("gpl")) return "gpl"
+  if (lower.includes("apache")) return "apache"
+  if (lower.includes("mit")) return "mit"
+  if (lower.includes("bsd")) return "bsd"
+  if (lower.includes("mpl")) return "mpl"
+  if (lower.includes("unlicense")) return "unlicense"
+  return "unknown"
+}
+
+/** 协议风险等级 */
+type LicenseRisk = "safe" | "caution" | "danger"
+
 /* ========== 主组件 ========== */
 export default function RepositoryAnalysis() {
   const { t } = useTranslation()
@@ -261,6 +281,41 @@ export default function RepositoryAnalysis() {
     { label: t("repoAnalysis.radarDocs"), value: 90, color: "bg-domain-backend" },
     { label: t("repoAnalysis.radarStability"), value: 78, color: "bg-domain-ai" },
   ]
+
+  // 协议分析派生数据：根据 license 类型生成建议、注意事项、风险
+  const licenseInfo = useMemo(() => {
+    const raw = activeRepo?.license ?? ""
+    const type = detectLicenseType(raw)
+
+    const riskMap: Record<LicenseType, LicenseRisk> = {
+      mit: "safe",
+      apache: "safe",
+      bsd: "safe",
+      unlicense: "safe",
+      mpl: "caution",
+      lgpl: "caution",
+      gpl: "danger",
+      agpl: "danger",
+      unknown: "danger",
+    }
+
+    const risk = riskMap[type]
+    const typeKey = `repoAnalysis.licenseType_${type}`
+    const adviceKey = `repoAnalysis.licenseAdvice_${type}`
+    const cautionKey = `repoAnalysis.licenseCaution_${type}`
+    const riskKey = `repoAnalysis.licenseRisk_${type}`
+
+    return {
+      type,
+      risk,
+      rawLicense: raw || t("repoAnalysis.licenseUnknown"),
+      typeName: t(typeKey),
+      advice: t(adviceKey),
+      caution: t(cautionKey),
+      riskText: t(riskKey),
+      riskLabel: risk === "safe" ? t("repoAnalysis.riskSafe") : risk === "caution" ? t("repoAnalysis.riskCaution") : t("repoAnalysis.riskDanger"),
+    }
+  }, [activeRepo, t])
 
   return (
     <div className="min-h-[calc(100vh-8rem)] bg-grid-pattern">
@@ -626,7 +681,7 @@ export default function RepositoryAnalysis() {
           </section>
         )}
 
-        {/* 协议分析（合并协议风险 + 协议健康度） */}
+        {/* 协议分析 */}
         {activeRepo && (
           <section>
             <Card>
@@ -637,35 +692,54 @@ export default function RepositoryAnalysis() {
                 </CardTitle>
                 <CardDescription>{t("repoAnalysis.licenseAnalysisDesc")}</CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {/* 左：协议健康度摘要 */}
-                <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4 space-y-3">
+              <CardContent className="space-y-4">
+                {/* 协议概览栏 */}
+                <div className="flex flex-wrap items-center gap-4 rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-status-safe" />
-                    <span className="font-medium text-on-surface">{activeRepo.license}</span>
+                    <ShieldCheck className={`h-5 w-5 ${licenseInfo.risk === "safe" ? "text-status-safe" : licenseInfo.risk === "caution" ? "text-status-warning" : "text-status-danger"}`} />
+                    <span className="text-lg font-semibold text-on-surface">{licenseInfo.rawLicense}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-status-safe">{t("repoAnalysis.lowRisk")}</span>
-                    <span className="text-xs text-muted-foreground">{t("repoAnalysis.licenseFreeDesc")}</span>
-                  </div>
+                  <Badge variant={licenseInfo.risk === "safe" ? "default" : licenseInfo.risk === "caution" ? "secondary" : "destructive"}>
+                    {licenseInfo.riskLabel}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">{licenseInfo.typeName}</span>
                 </div>
-                {/* 右：协议风险详情（占2列） */}
-                <div className="lg:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {activeRepo.risks.map((risk) => (
-                    <div key={risk.label} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
-                      <div className="mb-3 flex items-center gap-2">
-                        {risk.tone === "safe" ? (
-                          <CheckCircle2 className={`h-4 w-4 ${toneClass[risk.tone]}`} />
-                        ) : (
-                          <AlertTriangle className={`h-4 w-4 ${toneClass[risk.tone]}`} />
-                        )}
-                        <h3 className="text-sm font-semibold text-on-surface">{risk.label}</h3>
-                      </div>
-                      <div className={`mb-3 h-1 rounded-full ${barClass[risk.tone]}`} />
-                      <p className="text-xs leading-5 text-muted-foreground">{risk.detail}</p>
+
+                {/* 三栏：使用建议 / 注意事项 / 风险提示 */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {/* 使用建议 */}
+                  <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-status-safe" />
+                      <h3 className="text-sm font-semibold text-on-surface">{t("repoAnalysis.licenseUsageAdvice")}</h3>
                     </div>
-                  ))}
+                    <div className="mb-3 h-1 rounded-full bg-status-safe" />
+                    <p className="text-xs leading-6 text-muted-foreground">{licenseInfo.advice}</p>
+                  </div>
+
+                  {/* 注意事项 */}
+                  <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-status-warning" />
+                      <h3 className="text-sm font-semibold text-on-surface">{t("repoAnalysis.licenseCautionTitle")}</h3>
+                    </div>
+                    <div className="mb-3 h-1 rounded-full bg-status-warning" />
+                    <p className="text-xs leading-6 text-muted-foreground">{licenseInfo.caution}</p>
+                  </div>
+
+                  {/* 风险提示 */}
+                  <div className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <ShieldAlert className={`h-4 w-4 ${licenseInfo.risk === "safe" ? "text-status-safe" : "text-status-danger"}`} />
+                      <h3 className="text-sm font-semibold text-on-surface">{t("repoAnalysis.licenseRiskTitle2")}</h3>
+                    </div>
+                    <div className={`mb-3 h-1 rounded-full ${licenseInfo.risk === "safe" ? "bg-status-safe" : licenseInfo.risk === "caution" ? "bg-status-warning" : "bg-status-danger"}`} />
+                    <p className="text-xs leading-6 text-muted-foreground">{licenseInfo.riskText}</p>
+                  </div>
                 </div>
+
+                {/* 免责声明 */}
+                <p className="text-xs text-muted-foreground">{t("repoAnalysis.licenseDisclaimer")}</p>
               </CardContent>
             </Card>
           </section>
