@@ -707,18 +707,18 @@ export default function Developers() {
         </div>
       )}
       {!loading && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 mb-6">
+        <div className="flex flex-wrap gap-3 mb-6">
           {paginatedDevs.map((dev) => (
             <Card
               key={dev.id}
-              className={`border transition-colors cursor-pointer ${
+              className={`w-[220px] shrink-0 border transition-colors cursor-pointer ${
                 dev.isActive
                   ? "border-primary bg-surface-container-high shadow-sm"
                   : "border-outline-variant/50 bg-surface-container-low hover:bg-surface-container"
               }`}
               onClick={() => selectDeveloper(dev.id)}
             >
-              <CardContent className="flex items-start gap-3 py-3 px-4">
+              <CardContent className="flex items-start gap-2.5 py-3 px-3.5">
                 {/* 选中指示器 */}
                 <div
                   className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${
@@ -733,8 +733,8 @@ export default function Developers() {
                 </div>
                 {/* 信息 */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-sm font-semibold text-on-surface truncate">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-on-surface">
                       @{dev.name}
                     </span>
                     {dev.isActive && (
@@ -745,7 +745,7 @@ export default function Developers() {
                   </div>
                   {/* 显示名称 */}
                   {dev.displayName && (
-                    <div className="text-xs text-on-surface-variant truncate">
+                    <div className="text-xs text-on-surface-variant">
                       {dev.displayName}
                     </div>
                   )}
@@ -770,7 +770,7 @@ export default function Developers() {
                   </div>
                   {/* 公司 / 所在地 */}
                   {(dev.company || dev.location) && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant/70 mt-0.5 truncate">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-on-surface-variant/70 mt-0.5">
                       {dev.company && (
                         <span className="flex items-center gap-0.5">
                           <Building2 className="w-3 h-3" />
