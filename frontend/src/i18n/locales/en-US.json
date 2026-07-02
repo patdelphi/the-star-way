@@ -93,6 +93,7 @@
     "tagCloud": "Popular Tags",
     "tagCloudDesc": "Repository distribution by tag",
     "languageDistribution": "Language Distribution",
+    "recentStars": "Recent Stars",
     "starTrend": "Star Trend",
     "starTrendDesc": "Monthly star count changes",
     "trendTotal": "Total",

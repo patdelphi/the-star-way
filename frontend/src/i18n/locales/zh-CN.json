@@ -93,6 +93,7 @@
     "tagCloud": "热门标签",
     "tagCloudDesc": "按标签统计的仓库分布",
     "languageDistribution": "语言分布",
+    "recentStars": "最近星标",
     "starTrend": "星标趋势",
     "starTrendDesc": "按月统计的星标数量变化",
     "trendTotal": "总计",
