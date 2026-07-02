@@ -33,8 +33,11 @@ import {
   GitBranch,
   MapPin,
   Building2,
+  BarChart3,
 } from "lucide-react"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags } from "@/lib/api"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags, getUserStarTimeline } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Select, SelectOption } from "@/components/ui/select"
@@ -120,6 +123,7 @@ export default function Developers() {
   const [starDna, setStarDna] = useState<string | null>(null)
   const [developerStats, setDeveloperStats] = useState<UserStats | null>(null)
   const [developerTags, setDeveloperTags] = useState<{ tag: string; count: number }[]>([])
+  const [starTimeline, setStarTimeline] = useState<Array<{ month: string; count: number }>>([])
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -304,11 +308,13 @@ export default function Developers() {
       loadStarDna(activeDev.name)
       getStats(activeDev.name).then(setDeveloperStats).catch(() => setDeveloperStats(null))
       getTags(activeDev.name).then(setDeveloperTags).catch(() => setDeveloperTags([]))
+      getUserStarTimeline(activeDev.name).then(setStarTimeline).catch(() => setStarTimeline([]))
     } else {
       setSyncRuns([])
       setStarDna(null)
       setDeveloperStats(null)
       setDeveloperTags([])
+      setStarTimeline([])
     }
   }, [activeDev])
 
@@ -764,6 +770,34 @@ export default function Developers() {
               </span>
             </div>
           </section>
+
+          {/* Star 数量月度时间轴 */}
+          {starTimeline.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">{t("developers.starTimeline")}</h3>
+              </div>
+              <Card className="p-4">
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={starTimeline} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value: string) => value.slice(5)}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<ThemedChartTooltip />} />
+                    <Bar dataKey="count" fill="var(--color-primary)" fillOpacity={0.85} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </section>
+          )}
 
           {/* 真实统计说明 */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

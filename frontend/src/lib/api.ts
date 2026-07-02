@@ -233,6 +233,20 @@ export async function getStats(login: string): Promise<UserStats | null> {
 }
 
 /**
+ * 获取用户按月 star 仓库数量时间轴
+ */
+export async function getUserStarTimeline(login: string): Promise<Array<{ month: string; count: number }> | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-timeline`)
+      const data = await res.json()
+      return data.data as Array<{ month: string; count: number }>
+    }
+  } catch { /* 忽略错误 */ }
+  return null
+}
+
+/**
  * 获取数据库全局概览
  */
 export async function getGlobalOverview(): Promise<GlobalOverview | null> {

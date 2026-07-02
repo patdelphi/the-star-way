@@ -16,6 +16,7 @@ import {
   queryUserSummary,
   queryUserListSummaries,
   queryGlobalOverview,
+  queryUserStarTimeline,
   SYSTEM_DEMO_LOGIN,
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
@@ -236,6 +237,19 @@ export function createRouter(db: Database.Database) {
             aiEnabled: aiConfig.enabled,
           },
         })
+        return
+      }
+
+      // ===== GET /api/users/:login/star-timeline =====
+      const timelineMatch = matchRoute('/api/users/:login/star-timeline', url.split('?')[0])
+      if (method === 'GET' && timelineMatch) {
+        const { login } = timelineMatch
+        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        if (!user) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+        json(res, { data: queryUserStarTimeline(db, login) })
         return
       }
 

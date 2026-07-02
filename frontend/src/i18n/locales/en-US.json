@@ -80,6 +80,7 @@
     "starCountShort": "stars",
     "followers": "followers",
     "publicRepos": "repos",
+    "starTimeline": "Starred Repos Timeline",
     "sortField": {
       "name": "By Name",
       "synced_at": "By Join Time",

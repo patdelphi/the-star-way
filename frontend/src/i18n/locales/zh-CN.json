@@ -80,6 +80,7 @@
     "starCountShort": "星标",
     "followers": "关注者",
     "publicRepos": "仓库",
+    "starTimeline": "关注仓库数量时间轴",
     "sortField": {
       "name": "按用户名",
       "synced_at": "按加入时间",

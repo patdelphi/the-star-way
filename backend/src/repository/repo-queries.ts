@@ -612,3 +612,22 @@ export function queryGlobalOverview(db: Database.Database): {
     starTrend: trendRows.slice(-12).map(row => ({ label: row.label.slice(5), value: row.value })),
   }
 }
+
+/**
+ * 查询指定用户按月的 star 仓库数量时间轴
+ * @returns 按月聚合的 star 数量数组，格式 [{ month: '2024-01', count: 5 }, ...]
+ */
+export function queryUserStarTimeline(
+  db: Database.Database,
+  login: string,
+): Array<{ month: string; count: number }> {
+  return db.prepare(`
+    SELECT
+      strftime('%Y-%m', starred_at) as month,
+      COUNT(*) as count
+    FROM stars
+    WHERE user_login = ? AND starred_at IS NOT NULL AND removed_at IS NULL
+    GROUP BY month
+    ORDER BY month ASC
+  `).all(login) as Array<{ month: string; count: number }>
+}
