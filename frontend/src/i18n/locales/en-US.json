@@ -455,7 +455,11 @@
     "repos": "repos",
     "noDesc": "No description",
     "noReposInTag": "No repos under this tag",
-    "noTags": "No tag data available"
+    "noTags": "No tag data available",
+    "allTags": "All Tags",
+    "clearTags": "Clear selection",
+    "filteredBy": "Filtered by:",
+    "noResults": "No matching repos"
   },
   "common": {
     "stars": "Stars",

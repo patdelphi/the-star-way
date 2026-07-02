@@ -455,7 +455,11 @@
     "repos": "个仓库",
     "noDesc": "暂无描述",
     "noReposInTag": "该标签下暂无仓库",
-    "noTags": "暂无标签数据"
+    "noTags": "暂无标签数据",
+    "allTags": "全部标签",
+    "clearTags": "清除选择",
+    "filteredBy": "按标签筛选：",
+    "noResults": "没有匹配的仓库"
   },
   "common": {
     "stars": "星标",
