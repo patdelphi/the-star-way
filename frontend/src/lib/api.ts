@@ -211,9 +211,16 @@ export async function getRepos(login: string, params: RepoQueryParams = {}): Pro
 export async function getRepo(login: string, fullName: string): Promise<(Repo & { starred_at: string; tags: string[] }) | null> {
   try {
     if (await checkApiAvailable()) {
+      // 先尝试从当前用户获取
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/repos/${fullName}`)
       if (res.ok) {
         const data = await res.json()
+        return data.data as (Repo & { starred_at: string; tags: string[] })
+      }
+      // 回退到全局仓库查询
+      const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${fullName}`)
+      if (globalRes.ok) {
+        const data = await globalRes.json()
         return data.data as (Repo & { starred_at: string; tags: string[] })
       }
       return null

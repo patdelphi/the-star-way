@@ -21,7 +21,8 @@
 8. `feature-list.md`：功能清单与 AI API 依赖划分。
 9. `development-plan.md`：正式代码开发计划。
 10. `troubleshooting.md`：启动、native 模块和 GitHub token 常见问题排查。
-11. `changelog.md`：规划文档变更记录。
+11. `dual-architecture-cloudflare-plan.md`：本地架构与 Cloudflare 架构并存的改造方案。
+12. `changelog.md`：规划文档变更记录。
 
 ## 当前关键结论
 

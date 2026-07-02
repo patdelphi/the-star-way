@@ -160,6 +160,52 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/repos/*fullName（全局仓库查询，不限定用户） =====
+      const globalRepoMatch = matchRoute('/api/repos/*', url.split('?')[0])
+      if (method === 'GET' && globalRepoMatch) {
+        const fullName = decodeURIComponent(globalRepoMatch['*'] || '')
+        // 先从任意用户的星标中查找
+        const row = db.prepare(`
+          SELECT r.*, s.starred_at, s.user_login
+          FROM repos r
+          JOIN stars s ON r.full_name = s.repo_full_name
+          WHERE r.full_name = ?
+          LIMIT 1
+        `).get(fullName) as any
+        if (!row) {
+          error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
+          return
+        }
+        const tags = db.prepare(`
+          SELECT tag FROM repo_tags WHERE repo_full_name = ?
+        `).all(fullName) as { tag: string }[]
+        json(res, {
+          data: {
+            github_id: row.github_id,
+            full_name: row.full_name,
+            owner: row.owner,
+            name: row.name,
+            html_url: row.html_url,
+            description: row.description,
+            language: row.language,
+            license: row.license,
+            stars: row.stars,
+            forks: row.forks,
+            open_issues: row.open_issues,
+            topics_json: row.topics_json,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            pushed_at: row.pushed_at,
+            archived: row.archived,
+            fork: row.fork,
+            homepage: row.homepage,
+            starred_at: row.starred_at,
+            tags: tags.map(t => t.tag),
+          },
+        })
+        return
+      }
+
       // ===== GET /api/users/:login/repos =====
       const reposMatch = matchRoute('/api/users/:login/repos', url.split('?')[0])
       if (method === 'GET' && reposMatch) {
