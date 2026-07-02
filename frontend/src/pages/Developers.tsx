@@ -26,16 +26,18 @@ import {
   Loader2,
   Sparkles,
   Tags,
-  Code2,
   FolderGit2,
   ArrowUpDown,
   Users,
   GitBranch,
   MapPin,
   Building2,
-  BarChart3,
+  TrendingUp,
+  PieChart as PieChartIcon,
+  Radar as RadarIcon,
+  Clock,
 } from "lucide-react"
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags, getUserStarTimeline } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
@@ -83,18 +85,212 @@ interface SyncRun {
 
 const ITEMS_PER_PAGE = 20
 
-const LANGUAGE_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
+// ===== 技术雷达六维映射规则（从 Dashboard 复制） =====
+const RADAR_TAG_MAP: Record<string, string[]> = {
+  frontend: ['frontend', 'css', 'ui', 'react', 'vue', 'web'],
+  backend: ['backend', 'api', 'database', 'server', 'nodejs', 'python'],
+  ai: ['ai', 'llm', 'agent', 'machine-learning', 'deep-learning', 'rag', 'mcp'],
+  tools: ['cli', 'developer-tools', 'editor', 'git', 'tooling'],
+  infrastructure: ['devops', 'container', 'docker', 'ci', 'cloud', 'monitoring'],
+  data: ['data', 'visualization', 'database', 'etl', 'analytics'],
+}
+
+const RADAR_DIMENSIONS = [
+  { key: 'frontend', color: '#0284c7' },
+  { key: 'backend', color: '#059669' },
+  { key: 'ai', color: '#7c3aed' },
+  { key: 'tools', color: '#475569' },
+  { key: 'infrastructure', color: '#006b5c' },
+  { key: 'data', color: '#9b4420' },
 ]
 
-function percent(value: number, total: number): number {
+// ===== 语言生态归类配置（从 Dashboard 复制） =====
+const CATEGORY_MAP: Record<string, { key: string; color: string }> = {
+  'Python': { key: 'pythonEcosystem', color: 'bg-domain-backend' },
+  'TypeScript': { key: 'tsEcosystem', color: 'bg-domain-frontend' },
+  'JavaScript': { key: 'tsEcosystem', color: 'bg-domain-frontend' },
+  'Rust': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Go': { key: 'systemTools', color: 'bg-domain-tools' },
+  'C': { key: 'systemTools', color: 'bg-domain-tools' },
+  'C++': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Shell': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Objective-C': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Zig': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Nim': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Swift': { key: 'systemTools', color: 'bg-domain-tools' },
+  'Jupyter Notebook': { key: 'jupyterNotes', color: 'bg-domain-ai' },
+  'Java': { key: 'jvmEcosystem', color: 'bg-domain-backend' },
+  'Kotlin': { key: 'jvmEcosystem', color: 'bg-domain-backend' },
+  'Scala': { key: 'jvmEcosystem', color: 'bg-domain-backend' },
+  'Groovy': { key: 'jvmEcosystem', color: 'bg-domain-backend' },
+  'HTML': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
+  'CSS': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
+  'Vue': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
+  'PHP': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
+  'Dart': { key: 'frontendEcosystem', color: 'bg-domain-frontend' },
+}
+
+const LANGUAGE_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#6366f1',
+]
+
+interface PersonalityItem {
+  nameKey: string
+  count: number
+  color: string
+}
+
+interface RadarItem {
+  labelKey: string
+  value: number
+  color: string
+}
+
+/**
+ * 将语言分布归类为生态（从 Dashboard 复制）
+ */
+function categorizeLanguages(languages: { language: string; count: number }[]): PersonalityItem[] {
+  const agg: Record<string, { key: string; color: string; count: number }> = {}
+  for (const { language, count } of languages) {
+    const cfg = CATEGORY_MAP[language]
+    if (cfg) {
+      const existing = agg[cfg.key]
+      if (existing) {
+        existing.count += count
+      } else {
+        agg[cfg.key] = { ...cfg, count }
+      }
+    } else {
+      const other = agg['otherEcosystem']
+      if (other) {
+        other.count += count
+      } else {
+        agg['otherEcosystem'] = { key: 'otherEcosystem', color: 'bg-domain-backend', count }
+      }
+    }
+  }
+  return Object.values(agg)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4)
+    .map(item => ({ nameKey: item.key, count: item.count, color: item.color }))
+}
+
+/**
+ * 计算技术雷达六维数据（从 Dashboard 复制）
+ */
+function calcRadarData(tags: { tag: string; count: number }[]): RadarItem[] {
+  if (!tags || tags.length === 0) {
+    return []
+  }
+
+  const tagMap = new Map(tags.map(t => [t.tag.toLowerCase(), t.count]))
+  const dimCounts = RADAR_DIMENSIONS.map(dim => {
+    const keywords = RADAR_TAG_MAP[dim.key]
+    const count = keywords.reduce((sum, kw) => sum + (tagMap.get(kw) || 0), 0)
+    return { ...dim, count }
+  })
+
+  const totalRelevant = dimCounts.reduce((sum, d) => sum + d.count, 0)
+  if (totalRelevant === 0) {
+    return []
+  }
+
+  const maxCount = Math.max(...dimCounts.map(d => d.count), 1)
+  return dimCounts.map(dim => ({
+    labelKey: dim.key,
+    value: Math.round((dim.count / maxCount) * 60 + 40), // 映射到 40-100
+    color: dim.color,
+  }))
+}
+
+/**
+ * 格式化数字（>=1000 显示为 k 单位）
+ */
+function formatNumber(n: number): string {
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
+  return String(n)
+}
+
+/**
+ * 计算百分比
+ */
+function calcPercent(value: number, total: number): number {
   if (total <= 0) return 0
   return Math.round((value / total) * 100)
+}
+
+/**
+ * 取 count 最高的前 N 项
+ */
+function pickTopItems<T extends { count: number }>(items: T[], limit: number): T[] {
+  return [...items].sort((a, b) => b.count - a.count).slice(0, limit)
+}
+
+/**
+ * 星标时间趋势组件：统计卡片 + 面积图
+ */
+function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string } }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{total}</div>
+          <div className="text-sm font-medium text-on-surface">{labels.total}</div>
+        </div>
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{peak?.label || "-"}</div>
+          <div className="text-sm font-medium text-on-surface">{labels.peakMonth}</div>
+        </div>
+        <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="text-xs text-muted-foreground">{peak?.value || 0}</div>
+          <div className="text-sm font-medium text-on-surface">{labels.peakValue}</div>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={180}>
+        <AreaChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} />
+          <Tooltip content={<ThemedChartTooltip />} />
+          <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/**
+ * 紧凑统计网格组件：多列标签统计卡片
+ */
+function CompactStatGrid({
+  items,
+  total,
+  limit = 16,
+}: {
+  items: { label: string; count: number; color: string }[]
+  total: number
+  limit?: number
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {items.slice(0, limit).map((item) => (
+        <div key={item.label} className="min-w-0 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="truncate text-sm font-medium text-on-surface">{item.label}</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-mono text-lg font-semibold text-on-surface">{item.count}</span>
+            <span className="font-mono text-xs text-muted-foreground">{calcPercent(item.count, total)}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function Developers() {
@@ -345,6 +541,33 @@ export default function Developers() {
       setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
     }
   }
+
+  // ===== 详情面板派生数据（与 Dashboard 风格对齐） =====
+  // 技术人格：基于语言分布归类生态
+  const personalityData = useMemo(
+    () => (developerStats?.languages?.length ? categorizeLanguages(developerStats.languages) : []),
+    [developerStats],
+  )
+  // 技术雷达：基于标签六维映射
+  const radarData = useMemo(() => calcRadarData(developerTags), [developerTags])
+  // 技术雷达圆形渐变（conic-gradient 模拟）
+  const radarGradient = useMemo(() => {
+    const total = radarData.reduce((sum, r) => sum + r.value, 0)
+    if (total === 0) return ""
+    let start = 0
+    const segments = radarData.map((d) => {
+      const segStart = start
+      const segEnd = start + (d.value / total) * 360
+      start = segEnd
+      return `${d.color} ${segStart}deg ${segEnd}deg`
+    })
+    return `conic-gradient(${segments.join(", ")})`
+  }, [radarData])
+  // 星标趋势图表数据（月份取 MM 格式）
+  const trendData = useMemo(
+    () => starTimeline.map((item) => ({ label: item.month.slice(5), value: item.count })),
+    [starTimeline],
+  )
 
   return (
     <div className="bg-grid-pattern min-h-[calc(100vh-8rem)]">
@@ -724,7 +947,8 @@ export default function Developers() {
             {/* 同步历史列表 */}
             {syncRuns.length > 0 && (
               <div className="mt-4 space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
+                <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                  <Clock className="w-4 h-4" />
                   {t("developers.syncHistory")}
                 </h3>
                 <div className="space-y-1.5">
@@ -763,7 +987,7 @@ export default function Developers() {
             )}
             <div className="flex items-baseline gap-2 pt-2">
               <span className="text-4xl font-bold tracking-tight text-primary">
-                {activeDev.stars}
+                {formatNumber(activeDev.stars)}
               </span>
               <span className="text-lg text-muted-foreground">
                 {t("developers.starCount")}
@@ -771,50 +995,9 @@ export default function Developers() {
             </div>
           </section>
 
-          {/* Star 数量月度时间轴 */}
-          {starTimeline.length > 0 && (() => {
-            const total = starTimeline.reduce((sum, item) => sum + item.count, 0)
-            const peak = starTimeline.reduce((best, item) => item.count > best.count ? item : best, starTimeline[0])
-            const chartData = starTimeline.map(item => ({ label: item.month.slice(5), value: item.count }))
-            return (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">{t("developers.starTimeline")}</h3>
-                </div>
-                <Card className="p-4">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
-                        <div className="text-xs text-muted-foreground">{total}</div>
-                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelineTotal")}</div>
-                      </div>
-                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
-                        <div className="text-xs text-muted-foreground">{peak?.month || "-"}</div>
-                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelinePeakMonth")}</div>
-                      </div>
-                      <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
-                        <div className="text-xs text-muted-foreground">{peak?.count || 0}</div>
-                        <div className="text-sm font-medium text-on-surface">{t("developers.starTimelinePeakValue")}</div>
-                      </div>
-                    </div>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <AreaChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip content={<ThemedChartTooltip />} />
-                        <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Card>
-              </section>
-            )
-          })()}
-
-          {/* 真实统计说明 */}
+          {/* 技术人格 + 技术雷达 双栏（与 Dashboard 风格对齐） */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* 技术人格卡片（占 8/12）- Bento Grid 生态归类 */}
             <Card className="lg:col-span-8">
               <CardHeader>
                 <div className="flex items-center gap-2">
@@ -822,21 +1005,23 @@ export default function Developers() {
                   <CardTitle className="text-xl">{t("developers.personality")}</CardTitle>
                 </div>
                 <CardDescription>
-                  {t("developers.personalityEvidenceDesc")}
+                  {t("developers.personalityDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {developerStats?.languages?.length ? (
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                    {developerStats.languages.slice(0, 6).map((item, index) => (
-                      <div key={item.language || "Unknown"} className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: LANGUAGE_COLORS[index % LANGUAGE_COLORS.length] }} />
-                          <span className="truncate text-sm font-medium text-on-surface">{item.language || "Unknown"}</span>
+                {personalityData.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {personalityData.map((item) => (
+                      <div
+                        key={item.nameKey}
+                        className="rounded-xl border border-outline-variant/50 bg-surface-container-high p-4 transition-colors hover:bg-surface-container"
+                      >
+                        <div className={`mb-3 h-2 w-full rounded-full ${item.color}`} />
+                        <div className="text-2xl font-bold tracking-tight text-on-surface">
+                          {item.count}
                         </div>
-                        <div className="flex items-baseline justify-between">
-                          <span className="font-mono text-lg font-semibold text-on-surface">{item.count}</span>
-                          <span className="font-mono text-xs text-muted-foreground">{percent(item.count, developerStats.repoCount)}%</span>
+                        <div className="text-xs font-medium text-muted-foreground">
+                          {t(`developers.${item.nameKey}`)}
                         </div>
                       </div>
                     ))}
@@ -847,34 +1032,136 @@ export default function Developers() {
               </CardContent>
             </Card>
 
+            {/* 技术雷达卡片（占 4/12）- 圆形 conic-gradient 雷达图 */}
             <Card className="lg:col-span-4">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Tags className="h-5 w-5 text-primary" />
+                  <RadarIcon className="h-5 w-5 text-primary" />
                   <CardTitle className="text-xl">{t("developers.radar")}</CardTitle>
                 </div>
                 <CardDescription>
-                  {t("developers.radarEvidenceDesc")}
+                  {t("developers.radarDesc")}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {developerTags.slice(0, 8).map((item) => (
-                    <div key={item.tag} className="flex items-center justify-between gap-3 rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Code2 className="h-3.5 w-3.5 text-primary" />
-                        <span className="truncate text-on-surface-variant">{item.tag}</span>
+              <CardContent className="space-y-4">
+                {radarData.length > 0 ? (
+                  <>
+                    {/* 圆形雷达图（CSS conic-gradient 模拟） */}
+                    <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full"
+                      style={{ background: radarGradient }}
+                    >
+                      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container-low">
+                        <span className="text-lg font-bold text-primary">{t("developers.radarCenter")}</span>
                       </div>
-                      <span className="font-mono font-medium text-on-surface">{item.count}</span>
                     </div>
-                  ))}
-                  {developerTags.length === 0 && (
-                    <p className="text-sm text-muted-foreground">{t("developers.noTagStats")}</p>
-                  )}
-                </div>
+                    {/* 六维状态统计 */}
+                    <div className="space-y-2">
+                      {radarData.map((item) => (
+                        <div key={item.labelKey} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-on-surface-variant">{t(`developers.${item.labelKey}`)}</span>
+                          </div>
+                          <span className="font-mono font-medium text-on-surface">{item.value}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{t("developers.noTagStats")}</p>
+                )}
               </CardContent>
             </Card>
           </div>
+
+          {/* 语言分布饼图 */}
+          {developerStats?.languages?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <PieChartIcon className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl">{t("developers.languageDistribution")}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={240}>
+                  <RechartsPie>
+                    <Pie
+                      data={developerStats.languages.slice(0, 8).map((l) => ({
+                        name: l.language || "Unknown",
+                        value: l.count,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {developerStats.languages.slice(0, 8).map((_, i) => (
+                        <Cell key={i} fill={LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ThemedChartTooltip />} />
+                    <Legend />
+                  </RechartsPie>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 星标时间趋势（TrendBars 组件） */}
+          {starTimeline.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl">{t("developers.starTrend")}</CardTitle>
+                </div>
+                <CardDescription>
+                  {t("developers.starTrendDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrendBars
+                  data={trendData}
+                  labels={{
+                    total: t("developers.trendTotal"),
+                    peakMonth: t("developers.trendPeakMonth"),
+                    peakValue: t("developers.trendPeakValue"),
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top 标签（CompactStatGrid 组件） */}
+          {developerTags.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Tags className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-xl">{t("developers.tagCloud")}</CardTitle>
+                </div>
+                <CardDescription>
+                  {t("developers.tagCloudDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CompactStatGrid
+                  total={developerTags.reduce((sum, item) => sum + item.count, 0)}
+                  items={pickTopItems(developerTags, 16).map((item, i) => ({
+                    label: item.tag,
+                    count: item.count,
+                    color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
+                  }))}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
