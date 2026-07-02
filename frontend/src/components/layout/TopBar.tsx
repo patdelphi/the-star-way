@@ -29,10 +29,9 @@ function useTheme() {
   return { theme, toggleTheme }
 }
 
-// 支持的语言列表
 const languages = [
-  { code: "zh-CN", label: "中文" },
-  { code: "en-US", label: "英文" },
+  { code: "zh-CN", labelKey: "topBar.languageZh" },
+  { code: "en-US", labelKey: "topBar.languageEn" },
 ]
 
 export function TopBar() {
@@ -46,11 +45,7 @@ export function TopBar() {
   const currentLangCode = i18n.language?.startsWith('zh') ? 'zh-CN' : 'en-US'
   const currentLang = languages.find((l) => l.code === currentLangCode) ?? languages[0]
 
-  const searchResults = [
-    { name: "microsoft/markitdown", meta: "匹配仓库 · 文档处理" },
-    { name: "modelcontextprotocol/servers", meta: "匹配仓库 · MCP" },
-    { name: "astral-sh/uv", meta: "匹配仓库 · Python 工具链" },
-  ].filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  const searchResults: { name: string; meta: string }[] = []
 
   const handleLangChange = (code: string) => {
     i18n.changeLanguage(code)
@@ -121,7 +116,7 @@ export function TopBar() {
             className="text-on-surface-variant hover:text-primary font-sans text-sm tracking-wider gap-1.5"
             onClick={() => setLangOpen(!langOpen)}
           >
-            {currentLang.label}
+            {t(currentLang.labelKey)}
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${langOpen ? "rotate-180" : ""}`} />
           </Button>
 
@@ -144,7 +139,7 @@ export function TopBar() {
                     }`}
                     onClick={() => handleLangChange(l.code)}
                   >
-                    {l.label}
+                    {t(l.labelKey)}
                   </button>
                 ))}
               </div>

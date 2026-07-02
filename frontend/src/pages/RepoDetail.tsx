@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useParams, Link } from "react-router-dom"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,61 +35,6 @@ type RepoDetailData = Repo & {
   starred_at: string
   tags: string[]
 }
-
-// ===== Demo 静态数据（API 不可用时的兜底数据） =====
-
-/** 默认 AI 分析数据 */
-const demoAiAnalysis = {
-  reason: "项目价值判断",
-  reasonText:
-    "该项目提供了将各类文档（PDF、Word、PPT 等）转换为 Markdown 的方案，适用于需要把非结构化文档转为可检索、可处理文本的通用场景。",
-  learningValues: ["文档解析", "Markdown 生成", "Python 工具链"],
-  reuseAdvice:
-    "可作为文档转换、内容抽取或知识库入库流程的前置模块；正式集成前应评估格式覆盖、解析质量、异常处理和许可证要求。",
-}
-
-/** 默认协议健康度数据 */
-const demoLicenseHealth = {
-  license: "MIT",
-  riskLevel: "低风险",
-  riskColor: "text-status-safe",
-}
-
-/** 默认系统雷达数据（柱状图） */
-const demoSystemRadar = [
-  { label: "活跃度", value: 85, color: "bg-primary" },
-  { label: "社区", value: 72, color: "bg-domain-frontend" },
-  { label: "文档", value: 90, color: "bg-domain-backend" },
-  { label: "稳定性", value: 78, color: "bg-domain-ai" },
-]
-
-/** 默认推荐相关项目 */
-const demoRelatedRepos = [
-  {
-    fullName: "JupyterLab/jupyterlab",
-    description: "JupyterLab 交互式计算环境。",
-    stars: "14.2k",
-    forks: "2.8k",
-    language: "TypeScript",
-    langColor: "bg-domain-frontend",
-  },
-  {
-    fullName: "pandoc/pandoc",
-    description: "通用标记格式转换工具。",
-    stars: "35.6k",
-    forks: "3.2k",
-    language: "Haskell",
-    langColor: "bg-domain-tools",
-  },
-  {
-    fullName: "mozilla/pdf.js",
-    description: "使用 JavaScript 实现的 PDF 阅读器。",
-    stars: "48.1k",
-    forks: "9.5k",
-    language: "JavaScript",
-    langColor: "bg-domain-frontend",
-  },
-]
 
 /** 格式化数字：大于 1000 时显示为 k */
 function formatCount(num: number): string {
@@ -141,7 +86,7 @@ const RepoDetail: React.FC = () => {
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
-        console.error("复制失败", err)
+        console.error("COPY_CLONE_FAILED", err)
       })
   }
 
@@ -178,7 +123,7 @@ const RepoDetail: React.FC = () => {
         if (cancelled) return
         setError(t("repoDetail.fetchError"))
         // eslint-disable-next-line no-console
-        console.error("获取仓库详情失败:", err)
+        console.error("FETCH_REPO_DETAIL_FAILED", err)
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -206,7 +151,31 @@ const RepoDetail: React.FC = () => {
   const displayHtmlUrl = displayRepo?.html_url ?? `https://github.com/${owner}/${name}`
   const displayLanguage = displayRepo?.language ?? ""
   const displayLicense = displayRepo?.license ?? ""
-  const displayTags = displayRepo?.tags ?? ["AI 工具", displayLanguage].filter(Boolean)
+  const displayTags = displayRepo?.tags ?? [displayLanguage].filter(Boolean)
+
+  const learningValues = Array.from(new Set([displayLanguage, ...displayTags].filter(Boolean))).slice(0, 3)
+
+  // AI 分析为基于当前仓库真实字段的本地规则文案，随语言切换展示。
+  const aiAnalysis = {
+    reasonText: t("repoDetail.aiReasonText", {
+      name: displayFullName || t("repoDetail.unknownRepo"),
+      language: displayLanguage || t("repoDetail.unknown"),
+      license: displayLicense || t("repoDetail.unknown"),
+    }),
+    learningValues: learningValues.length > 0 ? learningValues : [t("repoDetail.repositoryMetadata")],
+    reuseAdvice: t("repoDetail.aiReuseAdvice", {
+      name: displayFullName || t("repoDetail.unknownRepo"),
+      license: displayLicense || t("repoDetail.unknown"),
+    }),
+  }
+
+  /** 默认系统雷达数据（柱状图），标签走 i18n。 */
+  const systemRadar = [
+    { label: t("repoDetail.radarActivity"), value: 85, color: "bg-primary" },
+    { label: t("repoDetail.radarCommunity"), value: 72, color: "bg-domain-frontend" },
+    { label: t("repoDetail.radarDocs"), value: 90, color: "bg-domain-backend" },
+    { label: t("repoDetail.radarStability"), value: 78, color: "bg-domain-ai" },
+  ]
 
   // 协议健康度：根据 API 返回的 license 动态展示
   const licenseHealth = displayRepo?.license
@@ -215,7 +184,11 @@ const RepoDetail: React.FC = () => {
         riskLevel: t("repoDetail.riskLevel"),
         riskColor: "text-status-safe",
       }
-    : demoLicenseHealth
+    : {
+        license: "MIT",
+        riskLevel: t("repoDetail.lowRisk"),
+        riskColor: "text-status-safe",
+      }
 
   return (
     <div className="min-h-screen bg-grid-pattern p-6 md:p-8">
@@ -317,7 +290,7 @@ const RepoDetail: React.FC = () => {
                   <span>{t("repoDetail.whyStarred")}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  {demoAiAnalysis.reasonText}
+                  {aiAnalysis.reasonText}
                 </p>
               </div>
 
@@ -328,7 +301,7 @@ const RepoDetail: React.FC = () => {
                   <span>{t("repoDetail.learningValues")}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {demoAiAnalysis.learningValues.map((tag) => (
+                  {aiAnalysis.learningValues.map((tag) => (
                     <Badge key={tag} variant="default" className="font-mono text-xs uppercase tracking-wider">
                       {tag}
                     </Badge>
@@ -343,7 +316,7 @@ const RepoDetail: React.FC = () => {
                   <span>{t("repoDetail.reuseAdvice")}</span>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  {demoAiAnalysis.reuseAdvice}
+                  {aiAnalysis.reuseAdvice}
                 </p>
               </div>
             </CardContent>
@@ -386,7 +359,7 @@ const RepoDetail: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {demoSystemRadar.map((item) => (
+                {systemRadar.map((item) => (
                   <div key={item.label} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{item.label}</span>
@@ -404,47 +377,6 @@ const RepoDetail: React.FC = () => {
             </Card>
           </div>
         </div>
-
-        {/* 推荐相关项目（占 12/12） */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold tracking-tight text-on-surface">
-            {t("repoDetail.relatedRepos")}
-          </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {demoRelatedRepos.map((repo) => (
-              <Card key={repo.fullName} className="group flex flex-col transition-shadow hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge className={`${repo.langColor} text-white`}>
-                      {repo.language}
-                    </Badge>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <CardTitle className="text-base font-semibold tracking-tight text-on-surface">
-                    {repo.fullName}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {repo.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="mt-auto pt-0">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-3.5 w-3.5" />
-                      <span>{repo.stars}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <GitFork className="h-3.5 w-3.5" />
-                      <span>{repo.forks}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
 
         {/* 跳转到分析页 */}
         <div className="flex justify-end pt-4">

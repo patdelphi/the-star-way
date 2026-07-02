@@ -70,185 +70,12 @@ type StarRepo = {
 }
 
 const developerProfile = {
-  totalStars: 691,
-  syncedAt: "2026-06-30 22:40",
-  demoMode: "演示数据：691 条 GitHub 星标仓库",
+  totalStars: 0,
+  syncedAt: "-",
+  demoMode: "",
 }
 
-// Demo 数据：API 不可用时作为兜底
-const sampleRepos: StarRepo[] = [
-  {
-    fullName: "microsoft/markitdown",
-    description: "用于把文件和办公文档转换为 Markdown 的 Python 工具。",
-    stars: "40.2k",
-    forks: "1.8k",
-    language: "Python",
-    langColor: "bg-domain-backend",
-    license: "MIT",
-    starredAt: "2026-06-18",
-    updatedAt: "2026-06-28",
-    topics: ["rag", "markdown", "document-ai"],
-    autoTags: ["RAG 前置", "文档处理", "AI 工具"],
-    manualTags: [],
-    category: "文档处理",
-    score: 92,
-    health: "active",
-    whyStarred: "适合把 Office、PDF、网页内容转成 Markdown，作为知识库和 RAG 的入口。",
-    learningValue: ["文档解析", "Markdown 生成", "自动化流水线"],
-    reuseAdvice: "可作为本地文档处理工具链的前置转换模块。",
-  },
-  {
-    fullName: "modelcontextprotocol/servers",
-    description: "Model Context Protocol 的参考实现和社区服务器集合。",
-    stars: "18.7k",
-    forks: "2.3k",
-    language: "TypeScript",
-    langColor: "bg-domain-frontend",
-    license: "MIT",
-    starredAt: "2026-06-11",
-    updatedAt: "2026-06-29",
-    topics: ["mcp", "agent", "tool-use"],
-    autoTags: ["MCP", "Agent", "工具调用"],
-    manualTags: [],
-    category: "Agent 生态",
-    score: 95,
-    health: "active",
-    whyStarred: "用于理解 MCP Server 的能力边界、工具暴露方式和本地 Agent 集成模式。",
-    learningValue: ["MCP 协议", "工具调用", "Agent 基础设施"],
-    reuseAdvice: "适合作为自定义 MCP 工具服务器的实现参考。",
-  },
-  {
-    fullName: "astral-sh/uv",
-    description: "用 Rust 编写的高速 Python 包管理和项目管理工具。",
-    stars: "58.1k",
-    forks: "1.6k",
-    language: "Rust",
-    langColor: "bg-domain-tools",
-    license: "MIT / Apache-2.0",
-    starredAt: "2026-05-21",
-    updatedAt: "2026-06-30",
-    topics: ["python", "cli", "packaging"],
-    autoTags: ["工具链", "Python 基建", "CLI"],
-    manualTags: [],
-    category: "开发工具",
-    score: 90,
-    health: "active",
-    whyStarred: "能显著降低 Python 项目的依赖安装和环境管理成本。",
-    learningValue: ["包管理", "Rust 工具链", "CI 加速"],
-    reuseAdvice: "可替代部分 pip/venv/poetry 工作流，先在新项目中试点。",
-  },
-  {
-    fullName: "langchain-ai/langgraph",
-    description: "用图结构构建更可靠的语言智能体。",
-    stars: "15.9k",
-    forks: "2.7k",
-    language: "Python",
-    langColor: "bg-domain-ai",
-    license: "MIT",
-    starredAt: "2026-04-14",
-    updatedAt: "2026-06-27",
-    topics: ["llm", "agent", "workflow"],
-    autoTags: ["LLM", "Agent", "编排"],
-    manualTags: [],
-    category: "AI 应用框架",
-    score: 87,
-    health: "active",
-    whyStarred: "适合学习多步骤 Agent、状态图和可恢复执行的产品化设计。",
-    learningValue: ["状态图", "Agent 编排", "LLM 应用"],
-    reuseAdvice: "适合复杂 Agent 流程，简单问答场景不必引入。",
-  },
-  {
-    fullName: "neovim/neovim",
-    description: "专注可扩展性和可用性的 Vim 分支编辑器。",
-    stars: "82.1k",
-    forks: "5.6k",
-    language: "C",
-    langColor: "bg-domain-tools",
-    license: "Apache-2.0",
-    starredAt: "2025-12-02",
-    updatedAt: "2026-06-30",
-    topics: ["editor", "cli", "developer-tools"],
-    autoTags: ["编辑器", "CLI", "开发效率"],
-    manualTags: [],
-    category: "开发工具",
-    score: 78,
-    health: "active",
-    whyStarred: "代表高可扩展编辑器生态，适合研究插件系统和开发者工具体验。",
-    learningValue: ["插件生态", "CLI UX", "编辑器架构"],
-    reuseAdvice: "可借鉴其配置和插件生态设计，不建议直接嵌入业务系统。",
-  },
-  {
-    fullName: "jina-ai/reader",
-    description: "把任意网页链接转换为适合大模型读取的输入。",
-    stars: "8.4k",
-    forks: "620",
-    language: "TypeScript",
-    langColor: "bg-domain-frontend",
-    license: "Apache-2.0",
-    starredAt: "2026-03-09",
-    updatedAt: "2026-05-14",
-    topics: ["llm", "reader", "web"],
-    autoTags: ["网页解析", "LLM 输入", "RAG"],
-    manualTags: [],
-    category: "数据摄取",
-    score: 81,
-    health: "watch",
-    whyStarred: "可把网页转换为更适合 LLM 的上下文输入，适合内容采集和总结。",
-    learningValue: ["网页抽取", "LLM 上下文", "内容清洗"],
-    reuseAdvice: "适合做网页转 Markdown 的补充能力，需关注调用稳定性。",
-  },
-  {
-    fullName: "oldtools/archive-ui",
-    description: "曾经流行但近期维护有限的后台管理模板。",
-    stars: "6.2k",
-    forks: "1.1k",
-    language: "JavaScript",
-    langColor: "bg-domain-frontend",
-    license: "GPL-3.0",
-    starredAt: "2024-01-22",
-    updatedAt: "2024-08-03",
-    topics: ["admin", "template", "dashboard"],
-    autoTags: ["沉睡星标", "前端模板", "协议关注"],
-    manualTags: [],
-    category: "前端模板",
-    score: 41,
-    health: "stale",
-    whyStarred: "历史上可能用于后台界面参考，但维护和协议风险都需要重新评估。",
-    learningValue: ["后台布局", "旧技术债识别"],
-    reuseAdvice: "只作为视觉参考，不建议直接复用代码。",
-  },
-]
-
 const activeFilters: Filter[] = []
-
-// 静态 fallback 数据（API 无对应统计时展示）
-const fallbackLanguageStats = [
-  { label: "Python 生态", count: 254, color: "bg-domain-backend" },
-  { label: "TypeScript 生态", count: 125, color: "bg-domain-frontend" },
-  { label: "JavaScript 生态", count: 45, color: "bg-domain-frontend" },
-  { label: "Rust 工具", count: 21, color: "bg-domain-tools" },
-]
-
-const fallbackTopicClusters = [
-  { label: "智能应用 / 大模型", count: 143, topics: ["人工智能", "大模型", "OpenAI", "聊天机器人"] },
-  { label: "智能体 / MCP", count: 61, topics: ["MCP", "智能体", "Claude Code"] },
-  { label: "检索增强 / 文档", count: 40, topics: ["RAG", "PDF", "Markdown"] },
-  { label: "命令行 / 工具链", count: 55, topics: ["命令行", "Python", "Windows"] },
-]
-
-const starTimeline = [
-  { period: "2026 Q2", count: 173, focus: "MCP、Agent、文档 AI" },
-  { period: "2026 Q1", count: 148, focus: "RAG、兼容 OpenAI 接口、命令行" },
-  { period: "2025 Q4", count: 126, focus: "Python 工具链、Windows 自动化" },
-  { period: "2025 Q3", count: 94, focus: "前端框架、仪表盘、编辑器" },
-]
-
-const fallbackLicenseStats = [
-  { label: "MIT", count: 286, color: "bg-status-safe" },
-  { label: "Apache-2.0", count: 142, color: "bg-status-safe" },
-  { label: "GPL 系", count: 31, color: "bg-status-warning" },
-  { label: "未知", count: 58, color: "bg-status-danger" },
-]
 
 /**
  * 根据语言返回对应的 UI 颜色类名
@@ -275,21 +102,21 @@ function getLangColor(language: string | null): string {
 /**
  * 将 API 返回的仓库数据转换为页面内部 StarRepo 格式
  */
-function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
+function adaptApiRepo(apiRepo: RepoListResult["items"][number], fallback: { unknown: string; uncategorized: string }): StarRepo {
   const stars = apiRepo.stars
   const starsStr = stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars)
   const forks = apiRepo.forks
   const forksStr = forks >= 1000 ? `${(forks / 1000).toFixed(1)}k` : String(forks)
 
-  // 基于 star 数计算简单评分（0-100）
-  const score = Math.min(100, Math.max(30, Math.round(50 + Math.log10(Math.max(1, stars)) * 10)))
-
   // 根据最后推送时间判断健康度
   let health: RepoHealth = "active"
+  let score = 0
   if (apiRepo.pushed_at) {
     const lastPush = new Date(apiRepo.pushed_at)
     const now = new Date()
     const daysDiff = (now.getTime() - lastPush.getTime()) / (1000 * 60 * 60 * 24)
+    // 活跃度只表示维护新鲜度，不代表质量；近期更新越高，长期未更新越低。
+    score = daysDiff <= 30 ? 100 : daysDiff <= 90 ? 85 : daysDiff <= 180 ? 65 : daysDiff <= 365 ? 45 : 20
     if (daysDiff > 365) {
       health = "stale"
     } else if (daysDiff > 180) {
@@ -305,15 +132,15 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number]): StarRepo {
     description: apiRepo.description || "",
     stars: starsStr,
     forks: forksStr,
-    language: apiRepo.language || "未知",
+    language: apiRepo.language || fallback.unknown,
     langColor: getLangColor(apiRepo.language),
-    license: apiRepo.license || "未知",
+    license: apiRepo.license || fallback.unknown,
     starredAt: apiRepo.starred_at ? apiRepo.starred_at.slice(0, 10) : "",
     updatedAt: apiRepo.pushed_at ? apiRepo.pushed_at.slice(0, 10) : "",
     topics,
     autoTags: tags,
     manualTags: [],
-    category: tags[0] || "未分类",
+    category: tags[0] || fallback.uncategorized,
     score,
     health,
     whyStarred: "",
@@ -328,31 +155,12 @@ export default function StarExplorer() {
   const { currentLogin } = useDeveloper()
 
   // === 移到组件内部的 i18n 静态数据 ===
-  const classificationSources = useMemo(
-    () => [
-      { label: t("starExplorer.classificationSourceTopic"), count: 0, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
-      { label: t("starExplorer.classificationSourceName"), count: 96, confidence: "0.85", detail: t("starExplorer.classificationSourceNameDetail") },
-      { label: t("starExplorer.classificationSourceDesc"), count: 71, confidence: "0.80", detail: t("starExplorer.classificationSourceDescDetail") },
-      { label: t("starExplorer.classificationSourceManual"), count: 12, confidence: "1.00", detail: t("starExplorer.classificationSourceManualDetail") },
-    ],
-    [t]
-  )
-
   const exportFormats = useMemo(
     () => [
       { label: "CSV", detail: t("starExplorer.exportFormatCsv"), status: t("starExplorer.exportFormatCurrent") },
       { label: "JSON", detail: t("starExplorer.exportFormatJson"), status: t("starExplorer.exportFormatCurrent") },
       { label: "Markdown", detail: t("starExplorer.exportFormatMd"), status: t("starExplorer.exportFormatCurrent") },
       { label: "HTML", detail: t("starExplorer.exportFormatHtml"), status: t("starExplorer.exportFormatLater") },
-    ],
-    [t]
-  )
-
-  const removedStarSignals = useMemo(
-    () => [
-      { label: t("starExplorer.removedSignalUnstar"), count: 18, detail: t("starExplorer.removedSignalUnstarDetail") },
-      { label: t("starExplorer.removedSignalStale"), count: 34, detail: t("starExplorer.removedSignalStaleDetail") },
-      { label: t("starExplorer.removedSignalLicense"), count: 31, detail: t("starExplorer.removedSignalLicenseDetail") },
     ],
     [t]
   )
@@ -409,6 +217,16 @@ export default function StarExplorer() {
   const [usingFallback, setUsingFallback] = useState(false)
   const [cnSummaries, setCnSummaries] = useState<Record<string, string>>({})
 
+  const classificationSources = useMemo(
+    () => [
+      { label: t("starExplorer.classificationSourceTopic"), count: tags.length, confidence: "0.95", detail: t("starExplorer.classificationSourceTopicDetail") },
+      { label: t("starExplorer.classificationSourceName"), count: allRepos.filter((repo) => repo.autoTags.length > 0).length, confidence: "0.85", detail: t("starExplorer.classificationSourceNameDetail") },
+      { label: t("starExplorer.classificationSourceDesc"), count: allRepos.filter((repo) => repo.description.trim().length > 0).length, confidence: "0.80", detail: t("starExplorer.classificationSourceDescDetail") },
+      { label: t("starExplorer.classificationSourceManual"), count: allRepos.filter((repo) => repo.manualTags.length > 0).length, confidence: "1.00", detail: t("starExplorer.classificationSourceManualDetail") },
+    ],
+    [t, tags, allRepos]
+  )
+
   // === 首次加载：拉取真实数据 ===
   useEffect(() => {
     let cancelled = false
@@ -427,11 +245,14 @@ export default function StarExplorer() {
 
         // API 返回空列表视为不可用，回退到 Demo 数据
         if (repoResult.items.length === 0) {
-          setAllRepos(sampleRepos)
+          setAllRepos([])
           setUsingFallback(true)
           setAnalysisStatus(t("starExplorer.apiUnavailable"))
         } else {
-          setAllRepos(repoResult.items.map(adaptApiRepo))
+          setAllRepos(repoResult.items.map((repo) => adaptApiRepo(repo, {
+            unknown: t("starExplorer.unknown"),
+            uncategorized: t("starExplorer.uncategorized"),
+          })))
           setUsingFallback(false)
           setAnalysisStatus(t("starExplorer.loadedAnalysis", { login: currentLogin }))
         }
@@ -455,7 +276,7 @@ export default function StarExplorer() {
         if (cancelled) return
         const msg = err instanceof Error ? err.message : t("starExplorer.loadingHint")
         setError(msg)
-        setAllRepos(sampleRepos)
+        setAllRepos([])
         setUsingFallback(true)
         setAnalysisStatus(t("starExplorer.networkError"))
       } finally {
@@ -574,7 +395,7 @@ export default function StarExplorer() {
 
   // === 从 stats 动态生成展示数据（无 stats 时用 fallback）===
   const languageStats = useMemo(() => {
-    if (!stats?.languages?.length) return fallbackLanguageStats
+    if (!stats?.languages?.length) return []
     return stats.languages.map((l) => ({
       label: l.language,
       count: l.count,
@@ -583,7 +404,7 @@ export default function StarExplorer() {
   }, [stats])
 
   const topicClusters = useMemo(() => {
-    if (!stats?.topics?.length) return fallbackTopicClusters
+    if (!stats?.topics?.length) return []
     return stats.topics.slice(0, 4).map((t) => ({
       label: t.topic,
       count: t.count,
@@ -592,15 +413,15 @@ export default function StarExplorer() {
   }, [stats])
 
   const licenseStats = useMemo(() => {
-    if (!stats?.licenses?.length) return fallbackLicenseStats
+    if (!stats?.licenses?.length) return []
     return stats.licenses.map((l) => {
-      const lic = l.license || "未知"
+      const lic = l.license || t("starExplorer.unknown")
       let color = "bg-status-safe"
       if (lic.toLowerCase().includes("gpl")) color = "bg-status-warning"
-      else if (lic === "未知" || lic.toLowerCase() === "other") color = "bg-status-danger"
+      else if (lic === t("starExplorer.unknown") || lic.toLowerCase() === "other") color = "bg-status-danger"
       return { label: lic, count: l.count, color }
     })
-  }, [stats])
+  }, [stats, t])
 
   const totalLanguageCount = useMemo(
     () => languageStats.reduce((sum, item) => sum + item.count, 0),
@@ -615,7 +436,7 @@ export default function StarExplorer() {
   // === 从真实数据计算指标 ===
   // 沉睡星标 = 总仓库 - 活跃仓库
   const sleepStarsCount = useMemo(() => {
-    if (usingFallback) return 34
+    if (usingFallback) return 0
     const total = stats?.repoCount ?? allRepos.length
     const active = stats?.activeRepoCount ?? 0
     return total - active
@@ -623,7 +444,7 @@ export default function StarExplorer() {
 
   // 隐藏宝石 = 低星（<=1000）但近期有更新的仓库
   const hiddenGemsCount = useMemo(() => {
-    if (usingFallback) return 27
+    if (usingFallback) return 0
     const ninetyDaysAgo = new Date()
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
     return allRepos.filter((r) => {
@@ -651,11 +472,43 @@ export default function StarExplorer() {
 
   // 自动标签覆盖率 = tags 数 / repoCount
   const tagCoveragePercent = useMemo(() => {
-    if (usingFallback) return "83%"
+    if (usingFallback) return "0%"
     const total = stats?.repoCount ?? allRepos.length
     if (total === 0) return "0%"
     return `${Math.round((tags.length / total) * 100)}%`
   }, [tags, stats, allRepos, usingFallback])
+
+  const starTimelineData = useMemo(() => {
+    const counts = new Map<string, { count: number; languages: Map<string, number> }>()
+    for (const repo of allRepos) {
+      if (!repo.starredAt) continue
+      const period = repo.starredAt.slice(0, 7)
+      const item = counts.get(period) ?? { count: 0, languages: new Map<string, number>() }
+      item.count += 1
+      if (repo.language) item.languages.set(repo.language, (item.languages.get(repo.language) ?? 0) + 1)
+      counts.set(period, item)
+    }
+    return [...counts.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 6)
+      .map(([period, item]) => {
+        const focus = [...item.languages.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([language]) => language)
+          .join(" / ")
+        return { period, count: item.count, focus: focus || t("starExplorer.timelineNoFocus") }
+      })
+  }, [allRepos, t])
+
+  const removedStarSignals = useMemo(
+    () => [
+      { label: t("starExplorer.removedSignalUnstar"), count: removedRepos.length, detail: t("starExplorer.removedSignalUnstarDetail") },
+      { label: t("starExplorer.removedSignalStale"), count: sleepStarsCount, detail: t("starExplorer.removedSignalStaleDetail") },
+      { label: t("starExplorer.removedSignalLicense"), count: licenseRiskCount, detail: t("starExplorer.removedSignalLicenseDetail") },
+    ],
+    [t, removedRepos, sleepStarsCount, licenseRiskCount]
+  )
 
   // === 事件处理 ===
   const handleExport = (format: string) => {
@@ -825,7 +678,7 @@ export default function StarExplorer() {
               </Badge>
               <Badge className="font-mono text-xs">@{currentLogin}</Badge>
               <Badge variant="secondary" className="font-mono text-xs">
-                {usingFallback ? developerProfile.demoMode : t("starExplorer.realDataCount", { count: stats?.repoCount ?? allRepos.length })}
+                {usingFallback ? t("starExplorer.noLiveData") : t("starExplorer.realDataCount", { count: stats?.repoCount ?? allRepos.length })}
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">{t("starExplorer.title")}</h1>
@@ -858,7 +711,7 @@ export default function StarExplorer() {
           <MetricCard
             icon={Tags}
             label={t("starExplorer.tagCoverage")}
-            value={summary ? `${Math.round((summary.tagCount / summary.repoCount) * 100)}%` : tagCoveragePercent}
+            value={summary ? `${summary.repoCount > 0 ? Math.round((summary.tagCount / summary.repoCount) * 100) : 0}%` : tagCoveragePercent}
             detail={t("starExplorer.tagCoverageDetailCount", { count: summary?.tagCount ?? tags.length, total: summary?.repoCount ?? stats?.repoCount ?? allRepos.length })}
           />
           <MetricCard
@@ -882,7 +735,7 @@ export default function StarExplorer() {
           <MetricCard
             icon={LineChart}
             label={t("starExplorer.removedStars")}
-            value={usingFallback ? "18" : "0"}
+            value={String(removedRepos.length)}
             detail={usingFallback ? t("starExplorer.removedStarsDetail") : t("starExplorer.removedStarsDetailApi")}
           />
           <div onClick={() => setLicenseRiskOpen(true)} className="cursor-pointer">
@@ -989,7 +842,7 @@ export default function StarExplorer() {
               <CardDescription>{t("starExplorer.timelineDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {starTimeline.map((item) => (
+              {starTimelineData.map((item) => (
                 <div key={item.period} className="rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-semibold text-on-surface">{item.period}</span>
@@ -998,6 +851,9 @@ export default function StarExplorer() {
                   <p className="mt-1 text-xs text-muted-foreground">{item.focus}</p>
                 </div>
               ))}
+              {starTimelineData.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t("starExplorer.noTimelineData")}</p>
+              )}
             </CardContent>
           </Card>
         </section>
@@ -1264,7 +1120,7 @@ export default function StarExplorer() {
                     <TableRow>
                       <TableHead className="w-[280px]">{t("starExplorer.repo")}</TableHead>
                       <TableHead className="hidden md:table-cell">{t("starExplorer.category")}</TableHead>
-                      <TableHead className="text-right">{t("starExplorer.score")}</TableHead>
+                      <TableHead className="text-right" title={t("starExplorer.scoreHelp")}>{t("starExplorer.score")}</TableHead>
                       <TableHead className="hidden sm:table-cell">{t("starExplorer.languageCol")}</TableHead>
                       <TableHead className="hidden lg:table-cell">{t("starExplorer.licenseCol")}</TableHead>
                       <TableHead className="hidden xl:table-cell">{t("starExplorer.lastUpdate")}</TableHead>
@@ -1298,7 +1154,7 @@ export default function StarExplorer() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`}>{repo.score}</span>
+                          <span className={`font-mono font-semibold ${healthMeta[repo.health].className}`} title={t("starExplorer.scoreHelp")}>{repo.score}</span>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           <Badge className={`${repo.langColor} text-white text-xs`}>{repo.language}</Badge>

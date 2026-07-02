@@ -19,3 +19,14 @@
 - 前端新增当前开发者上下文，开发者页、星标仓库、单个仓库、仓库详情、概览和分类目录统一跟随当前 login。
 - 新增当前功能与显示优化清单，明确真实数据、CSV 快照、同步状态、指标口径和 AI 功能的后续整理顺序。
 - 新增 `sample.env`，覆盖 GitHub Token、AI API、后端端口和前端 API 地址。
+
+## 2026-07-02
+
+- 修复 `start-project.ps1` 的 Node native ABI 问题：启动脚本固定解析 Node/pnpm 路径，并用同一个 Node 进程检查 `better-sqlite3` native binary。
+- 清理前端硬编码 Demo 内容：星标仓库、概览、仓库分析、分类目录、仓库详情和顶部搜索不再展示旧静态样例仓库。
+- 新增统一图表 Tooltip，修复暗色主题下 Recharts popup 数字标签可读性问题。
+- 仓库详情、仓库分析、星标仓库和开发者页面补齐中英文 i18n；新增静态校验，除 locale 文件外前端源码不允许出现中文字符串字面量。
+- 新增真实 GitHub 样本导入脚本，可导入真实用户和真实 starred repo 样本用于本地端到端验证。
+- 修复后端 GitHub Token 加载问题：后端从 `backend` 目录启动时会同时加载 `backend/.env` 与项目根目录 `.env`，确保 `/api/sync` 使用 `STARWAY_GITHUB_TOKEN` 等环境变量。
+- 当前本地真实数据验证样本：34 个真实用户、3632 个真实仓库、3779 条星标关系、64 个标签分类。
+- 验证通过：后端 99 个测试、后端 TypeScript 构建、前端 40 项 UI 静态校验、前端生产构建。

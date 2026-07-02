@@ -287,7 +287,7 @@ export async function syncStars(username: string, token?: string): Promise<any |
       }, SYNC_TIMEOUT)
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data?.error?.message || '同步失败')
+        throw new Error(data?.error?.message || 'SYNC_FAILED')
       }
       return data.data
     }

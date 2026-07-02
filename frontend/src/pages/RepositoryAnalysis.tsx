@@ -1,7 +1,7 @@
 /**
  * RepositoryAnalysis.tsx
  * 单个仓库分析页，已接入真实 API。
- * 通过 getRepos / getStats / getTags 获取数据；API 不可用时自动回退到内置 Demo 数据。
+ * 通过 getRepos / getStats / getTags 获取真实数据；API 不可用时展示空状态。
  */
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -69,118 +69,6 @@ const barClass: Record<SignalTone, string> = {
   danger: "bg-status-danger",
 }
 
-/* ========== Demo 数据（API 不可用时回退） ========== */
-const repoAnalyses: RepoAnalysis[] = [
-  {
-    fullName: "microsoft/markitdown",
-    description: "用于把文件和办公文档转换为 Markdown 的 Python 工具。",
-    language: "Python",
-    stars: "40.2k",
-    forks: "1.8k",
-    updatedAt: "2026-06-28",
-    license: "MIT",
-    category: "文档处理 / RAG 前置",
-    summary:
-      "适合作为文档解析流水线入口，把 Office、PDF、网页等内容转换为 Markdown，方便进入知识库、RAG 或自动化审阅流程。",
-    stack: ["Python 生态", "Markdown 转换", "Office 解析", "PDF 解析", "命令行工具"],
-    tags: ["RAG 前置", "文档智能", "Markdown 转换", "自动化"],
-    maintainSignals: [
-      { label: "最近更新", value: "2 天前", tone: "safe" },
-      { label: "Issue 压力", value: "中等", tone: "warning" },
-      { label: "社区热度", value: "高速增长", tone: "safe" },
-      { label: "API 稳定性", value: "仍在演进", tone: "warning" },
-    ],
-    scores: [
-      { label: "学习价值", value: 92 },
-      { label: "复用价值", value: 88 },
-      { label: "维护活跃", value: 84 },
-      { label: "集成难度", value: 36 },
-    ],
-    risks: [
-      { label: "协议风险", detail: "MIT，工程使用风险低。", tone: "safe" },
-      { label: "依赖风险", detail: "文件格式解析依赖多，需关注边界样本。", tone: "warning" },
-      { label: "落地风险", detail: "复杂版式文档可能需要人工校验。", tone: "warning" },
-    ],
-    similar: [
-      { fullName: "pandoc/pandoc", reason: "通用文档转换能力更强", stars: "35.6k" },
-      { fullName: "Unstructured-IO/unstructured", reason: "面向 RAG 的文档解析链路", stars: "11.4k" },
-      { fullName: "mozilla/pdf.js", reason: "PDF 解析和预览基础能力", stars: "48.1k" },
-    ],
-  },
-  {
-    fullName: "modelcontextprotocol/servers",
-    description: "Model Context Protocol 的参考实现和社区服务器集合。",
-    language: "TypeScript",
-    stars: "18.7k",
-    forks: "2.3k",
-    updatedAt: "2026-06-29",
-    license: "MIT",
-    category: "Agent / MCP 生态",
-    summary:
-      "用于理解 MCP Server 的能力边界、工具暴露方式和集成模式，适合做本地 Agent 工具生态调研。",
-    stack: ["TypeScript 生态", "Node.js 服务", "MCP 协议", "JSON-RPC 通信", "命令行工具"],
-    tags: ["MCP", "智能体", "工具调用", "开发者工具"],
-    maintainSignals: [
-      { label: "最近更新", value: "1 天前", tone: "safe" },
-      { label: "Issue 压力", value: "偏高", tone: "warning" },
-      { label: "社区热度", value: "爆发期", tone: "safe" },
-      { label: "接口稳定性", value: "快速变化", tone: "warning" },
-    ],
-    scores: [
-      { label: "学习价值", value: 95 },
-      { label: "复用价值", value: 82 },
-      { label: "维护活跃", value: 91 },
-      { label: "集成难度", value: 58 },
-    ],
-    risks: [
-      { label: "协议风险", detail: "MIT，适合二次开发。", tone: "safe" },
-      { label: "生态风险", detail: "规范更新快，升级成本需要预留。", tone: "warning" },
-      { label: "安全风险", detail: "工具调用需最小权限和明确确认。", tone: "danger" },
-    ],
-    similar: [
-      { fullName: "anthropics/anthropic-sdk-typescript", reason: "Agent 工具调用 SDK 参考", stars: "1.2k" },
-      { fullName: "openai/openai-agents-js", reason: "Agent 编排模型参考", stars: "6.8k" },
-      { fullName: "langchain-ai/langgraph", reason: "多步骤 Agent 状态流", stars: "15.9k" },
-    ],
-  },
-  {
-    fullName: "astral-sh/uv",
-    description: "用 Rust 编写的高速 Python 包管理和项目管理工具。",
-    language: "Rust",
-    stars: "58.1k",
-    forks: "1.6k",
-    updatedAt: "2026-06-30",
-    license: "MIT / Apache-2.0",
-    category: "工具链 / Python 基建",
-    summary:
-      "可替代多段 Python 依赖管理流程，适合本地工具、CI 和数据处理项目降低环境初始化成本。",
-    stack: ["Rust 工具", "Python 生态", "包管理", "虚拟环境", "命令行工具"],
-    tags: ["Python", "命令行", "包管理", "开发者工具"],
-    maintainSignals: [
-      { label: "最近更新", value: "今天", tone: "safe" },
-      { label: "Issue 压力", value: "高", tone: "warning" },
-      { label: "社区热度", value: "高速增长", tone: "safe" },
-      { label: "替换成本", value: "中等", tone: "warning" },
-    ],
-    scores: [
-      { label: "学习价值", value: 86 },
-      { label: "复用价值", value: 94 },
-      { label: "维护活跃", value: 96 },
-      { label: "集成难度", value: 42 },
-    ],
-    risks: [
-      { label: "协议风险", detail: "双协议，商业使用友好。", tone: "safe" },
-      { label: "迁移风险", detail: "团队既有 pip/poetry 流程需逐步替换。", tone: "warning" },
-      { label: "兼容风险", detail: "少数旧项目依赖解析需要单独验证。", tone: "warning" },
-    ],
-    similar: [
-      { fullName: "pypa/pip", reason: "Python 官方生态基础包管理器", stars: "9.8k" },
-      { fullName: "python-poetry/poetry", reason: "项目依赖管理对照方案", stars: "32.4k" },
-      { fullName: "astral-sh/ruff", reason: "同团队高性能 Python 工具链", stars: "39.5k" },
-    ],
-  },
-]
-
 /* ========== 工具函数 ========== */
 
 /** 将数字格式化为 k / M 显示 */
@@ -194,7 +82,7 @@ function formatStars(n: number): string {
 export default function RepositoryAnalysis() {
   const { t } = useTranslation()
   const { currentLogin } = useDeveloper()
-  const [selectedRepo, setSelectedRepo] = useState(repoAnalyses[0].fullName)
+  const [selectedRepo, setSelectedRepo] = useState("")
   const [status, setStatus] = useState(t("repoAnalysis.initializing"))
   const [loading, setLoading] = useState(true)
 
@@ -209,7 +97,7 @@ export default function RepositoryAnalysis() {
     return dateStr.split("T")[0]
   }
 
-  /** 为仅有 API 数据、没有 Demo 分析数据的仓库生成默认分析结构 */
+  /** 为 API 仓库生成基础分析结构 */
   const buildDefaultAnalysis = (repo: Repo & { tags: string[] }): RepoAnalysis => {
     return {
       fullName: repo.full_name,
@@ -225,7 +113,7 @@ export default function RepositoryAnalysis() {
       tags: repo.tags.length > 0 ? repo.tags : [],
       maintainSignals: [
         { label: t("repoAnalysis.signalLastUpdate"), value: formatDate(repo.pushed_at), tone: "safe" },
-        { label: t("repoAnalysis.signalIssuePressure"), value: repo.open_issues > 50 ? "偏高" : "中等", tone: repo.open_issues > 50 ? "warning" : "safe" },
+        { label: t("repoAnalysis.signalIssuePressure"), value: repo.open_issues > 50 ? t("repoAnalysis.issuePressureHigh") : t("repoAnalysis.issuePressureMedium"), tone: repo.open_issues > 50 ? "warning" : "safe" },
         { label: t("repoAnalysis.signalCommunityHeat"), value: t("repoAnalysis.unknown"), tone: "warning" },
         { label: t("repoAnalysis.signalApiStability"), value: t("repoAnalysis.unknown"), tone: "warning" },
       ],
@@ -238,7 +126,7 @@ export default function RepositoryAnalysis() {
       risks: [
         {
           label: t("repoAnalysis.licenseRisk"),
-          detail: repo.license ? `${repo.license}，${t("repoAnalysis.unknown")}。` : t("repoAnalysis.unknown"),
+          detail: repo.license ? t("repoAnalysis.licenseKnownDetail", { license: repo.license }) : t("repoAnalysis.licenseUnknownDetail"),
           tone: repo.license ? "safe" : "warning",
         },
       ],
@@ -253,7 +141,7 @@ export default function RepositoryAnalysis() {
     if (tagCount > 0) parts.push(t("repoAnalysis.tagCount", { count: tagCount }))
     if (stats) parts.push(t("repoAnalysis.repoStats", { total: stats.repoCount, active: stats.activeRepoCount }))
     if (parts.length === 0) return t("repoAnalysis.noApiData")
-    return parts.join("，") + "。"
+    return parts.join(t("repoAnalysis.statusSeparator")) + t("repoAnalysis.statusSuffix")
   }
 
   /** 初始化：并行加载仓库列表、统计和标签 */
@@ -275,17 +163,18 @@ export default function RepositoryAnalysis() {
         setUserStats(statsResult)
         setAllTags(tagsResult)
 
-        const storedRepo = localStorage.getItem("selected-star-repo")
+          const storedRepo = localStorage.getItem("selected-star-repo")
         if (storedRepo) {
           const existsInApi = reposResult.items.some((r) => r.full_name === storedRepo)
-          const existsInDemo = repoAnalyses.some((r) => r.fullName === storedRepo)
-          if (existsInApi || existsInDemo) {
+          if (existsInApi) {
             setSelectedRepo(storedRepo)
             setStatus(t("repoAnalysis.importedFromStarred", { repo: storedRepo }))
           } else {
+            setSelectedRepo(reposResult.items[0]?.full_name ?? "")
             setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
           }
         } else {
+          setSelectedRepo(reposResult.items[0]?.full_name ?? "")
           setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
         }
       } catch (err) {
@@ -302,49 +191,20 @@ export default function RepositoryAnalysis() {
     }
   }, [t, currentLogin])
 
-  /** 下拉选择器的数据源：优先 API，回退 Demo */
+  /** 下拉选择器的数据源：只使用 API 返回的真实仓库 */
   const selectorOptions = useMemo(() => {
-    if (apiRepos.length > 0) {
-      return apiRepos.map((r) => ({ fullName: r.full_name, description: r.description ?? "" }))
-    }
-    return repoAnalyses.map((r) => ({ fullName: r.fullName, description: r.description }))
+    return apiRepos.map((r) => ({ fullName: r.full_name, description: r.description ?? "" }))
   }, [apiRepos])
 
-  /** 当前激活的仓库：API 基本信息与 Demo 分析数据合并 */
-  const activeRepo = useMemo<RepoAnalysis>(() => {
+  /** 当前激活的仓库：由 API 基础字段生成 */
+  const activeRepo = useMemo<RepoAnalysis | null>(() => {
     const apiRepo = apiRepos.find((r) => r.full_name === selectedRepo)
-    const demoRepo = repoAnalyses.find((r) => r.fullName === selectedRepo)
-
-    // 都未找到，回退第一个 Demo
-    if (!apiRepo && !demoRepo) return repoAnalyses[0]
-
-    // API 和 Demo 都有：基本信息用 API，分析字段用 Demo
-    if (apiRepo && demoRepo) {
-      return {
-        ...demoRepo,
-        fullName: apiRepo.full_name,
-        description: apiRepo.description ?? demoRepo.description,
-        language: apiRepo.language ?? demoRepo.language,
-        stars: formatStars(apiRepo.stars),
-        forks: String(apiRepo.forks),
-        updatedAt: formatDate(apiRepo.pushed_at),
-        license: apiRepo.license ?? demoRepo.license,
-        tags: apiRepo.tags.length > 0 ? apiRepo.tags : demoRepo.tags,
-      }
-    }
-
-    // 只有 API 数据：构建默认分析
-    if (apiRepo) {
-      return buildDefaultAnalysis(apiRepo)
-    }
-
-    // 只有 Demo 数据
-    return demoRepo!
+    return apiRepo ? buildDefaultAnalysis(apiRepo) : null
   }, [selectedRepo, apiRepos])
 
-  /** 重新分析按钮 */
-  const runMockAnalysis = () => {
-    setStatus(t("repoAnalysis.importedFromStarred", { repo: activeRepo.fullName }))
+  /** 重新读取当前仓库基础状态 */
+  const refreshAnalysisStatus = () => {
+    if (activeRepo) setStatus(t("repoAnalysis.importedFromStarred", { repo: activeRepo.fullName }))
   }
 
   return (
@@ -361,7 +221,7 @@ export default function RepositoryAnalysis() {
                 {t("repoAnalysis.analysisBadge")}
               </Badge>
               <Badge variant="secondary" className="font-mono text-xs">
-                {apiRepos.length > 0 ? "API 数据" : "静态演示"}
+                {apiRepos.length > 0 ? t("repoAnalysis.apiData") : t("repoAnalysis.staticFallback")}
               </Badge>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-on-surface">
@@ -375,10 +235,10 @@ export default function RepositoryAnalysis() {
             <Button variant="outline" className="gap-2" asChild>
               <Link to="/explorer">
                 <ArrowLeft className="h-4 w-4" />
-                返回星标仓库
+                {t("repoAnalysis.backToStarRepos")}
               </Link>
             </Button>
-            <Button variant="outline" className="gap-2" onClick={runMockAnalysis} disabled={loading}>
+            <Button variant="outline" className="gap-2" onClick={refreshAnalysisStatus} disabled={loading || !activeRepo}>
               <LineChart className="h-4 w-4" />
               {t("repoAnalysis.reAnalyze")}
             </Button>
@@ -389,19 +249,34 @@ export default function RepositoryAnalysis() {
           </div>
         </section>
 
-        <Card className="border-primary/20 bg-surface-container-low">
+        {!loading && !activeRepo && (
+          <Card className="border-outline-variant/60 bg-surface-container-low">
+            <CardContent className="p-10 text-center">
+              <PackageCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <h2 className="text-base font-semibold text-on-surface">{t("repoAnalysis.noRepoTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("repoAnalysis.noRepoDesc")}</p>
+              <Button variant="outline" className="mt-4 gap-2" asChild>
+                <Link to="/developers">
+                  <ArrowLeft className="h-4 w-4" />
+                  {t("nav.developers")}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeRepo && <Card className="border-primary/20 bg-surface-container-low">
           <CardContent className="flex gap-3 p-4 text-sm leading-6 text-muted-foreground">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <div>
-              <span className="font-medium text-on-surface">数据来源与容错：</span>
-              仓库名称、描述、语言、stars、forks、更新时间、license 和 topics 来自同步 GitHub stars 时保存的本地数据库。
-              README 摘要、深度分析、相似项目和评分只有在 AI 接口成功生成后才可信；没有 AI 结果时页面只展示基础字段，并用默认占位说明“暂无深度分析”。
+              <span className="font-medium text-on-surface">{t("repoAnalysis.dataSourceTitle")}：</span>
+              {t("repoAnalysis.dataSourceBody")}
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* 搜索与选择器 */}
-        <Card className="border-outline-variant/60 bg-surface-container-low">
+        {activeRepo && <Card className="border-outline-variant/60 bg-surface-container-low">
           <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -429,10 +304,10 @@ export default function RepositoryAnalysis() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* 仓库基本信息 / 标签 / 维护信号 */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        {activeRepo && <section className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -510,10 +385,10 @@ export default function RepositoryAnalysis() {
               ))}
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* README 摘要 / 技术栈 */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {activeRepo && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <Card className="lg:col-span-7">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -559,10 +434,10 @@ export default function RepositoryAnalysis() {
               )}
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* 活跃度 / 协议风险 */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {activeRepo && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <Card className="lg:col-span-5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -571,7 +446,7 @@ export default function RepositoryAnalysis() {
               </CardTitle>
               <CardDescription>
                 {userStats?.languages && userStats.languages.length > 0
-                  ? `${t("repoAnalysis.languageDistTitle")}：${userStats.languages.map((l) => `${l.language}(${l.count})`).join("、")}`
+                  ? `${t("repoAnalysis.languageDistTitle")}${t("repoAnalysis.labelSeparator")}${userStats.languages.map((l) => `${l.language}(${l.count})`).join(t("repoAnalysis.listSeparator"))}`
                   : t("repoAnalysis.activityAnalysisDesc")}
               </CardDescription>
             </CardHeader>
@@ -615,10 +490,10 @@ export default function RepositoryAnalysis() {
               ))}
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* 相似项目 */}
-        <Card>
+        {activeRepo && <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Network className="h-5 w-5 text-primary" />
@@ -643,7 +518,7 @@ export default function RepositoryAnalysis() {
               <div className="col-span-3 text-sm text-muted-foreground">{t("repoAnalysis.noSimilar")}</div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* 底部提示 */}
         <p className="text-xs text-muted-foreground">{t("repoAnalysis.rawDataHint")}</p>

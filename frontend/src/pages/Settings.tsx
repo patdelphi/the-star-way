@@ -140,7 +140,9 @@ export default function Settings() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">{t("settings.dbMode")}</span>
-              <Badge variant="secondary" className="font-mono text-xs">Demo 数据（691 条）</Badge>
+              <Badge variant={backendStatus === "online" ? "secondary" : "outline"} className="font-mono text-xs">
+                {backendStatus === "online" ? t("settings.dbModeSynced") : t("settings.dbModeUnavailable")}
+              </Badge>
             </div>
           </CardContent>
         </Card>

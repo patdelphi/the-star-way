@@ -2,7 +2,7 @@
  * verify-ui.mjs
  * 前端静态功能校验脚本，检查页面能力入口和中英文 i18n 文案是否覆盖核心 Demo 功能。
  */
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "..")
@@ -12,6 +12,43 @@ const readText = (path) => {
   return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : ""
 }
 const readJson = (path) => JSON.parse(readText(path))
+
+function listSourceFiles(dir) {
+  const result = []
+  for (const entry of readdirSync(dir)) {
+    const fullPath = resolve(dir, entry)
+    const stat = statSync(fullPath)
+    if (stat.isDirectory()) {
+      if (!fullPath.includes(`${resolve(root, "src/i18n/locales")}`)) {
+        result.push(...listSourceFiles(fullPath))
+      }
+    } else if (/\.(tsx?|jsx?)$/.test(entry)) {
+      result.push(fullPath)
+    }
+  }
+  return result
+}
+
+function findChineseStringLiterals() {
+  const sourceRoot = resolve(root, "src")
+  const hits = []
+  for (const file of listSourceFiles(sourceRoot)) {
+    const text = readFileSync(file, "utf8")
+    const withoutBlockComments = text.replace(/\/\*[\s\S]*?\*\//g, "")
+    const lines = withoutBlockComments.split(/\r?\n/).map((line) => line.replace(/\/\/.*$/, ""))
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i]
+      const re = /(['"])(?:\\.|(?!\1).)*?\1/g
+      let match
+      while ((match = re.exec(line))) {
+        if (/[\u4e00-\u9fff]/.test(match[0])) {
+          hits.push(`${file}:${i + 1}`)
+        }
+      }
+    }
+  }
+  return hits
+}
 
 const files = {
   app: readText("src/App.tsx"),
@@ -25,6 +62,7 @@ const files = {
   repoDetail: readText("src/pages/RepoDetail.tsx"),
   dashboard: readText("src/pages/Dashboard.tsx"),
   catalog: readText("src/pages/StarCatalog.tsx"),
+  chartTooltip: readText("src/components/ui/chart-tooltip.tsx"),
 }
 
 const locales = {
@@ -45,6 +83,7 @@ function flattenValues(obj) {
 
 const zhText = flattenValues(locales.zh).join("\n")
 const allPageText = Object.values(files).join("\n")
+const chineseStringLiterals = findChineseStringLiterals()
 
 const requiredLocaleKeys = [
   "topBar.searchPlaceholder",
@@ -78,12 +117,19 @@ const requiredLocaleKeys = [
   "repoAnalysis.techStack",
   "repoAnalysis.licenseRisk",
   "repoAnalysis.similarRepos",
+  "repoDetail.aiReasonText",
+  "repoDetail.aiReuseAdvice",
+  "repoDetail.unknown",
+  "repoDetail.unknownRepo",
+  "repoDetail.repositoryMetadata",
+  "repoDetail.lowRisk",
+  "repoDetail.radarActivity",
 ]
 
 const requiredChineseTexts = [
   "搜索仓库",
   "星标仓库",
-  "单个仓库",
+  "仓库分析",
   "指定开发者",
   "开发者星标全局分析",
   "星标仓库概览",
@@ -125,10 +171,19 @@ const forbiddenTexts = [
   "detected",
   "Tech",
   "AI/ML",
+  "原圆环图并非 100% 占比",
+  "静态评分用于呈现未来分析结果",
+  "模拟 README",
+  "演示结论",
+  "模拟分析",
+  "内置 Demo 数据",
+  "DEMO_TAGS",
+  "DEMO_REPOS",
 ]
 
 const checks = [
   ["中英文 locale 可解析", Boolean(locales.zh.app && locales.en.app)],
+  ["前端源码无中文字符串硬编码（locale 除外）", chineseStringLiterals.length === 0],
   ["核心 locale key 完整", requiredLocaleKeys.every((key) => getByPath(locales.zh, key) && getByPath(locales.en, key))],
   ["中文文案覆盖核心功能", requiredChineseTexts.every((text) => zhText.includes(text))],
   ["顶部搜索使用 i18n", files.topbar.includes("topBar.searchPlaceholder") && files.topbar.includes("topBar.searchResults")],
@@ -137,18 +192,18 @@ const checks = [
   ["开发者选择可跨页面共享", files.developers.includes("setCurrentLogin") && files.explorer.includes("currentLogin") && files.analysis.includes("currentLogin") && files.repoDetail.includes("currentLogin")],
   ["核心页面不写死 demo-user", ![files.explorer, files.analysis, files.repoDetail].some((content) => content.includes('"demo-user"') || content.includes("'demo-user'"))],
   ["星标仓库标题显示当前开发者", files.explorer.includes("@{currentLogin}") && !files.explorer.includes("developerProfile.login")],
-  ["概览和分类目录跟随当前开发者", files.dashboard.includes("currentLogin") && files.catalog.includes("currentLogin")],
+  ["分类目录跟随当前开发者，概览使用全库汇总", files.catalog.includes("currentLogin") && files.dashboard.includes("getGlobalOverview")],
   ["概览和分类目录不写死 demo-user", ![files.dashboard, files.catalog].some((content) => content.includes('"demo-user"') || content.includes("'demo-user'"))],
   ["默认测试开发者为 patdelphi", files.developerContext.includes('DEFAULT_LOGIN = "patdelphi"') && files.api.includes("login: 'patdelphi'")],
-  ["顶部无旧二级导航", !getByPath(locales.zh, "nav.starExplorer").includes("探索者") && !getByPath(locales.zh, "nav.repoAnalysis").includes("仓库分析")],
+  ["顶部无旧二级导航", !getByPath(locales.zh, "nav.starExplorer").includes("探索者")],
   ["单个仓库路由", files.app.includes('path="/analysis"')],
   ["星标仓库导航命名", getByPath(locales.zh, "nav.starExplorer") === "星标仓库"],
-  ["单个仓库导航命名", getByPath(locales.zh, "nav.repoAnalysis") === "单个仓库"],
+  ["仓库分析导航命名", getByPath(locales.zh, "nav.repoAnalysis") === "仓库分析"],
   ["星标仓库接入真实 API", ["getRepos", "getStats", "getTags", "exportData", "classifyRepos"].every((name) => files.explorer.includes(name))],
-  ["星标仓库保留 Demo 兜底", files.explorer.includes("sampleRepos") && files.explorer.includes("usingFallback")],
+  ["星标仓库 API 不可用时不展示样例仓库", files.explorer.includes("usingFallback") && files.explorer.includes("setAllRepos([])")],
   ["星标仓库筛选排序状态", ["selectedLanguage", "selectedTopic", "selectedLicense", "sortKey", "quickFilter"].every((name) => files.explorer.includes(name))],
   ["星标仓库导出弹窗", files.explorer.includes("exportOpen") && files.explorer.includes("exportPreview")],
-  ["星标仓库列表可跳单仓库", files.explorer.includes("selected-star-repo") && files.explorer.includes("/analysis")],
+  ["星标仓库列表可跳仓库详情", files.explorer.includes("selected-star-repo") && files.explorer.includes("/repo/")],
   ["顶部 8 个信息块", [
     "starCount",
     "lastSync",
@@ -160,7 +215,32 @@ const checks = [
     "licenseRisk",
   ].every((key) => files.explorer.includes(`starExplorer.${key}`))],
   ["星标仓库页不含单仓库深度分析模块", !["仓库价值分析", "选中仓库速览", "协议与维护", "系统雷达"].some((text) => files.explorer.includes(text))],
+  ["开发者详情可跳转星标仓库", files.developers.includes('to="/explorer"') && getByPath(locales.zh, "developers.viewStarRepos") && getByPath(locales.en, "developers.viewStarRepos")],
+  ["开发者说明全部走 i18n", !["技术人格按该用户", "暂无语言统计", "暂无标签统计", "原圆环图"].some((text) => files.developers.includes(text))],
+  ["星标仓库分数说明清晰", getByPath(locales.zh, "starExplorer.score") === "活跃度" && getByPath(locales.zh, "starExplorer.scoreHelp") && files.explorer.includes("scoreHelp")],
+  ["图表统一 Tooltip 组件", files.chartTooltip.includes("ThemedChartTooltip") && files.dashboard.includes("ThemedChartTooltip") && !files.dashboard.includes("<Tooltip />")],
+  ["图表 Tooltip 暗色主题可读", files.chartTooltip.includes("bg-popover") && files.chartTooltip.includes("text-popover-foreground")],
+  ["仓库详情 AI 分析 fallback 使用 i18n", [
+    "aiReasonText",
+    "aiReuseAdvice",
+    "unknown",
+    "unknownRepo",
+    "repositoryMetadata",
+    "lowRisk",
+    "radarActivity",
+  ].every((key) => files.repoDetail.includes(`repoDetail.${key}`))],
+  ["仓库详情不保留中文分析硬编码", ![
+    "该项目提供了将各类文档",
+    "文档解析",
+    "Python 工具链",
+    "可作为文档转换",
+    "低风险",
+    "JupyterLab 交互式计算环境",
+  ].some((text) => files.repoDetail.includes(text))],
   ["单个仓库接入真实 API", ["getRepos", "getStats", "getTags"].every((name) => files.analysis.includes(name))],
+  ["仓库分析不再使用内置 Demo 分析数据", !files.analysis.includes("repoAnalyses") && !files.analysis.includes("只有 Demo 数据")],
+  ["分类目录不保留内置 Demo 数据", !files.catalog.includes("DEMO_TAGS") && !files.catalog.includes("DEMO_REPOS")],
+  ["分类目录仓库详情链接使用 full_name 兜底", files.catalog.includes("repoDetailPath") && files.catalog.includes("encodeURIComponent")],
   ["单个仓库保留本地选择", files.analysis.includes("selected-star-repo")],
   ["开发者页接入同步 API", files.developers.includes("getUsers") && files.developers.includes("syncStars")],
   ["开发者同步状态", files.developers.includes("syncStatus") && getByPath(locales.zh, "developers.syncStates.rateLimit") === "GitHub API 限流"],

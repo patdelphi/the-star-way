@@ -7,6 +7,7 @@
  */
 import { useState, useMemo, useEffect } from "react"
 import { useTranslation } from "react-i18next"
+import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +27,7 @@ import {
   Sparkles,
   Tags,
   Code2,
+  FolderGit2,
 } from "lucide-react"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getStats, getTags } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
@@ -57,34 +59,6 @@ interface SyncRun {
   rate_limit_reset: string | null
   error_message: string | null
 }
-
-// ===== Demo 开发者数据（API 不可用时回退） =====
-const demoDevelopers: Developer[] = [
-  { id: "1", name: "patdelphi", stars: 691, isActive: true },
-  { id: "2", name: "torvalds", stars: 0, isActive: false },
-  { id: "3", name: "antirez", stars: 128, isActive: false },
-  { id: "4", name: "gaearon", stars: 342, isActive: false },
-  { id: "5", name: "sindresorhus", stars: 856, isActive: false },
-  { id: "6", name: "tj", stars: 215, isActive: false },
-  { id: "7", name: "yyx990803", stars: 567, isActive: false },
-  { id: "8", name: "ruanyf", stars: 423, isActive: false },
-  { id: "9", name: "BrendanEich", stars: 89, isActive: false },
-  { id: "10", name: "mattn", stars: 312, isActive: false },
-  { id: "11", name: "feross", stars: 178, isActive: false },
-  { id: "12", name: "kamranahmedse", stars: 445, isActive: false },
-  { id: "13", name: "dabit3", stars: 267, isActive: false },
-  { id: "14", name: "kentcdodds", stars: 534, isActive: false },
-  { id: "15", name: "remy", stars: 198, isActive: false },
-  { id: "16", name: "substack", stars: 156, isActive: false },
-  { id: "17", name: "jashkenas", stars: 289, isActive: false },
-  { id: "18", name: "mxcl", stars: 367, isActive: false },
-  { id: "19", name: "cassidoo", stars: 412, isActive: false },
-  { id: "20", name: " levelsio", stars: 245, isActive: false },
-  { id: "21", name: "thebau5", stars: 189, isActive: false },
-  { id: "22", name: "ankane", stars: 334, isActive: false },
-  { id: "23", name: "nikic", stars: 278, isActive: false },
-  { id: "24", name: "fatedier", stars: 156, isActive: false },
-]
 
 const ITEMS_PER_PAGE = 20
 
@@ -164,15 +138,14 @@ export default function Developers() {
           setDevelopers(mapped)
           setIsApiMode(true)
         } else {
-          // API 不可用，回退到 Demo 数据
-          setDevelopers(demoDevelopers)
+          setDevelopers([])
           setIsApiMode(false)
         }
       })
       .catch(() => {
         if (cancelled) return
         setError(t("developers.loadError"))
-        setDevelopers(demoDevelopers)
+        setDevelopers([])
         setIsApiMode(false)
       })
       .finally(() => {
@@ -232,7 +205,7 @@ export default function Developers() {
     const newDev: Developer = {
       id: Date.now().toString(),
       name,
-      stars: Math.floor(Math.random() * 500),
+      stars: 0,
       isActive: false,
     }
     setDevelopers((prev) => [...prev, newDev])
@@ -295,7 +268,8 @@ export default function Developers() {
       }
     } catch (err) {
       setSyncStatus("networkFail")
-      setSyncError(err instanceof Error ? err.message : t("developers.syncUnknownError"))
+      const message = err instanceof Error ? err.message : ""
+      setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
     }
   }
 
@@ -523,15 +497,23 @@ export default function Developers() {
                   </p>
                 </div>
               </div>
-              {/* 同步当前开发者星标 */}
-              <Button
-                className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
-                onClick={() => runSync(activeDev.name)}
-                disabled={syncStatus === "syncing"}
-              >
-                <RotateCw className={`w-4 h-4 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-                {syncStatus === "syncing" ? t("developers.syncingBtn") : t("developers.syncBtn")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {/* 同步当前开发者星标 */}
+                <Button
+                  className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
+                  onClick={() => runSync(activeDev.name)}
+                  disabled={syncStatus === "syncing"}
+                >
+                  <RotateCw className={`w-4 h-4 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+                  {syncStatus === "syncing" ? t("developers.syncingBtn") : t("developers.syncBtn")}
+                </Button>
+                <Button variant="outline" className="gap-2" asChild>
+                  <Link to="/explorer">
+                    <FolderGit2 className="h-4 w-4" />
+                    {t("developers.viewStarRepos")}
+                  </Link>
+                </Button>
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">{t("developers.syncStatus")}</span>
@@ -619,7 +601,7 @@ export default function Developers() {
                   <CardTitle className="text-xl">{t("developers.personality")}</CardTitle>
                 </div>
                 <CardDescription>
-                  技术人格按该用户星标仓库的主语言分布计算；这里展示真实 API 返回的前 6 个语言，不再使用静态样例。
+                  {t("developers.personalityEvidenceDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -639,7 +621,7 @@ export default function Developers() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">暂无语言统计。请先同步该用户星标。</p>
+                  <p className="text-sm text-muted-foreground">{t("developers.noLanguageStats")}</p>
                 )}
               </CardContent>
             </Card>
@@ -651,7 +633,7 @@ export default function Developers() {
                   <CardTitle className="text-xl">{t("developers.radar")}</CardTitle>
                 </div>
                 <CardDescription>
-                  原圆环图并非 100% 占比，容易误导；这里改为真实标签命中数排行。
+                  {t("developers.radarEvidenceDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -666,7 +648,7 @@ export default function Developers() {
                     </div>
                   ))}
                   {developerTags.length === 0 && (
-                    <p className="text-sm text-muted-foreground">暂无标签统计。请在星标仓库页触发规则分类。</p>
+                    <p className="text-sm text-muted-foreground">{t("developers.noTagStats")}</p>
                   )}
                 </div>
               </CardContent>

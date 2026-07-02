@@ -15,74 +15,15 @@ import { getRepos, getTags } from "@/lib/api"
 import type { Repo } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
-// Demo 数据：标签列表
-const DEMO_TAGS: { tag: string; count: number }[] = [
-  { tag: "react", count: 12 },
-  { tag: "python", count: 9 },
-  { tag: "typescript", count: 8 },
-  { tag: "cli", count: 6 },
-  { tag: "ai", count: 5 },
-  { tag: "rust", count: 4 },
-  { tag: "go", count: 3 },
-]
-
-// Demo 数据：仓库列表
-const DEMO_REPOS: (Repo & { tags: string[] })[] = [
-  {
-    github_id: 1, full_name: "vercel/next.js", owner: "vercel", name: "next.js",
-    description: "The React Framework for the Web", html_url: "https://github.com/vercel/next.js",
-    language: "TypeScript", license: "MIT", stars: 127500, forks: 27100,
-    open_issues: 300, pushed_at: "2024-06-01T00:00:00Z", created_at: "2016-01-01T00:00:00Z",
-    tags: ["react", "typescript"],
-  },
-  {
-    github_id: 2, full_name: "facebook/react", owner: "facebook", name: "react",
-    description: "The library for web and native user interfaces", html_url: "https://github.com/facebook/react",
-    language: "JavaScript", license: "MIT", stars: 225000, forks: 46000,
-    open_issues: 400, pushed_at: "2024-05-15T00:00:00Z", created_at: "2013-05-01T00:00:00Z",
-    tags: ["react"],
-  },
-  {
-    github_id: 3, full_name: "hwchase17/langchain", owner: "hwchase17", name: "langchain",
-    description: "Build context-aware reasoning applications", html_url: "https://github.com/hwchase17/langchain",
-    language: "Python", license: "MIT", stars: 95300, forks: 15200,
-    open_issues: 200, pushed_at: "2024-06-10T00:00:00Z", created_at: "2022-10-01T00:00:00Z",
-    tags: ["python", "ai"],
-  },
-  {
-    github_id: 4, full_name: "BurntSushi/ripgrep", owner: "BurntSushi", name: "ripgrep",
-    description: "ripgrep recursively searches directories for a regex pattern", html_url: "https://github.com/BurntSushi/ripgrep",
-    language: "Rust", license: "MIT", stars: 46000, forks: 2000,
-    open_issues: 50, pushed_at: "2024-06-05T00:00:00Z", created_at: "2015-08-01T00:00:00Z",
-    tags: ["rust", "cli"],
-  },
-  {
-    github_id: 5, full_name: "golang/go", owner: "golang", name: "go",
-    description: "The Go programming language", html_url: "https://github.com/golang/go",
-    language: "Go", license: "BSD-3-Clause", stars: 122000, forks: 18000,
-    open_issues: 800, pushed_at: "2024-06-08T00:00:00Z", created_at: "2014-07-01T00:00:00Z",
-    tags: ["go"],
-  },
-  {
-    github_id: 6, full_name: "denoland/deno", owner: "denoland", name: "deno",
-    description: "A modern runtime for JavaScript and TypeScript", html_url: "https://github.com/denoland/deno",
-    language: "Rust", license: "MIT", stars: 95000, forks: 5200,
-    open_issues: 600, pushed_at: "2024-06-02T00:00:00Z", created_at: "2018-06-01T00:00:00Z",
-    tags: ["typescript", "rust"],
-  },
-  {
-    github_id: 7, full_name: "cli/cli", owner: "cli", name: "cli",
-    description: "GitHub's official command line tool", html_url: "https://github.com/cli/cli",
-    language: "Go", license: "MIT", stars: 36000, forks: 6000,
-    open_issues: 300, pushed_at: "2024-06-09T00:00:00Z", created_at: "2019-08-01T00:00:00Z",
-    tags: ["cli", "go"],
-  },
-]
-
 // 格式化星数
 function formatStars(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return String(n)
+}
+
+function repoDetailPath(repo: Repo): string {
+  const [owner, name] = repo.full_name.split("/")
+  return `/repo/${encodeURIComponent(repo.owner || owner || "")}/${encodeURIComponent(repo.name || name || "")}`
 }
 
 const StarCatalog: React.FC = () => {
@@ -123,15 +64,14 @@ const StarCatalog: React.FC = () => {
           setRepos(reposRes.items)
           setIsDemoMode(false)
         } else {
-          // API 不可用，回退到 demo 数据
-          setTags(DEMO_TAGS)
-          setRepos(DEMO_REPOS)
+          setTags([])
+          setRepos([])
           setIsDemoMode(true)
         }
       } catch {
         if (!cancelled) {
-          setTags(DEMO_TAGS)
-          setRepos(DEMO_REPOS)
+          setTags([])
+          setRepos([])
           setIsDemoMode(true)
         }
       } finally {
@@ -290,7 +230,7 @@ const StarCatalog: React.FC = () => {
                         <CardContent className="p-4">
                           {/* 仓库名 */}
                           <Link
-                            to={`/repo/${repo.owner}/${repo.name}`}
+                            to={repoDetailPath(repo)}
                             className="font-medium text-primary hover:underline line-clamp-1"
                           >
                             {repo.full_name}

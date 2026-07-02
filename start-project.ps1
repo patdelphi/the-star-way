@@ -4,6 +4,7 @@
   [switch]$OpenBrowser
 )
 
+# 程序说明：启动 the-star-way 后端和前端，并固定 Node/pnpm 入口，避免 native 模块 ABI 混用。
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -53,6 +54,27 @@ function Show-Log {
   }
 }
 
+function Resolve-RequiredCommand {
+  param([string]$Name)
+  $cmd = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $cmd) { throw "$Name not found" }
+  if (-not $cmd.Source) { throw "$Name path not resolved" }
+  return $cmd.Source
+}
+
+function Initialize-LogFile {
+  param([string]$Path, [string]$Prefix)
+  try {
+    Set-Content -Path $Path -Value "" -Encoding UTF8 -ErrorAction Stop
+    return $Path
+  } catch {
+    # 旧进程可能仍持有日志文件句柄，改用本次启动专属日志，避免启动流程被旧日志阻塞。
+    $fallback = Join-Path $RuntimeDir "$Prefix-$PID.log"
+    Set-Content -Path $fallback -Value "" -Encoding UTF8
+    return $fallback
+  }
+}
+
 # ===== Main =====
 try {
   Cleanup-Previous
@@ -62,23 +84,34 @@ try {
 
   if (-not (Test-Path $BackendDir)) { throw "Missing backend dir: $BackendDir" }
   if (-not (Test-Path $FrontendDir)) { throw "Missing frontend dir: $FrontendDir" }
-  if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "pnpm not found" }
+  $NodeCmd = Resolve-RequiredCommand "node"
+  $PnpmCmd = Resolve-RequiredCommand "pnpm"
+  $NodeDir = Split-Path -Parent $NodeCmd
+  $env:PATH = "$NodeDir;$env:PATH"
+  $env:STARWAY_NODE_CMD = $NodeCmd
+  $env:STARWAY_PNPM_CMD = $PnpmCmd
   if (-not (Test-Path (Join-Path $BackendDir "node_modules"))) { throw "Backend deps missing: cd backend && pnpm install" }
   if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) { throw "Frontend deps missing: cd frontend && pnpm install" }
+  $BackendTsx = Join-Path $BackendDir "node_modules\tsx\dist\cli.mjs"
+  $FrontendVite = Join-Path $FrontendDir "node_modules\vite\bin\vite.js"
+  if (-not (Test-Path $BackendTsx)) { throw "Backend tsx CLI missing: $BackendTsx" }
+  if (-not (Test-Path $FrontendVite)) { throw "Frontend vite CLI missing: $FrontendVite" }
 
   if (-not (Test-Path $RuntimeDir)) { New-Item -ItemType Directory -Path $RuntimeDir | Out-Null }
   $backendLog = Join-Path $RuntimeDir "backend.log"
   $frontendLog = Join-Path $RuntimeDir "frontend.log"
+  $backendLog = Initialize-LogFile $backendLog "backend"
+  $frontendLog = Initialize-LogFile $frontendLog "frontend"
 
   Write-Host "Starting..."
 
-  # Check & rebuild native modules (use system node — child process inherits same PATH)
+  # 检查 native 模块：用后续启动后端的同一个 Node ABI 进行加载验证。
   Write-Host "Checking native modules..."
   Push-Location $BackendDir
-  node -e "require('better-sqlite3')" 2>&1 | Out-Null
+  & $NodeCmd -e "const Database = require('better-sqlite3'); new Database(':memory:').close()" 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "Rebuilding better-sqlite3 for Node.js v$((node -v).Trim()) ..."
-    pnpm rebuild better-sqlite3 2>&1 | Out-Null
+    Write-Host "Rebuilding better-sqlite3 for Node.js $((& $NodeCmd -v).Trim()) ..."
+    & $PnpmCmd rebuild better-sqlite3 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
       throw "better-sqlite3 rebuild failed. Try manually: cd backend && pnpm rebuild better-sqlite3"
     }
@@ -86,13 +119,13 @@ try {
   }
   Pop-Location
 
-  # Launch backend (child powershell, pnpm exec ensures correct Node)
-  $backendCmd = "Set-Location '$BackendDir'; `$env:PORT='$actualBackend'; pnpm exec tsx src/api/start.ts *>&1 | Tee-Object -FilePath '$backendLog'"
+  # 子进程复用父进程解析出的绝对路径，避免 PowerShell 在不同 PATH 下找到另一套 pnpm/node。
+  $backendCmd = "Set-Location '$BackendDir'; `$env:PATH='$NodeDir;' + `$env:PATH; `$env:PORT='$actualBackend'; & `$env:STARWAY_NODE_CMD -p `"process.version + ' modules=' + process.versions.modules + ' exec=' + process.execPath`"; & `$env:STARWAY_NODE_CMD '$BackendTsx' src/api/start.ts *>&1 | Tee-Object -FilePath '$backendLog'"
   $backendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$backendCmd) -WindowStyle Hidden -PassThru
   Write-Host "Backend PID: $($backendProc.Id)"
 
   # Launch frontend
-  $frontendCmd = "Set-Location '$FrontendDir'; `$env:VITE_API_BASE='http://localhost:$actualBackend'; pnpm exec vite --host 127.0.0.1 --port $actualFrontend *>&1 | Tee-Object -FilePath '$frontendLog'"
+  $frontendCmd = "Set-Location '$FrontendDir'; `$env:PATH='$NodeDir;' + `$env:PATH; `$env:VITE_API_BASE='http://localhost:$actualBackend'; & `$env:STARWAY_NODE_CMD -p `"process.version + ' modules=' + process.versions.modules + ' exec=' + process.execPath`"; & `$env:STARWAY_NODE_CMD '$FrontendVite' --host 127.0.0.1 --port $actualFrontend *>&1 | Tee-Object -FilePath '$frontendLog'"
   $frontendProc = Start-Process -FilePath "powershell" -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$frontendCmd) -WindowStyle Hidden -PassThru
   Write-Host "Frontend PID: $($frontendProc.Id)"
 

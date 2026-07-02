@@ -37,16 +37,17 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts"
+import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
 
 
 // ===== 技术雷达六维映射规则 =====
 const RADAR_TAG_MAP: Record<string, string[]> = {
-  frontend: ['前端框架', '前端工具', 'CSS', 'UI 组件', 'React', 'Vue'],
-  backend: ['后端框架', 'API', '数据库', 'Web 服务', 'Node.js', 'Python'],
-  ai: ['AI/LLM', 'AI Agent', '机器学习', '深度学习', 'RAG', 'MCP'],
-  tools: ['CLI 工具', '开发者工具', '编辑器', '版本控制'],
-  infrastructure: ['DevOps', '容器化', 'CI/CD', '云平台', '监控'],
-  data: ['数据处理', '数据可视化', '数据库', 'ETL'],
+  frontend: ['frontend', 'css', 'ui', 'react', 'vue', 'web'],
+  backend: ['backend', 'api', 'database', 'server', 'nodejs', 'python'],
+  ai: ['ai', 'llm', 'agent', 'machine-learning', 'deep-learning', 'rag', 'mcp'],
+  tools: ['cli', 'developer-tools', 'editor', 'git', 'tooling'],
+  infrastructure: ['devops', 'container', 'docker', 'ci', 'cloud', 'monitoring'],
+  data: ['data', 'visualization', 'database', 'etl', 'analytics'],
 }
 
 const RADAR_DIMENSIONS = [
@@ -56,62 +57,6 @@ const RADAR_DIMENSIONS = [
   { key: 'tools', color: '#475569' },
   { key: 'infrastructure', color: '#006b5c' },
   { key: 'data', color: '#9b4420' },
-]
-
-// ===== Demo 数据（API 不可用时回退） =====
-const demoPersonalityData = [
-  { nameKey: 'pythonEcosystem', count: 254, color: 'bg-domain-backend' },
-  { nameKey: 'tsEcosystem', count: 125, color: 'bg-domain-frontend' },
-  { nameKey: 'systemTools', count: 89, color: 'bg-domain-tools' },
-  { nameKey: 'jupyterNotes', count: 42, color: 'bg-domain-ai' },
-]
-
-const demoRadarData = [
-  { labelKey: 'frontend', value: 75, color: '#0284c7' },
-  { labelKey: 'backend', value: 90, color: '#059669' },
-  { labelKey: 'ai', value: 65, color: '#7c3aed' },
-  { labelKey: 'tools', value: 80, color: '#475569' },
-  { labelKey: 'infrastructure', value: 55, color: '#006b5c' },
-  { labelKey: 'data', value: 70, color: '#9b4420' },
-]
-
-const demoHotTopics = [
-  '机器学习',
-  '网页框架',
-  '命令行工具',
-  '数据科学',
-  '开源项目',
-  '开发者工具',
-]
-
-const demoGemRepos = [
-  {
-    fullName: 'karpathy/micrograd',
-    description: '微型标量自动求导引擎，以及基于它实现的神经网络库。',
-    stars: '10.2k',
-    forks: '1.1k',
-    language: 'Python',
-    langColor: 'bg-domain-backend',
-    htmlUrl: 'https://github.com/karpathy/micrograd',
-  },
-  {
-    fullName: 'tiangolo/fastapi',
-    description: '高性能、易学习、编码快、可用于生产环境的 FastAPI 框架。',
-    stars: '78.5k',
-    forks: '6.6k',
-    language: 'Python',
-    langColor: 'bg-domain-backend',
-    htmlUrl: 'https://github.com/tiangolo/fastapi',
-  },
-  {
-    fullName: 'charmbracelet/bubbletea',
-    description: '轻量但能力完整的终端界面框架。',
-    stars: '29.8k',
-    forks: '800',
-    language: 'Go',
-    langColor: 'bg-domain-tools',
-    htmlUrl: 'https://github.com/charmbracelet/bubbletea',
-  },
 ]
 
 // ===== 语言生态归类配置 =====
@@ -201,10 +146,10 @@ function categorizeLanguages(languages: { language: string; count: number }[]): 
  */
 function calcRadarData(tags: { tag: string; count: number }[]): RadarItem[] {
   if (!tags || tags.length === 0) {
-    return demoRadarData.map(d => ({ ...d }))
+    return []
   }
 
-  const tagMap = new Map(tags.map(t => [t.tag, t.count]))
+  const tagMap = new Map(tags.map(t => [t.tag.toLowerCase(), t.count]))
   const dimCounts = RADAR_DIMENSIONS.map(dim => {
     const keywords = RADAR_TAG_MAP[dim.key]
     const count = keywords.reduce((sum, kw) => sum + (tagMap.get(kw) || 0), 0)
@@ -213,7 +158,7 @@ function calcRadarData(tags: { tag: string; count: number }[]): RadarItem[] {
 
   const totalRelevant = dimCounts.reduce((sum, d) => sum + d.count, 0)
   if (totalRelevant === 0) {
-    return demoRadarData.map(d => ({ ...d }))
+    return []
   }
 
   const maxCount = Math.max(...dimCounts.map(d => d.count), 1)
@@ -264,7 +209,7 @@ function pickTopItems<T extends { count: number }>(items: T[], limit: number): T
   return [...items].sort((a, b) => b.count - a.count).slice(0, limit)
 }
 
-function TrendBars({ data }: { data: { label: string; value: number }[] }) {
+function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string } }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
 
@@ -273,15 +218,15 @@ function TrendBars({ data }: { data: { label: string; value: number }[] }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
           <div className="text-xs text-muted-foreground">{total}</div>
-          <div className="text-sm font-medium text-on-surface">近 12 月新增</div>
+          <div className="text-sm font-medium text-on-surface">{labels.total}</div>
         </div>
         <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
           <div className="text-xs text-muted-foreground">{peak?.label || "-"}</div>
-          <div className="text-sm font-medium text-on-surface">峰值月份</div>
+          <div className="text-sm font-medium text-on-surface">{labels.peakMonth}</div>
         </div>
         <div className="rounded-md border border-outline-variant/60 bg-surface-container-low px-3 py-2">
           <div className="text-xs text-muted-foreground">{peak?.value || 0}</div>
-          <div className="text-sm font-medium text-on-surface">峰值数量</div>
+          <div className="text-sm font-medium text-on-surface">{labels.peakValue}</div>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={180}>
@@ -289,7 +234,7 @@ function TrendBars({ data }: { data: { label: string; value: number }[] }) {
           <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip />
+          <Tooltip content={<ThemedChartTooltip />} />
           <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
@@ -330,11 +275,11 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [personalityData, setPersonalityData] = useState<PersonalityItem[]>(demoPersonalityData)
-  const [radarData, setRadarData] = useState<RadarItem[]>(demoRadarData)
-  const [hotTopics, setHotTopics] = useState<string[]>(demoHotTopics)
-  const [gemRepos, setGemRepos] = useState<GemRepo[]>(demoGemRepos)
-  const [repoCount, setRepoCount] = useState(691)
+  const [personalityData, setPersonalityData] = useState<PersonalityItem[]>([])
+  const [radarData, setRadarData] = useState<RadarItem[]>([])
+  const [hotTopics, setHotTopics] = useState<string[]>([])
+  const [gemRepos, setGemRepos] = useState<GemRepo[]>([])
+  const [repoCount, setRepoCount] = useState(0)
   const [languageStats, setLanguageStats] = useState<{ language: string; count: number }[]>([])
   const [topicStats, setTopicStats] = useState<{ topic: string; count: number }[]>([])
   const [recentStars, setRecentStars] = useState<{ fullName: string; description: string; language: string; starredAt: string }[]>([])
@@ -363,7 +308,7 @@ const Dashboard: React.FC = () => {
           setPersonalityData(categorizeLanguages(overview.languages))
           setLanguageStats(overview.languages)
         } else {
-          setPersonalityData(demoPersonalityData)
+          setPersonalityData([])
           setLanguageStats([])
         }
 
@@ -375,7 +320,7 @@ const Dashboard: React.FC = () => {
           setHotTopics(overview.topics.slice(0, 6).map(t => t.topic))
           setTopicStats(overview.topics)
         } else {
-          setHotTopics(demoHotTopics)
+          setHotTopics([])
           setTopicStats([])
         }
 
@@ -384,7 +329,7 @@ const Dashboard: React.FC = () => {
         if (gems.length > 0) {
           setGemRepos(gems)
         } else {
-          setGemRepos(demoGemRepos)
+          setGemRepos([])
         }
 
         // 最近星标：全库最近星标
@@ -402,11 +347,12 @@ const Dashboard: React.FC = () => {
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : String(err))
-        // 回退到 Demo 数据
-        setPersonalityData(demoPersonalityData)
-        setRadarData(demoRadarData)
-        setHotTopics(demoHotTopics)
-        setGemRepos(demoGemRepos)
+        setUserCount(0)
+        setRepoCount(0)
+        setPersonalityData([])
+        setRadarData([])
+        setHotTopics([])
+        setGemRepos([])
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -585,7 +531,7 @@ const Dashboard: React.FC = () => {
                       <Cell key={i} fill={LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip content={<ThemedChartTooltip />} />
                   <Legend />
                 </RechartsPie>
               </ResponsiveContainer>
@@ -632,11 +578,18 @@ const Dashboard: React.FC = () => {
                 <CardTitle className="text-xl">{t("dashboard.starTrend")}</CardTitle>
               </div>
               <CardDescription>
-                按全库真实用户的 starred_at 聚合最近 12 个月新增星标。
+                {t("dashboard.starTrendDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TrendBars data={starTrend} />
+              <TrendBars
+                data={starTrend}
+                labels={{
+                  total: t("dashboard.trendTotal"),
+                  peakMonth: t("dashboard.trendPeakMonth"),
+                  peakValue: t("dashboard.trendPeakValue"),
+                }}
+              />
             </CardContent>
           </Card>
         )}
@@ -650,7 +603,7 @@ const Dashboard: React.FC = () => {
                 <CardTitle className="text-xl">{t("dashboard.tagCloud")}</CardTitle>
               </div>
               <CardDescription>
-                Top 标签按全库仓库 topics 出现次数排序，数量表示命中仓库数。
+                {t("dashboard.tagCloudDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -675,7 +628,7 @@ const Dashboard: React.FC = () => {
                 {t('dashboard.gemRepos')}
               </h2>
               <p className="text-sm text-muted-foreground">
-                规则：真实用户星标中，GitHub stars 50-10000，最近 90 天有更新，按 stars 倒序取前 3。
+                {t("dashboard.gemReposDesc")}
               </p>
             </div>
           </div>
