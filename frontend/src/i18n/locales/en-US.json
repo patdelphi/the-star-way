@@ -300,6 +300,8 @@
     "noDesc": "No description",
     "noDeepSummary": "[{{name}}] No deep analysis summary.",
     "summaryLoading": "Generating AI summary...",
+    "summaryEmpty": "No summary yet. Click the button above to regenerate.",
+    "regenerateSummary": "Regenerate",
     "initializing": "Initializing...",
     "importedFromStarred": "Imported {{repo}} from starred repo list.",
     "apiUnavailable": "API unavailable, fallback to Demo data.",

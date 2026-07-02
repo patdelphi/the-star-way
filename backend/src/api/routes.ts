@@ -671,16 +671,20 @@ export function createRouter(db: Database.Database) {
       const readmeMatch = matchRoute('/api/repos/*/readme-summary', url.split('?')[0])
       if (method === 'GET' && readmeMatch) {
         const fullName = decodeURIComponent(readmeMatch['*'] || '')
+        const query = parseQuery(url)
+        const force = query.force === '1'
 
-        // 先查缓存
-        const cached = db.prepare(`
-          SELECT translated_readme_summary FROM translations
-          WHERE repo_full_name = ? AND target_lang = 'zh'
-        `).get(fullName) as { translated_readme_summary: string } | undefined
+        // 先查缓存（非强制刷新时）
+        if (!force) {
+          const cached = db.prepare(`
+            SELECT translated_readme_summary FROM translations
+            WHERE repo_full_name = ? AND target_lang = 'zh'
+          `).get(fullName) as { translated_readme_summary: string } | undefined
 
-        if (cached?.translated_readme_summary) {
-          json(res, { data: { summary: cached.translated_readme_summary, cached: true } })
-          return
+          if (cached?.translated_readme_summary) {
+            json(res, { data: { summary: cached.translated_readme_summary, cached: true } })
+            return
+          }
         }
 
         // 获取仓库信息

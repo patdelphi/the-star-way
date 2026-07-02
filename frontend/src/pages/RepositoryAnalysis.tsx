@@ -3,7 +3,7 @@
  * 单个仓库分析页，已接入真实 API。
  * 通过 getRepos / getStats / getTags 获取真实数据；API 不可用时展示空状态。
  */
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useSearchParams } from "react-router-dom"
 import {
@@ -33,6 +33,7 @@ import {
   Sparkles,
   Star,
   Tags,
+  RefreshCw,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -251,8 +252,28 @@ export default function RepositoryAnalysis() {
     return () => { cancelled = true }
   }, [selectedRepo, apiRepos, currentLogin])
 
-  // README 中文摘要（来自 AI 接口），随选中仓库变化重新获取
+  // README 中文摘要（来自 AI 接口）
   const [readmeSummary, setReadmeSummary] = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  // 已加载过摘要的仓库缓存，避免重复请求
+  const summaryCache = useRef<Record<string, string>>({})
+
+  const loadSummary = useCallback((repo: string, force = false) => {
+    if (!force && summaryCache.current[repo]) {
+      setReadmeSummary(summaryCache.current[repo])
+      return
+    }
+    setSummaryLoading(true)
+    getReadmeSummary(repo, force)
+      .then((result) => {
+        if (result?.summary) {
+          setReadmeSummary(result.summary)
+          summaryCache.current[repo] = result.summary
+        }
+      })
+      .catch(() => { /* 忽略错误 */ })
+      .finally(() => setSummaryLoading(false))
+  }, [])
 
   useEffect(() => {
     if (!selectedRepo) {
@@ -260,14 +281,8 @@ export default function RepositoryAnalysis() {
       return
     }
     setReadmeSummary(null)
-    getReadmeSummary(selectedRepo)
-      .then((result) => {
-        if (result?.summary) setReadmeSummary(result.summary)
-      })
-      .catch(() => {
-        /* 忽略错误，摘要为可选内容 */
-      })
-  }, [selectedRepo])
+    loadSummary(selectedRepo)
+  }, [selectedRepo, loadSummary])
 
   // 加载相似项目
   useEffect(() => {
@@ -533,21 +548,42 @@ export default function RepositoryAnalysis() {
         {activeRepo && <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <Card className="lg:col-span-7">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <BookOpenText className="h-5 w-5 text-primary" />
-                {t("repoAnalysis.readmeSummary")}
-              </CardTitle>
-              <CardDescription>
-                {userStats
-                  ? t("repoAnalysis.repoStats", { total: userStats.repoCount, active: userStats.activeRepoCount })
-                  : t("repoAnalysis.readmeSummaryDesc")}
-              </CardDescription>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <BookOpenText className="h-5 w-5 text-primary" />
+                    {t("repoAnalysis.readmeSummary")}
+                  </CardTitle>
+                  <CardDescription className="mt-1.5">
+                    {userStats
+                      ? t("repoAnalysis.repoStats", { total: userStats.repoCount, active: userStats.activeRepoCount })
+                      : t("repoAnalysis.readmeSummaryDesc")}
+                  </CardDescription>
+                </div>
+                {readmeSummary && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-xs shrink-0"
+                    disabled={summaryLoading}
+                    onClick={() => loadSummary(selectedRepo, true)}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? "animate-spin" : ""}`} />
+                    {t("repoAnalysis.regenerateSummary")}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              {readmeSummary ? (
+              {summaryLoading && !readmeSummary ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  {t("repoAnalysis.summaryLoading")}
+                </div>
+              ) : readmeSummary ? (
                 <p className="text-sm leading-7 text-on-surface">{readmeSummary}</p>
               ) : (
-                <p className="text-sm leading-7 text-muted-foreground">{t("repoAnalysis.summaryLoading")}</p>
+                <p className="text-sm leading-7 text-muted-foreground">{t("repoAnalysis.summaryEmpty")}</p>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniFact icon={FileText} label={t("repoAnalysis.suitableFor")} value={activeRepo.category} />

@@ -424,14 +424,16 @@ export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
 
 /**
  * 获取仓库 README 中文摘要
+ * @param force 为 true 时强制重新生成（忽略缓存）
  */
-export async function getReadmeSummary(fullName: string): Promise<{
+export async function getReadmeSummary(fullName: string, force = false): Promise<{
   summary: string
   cached: boolean
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary`)
+      const params = force ? '?force=1' : ''
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary${params}`)
       const data = await res.json()
       return data.data
     }
