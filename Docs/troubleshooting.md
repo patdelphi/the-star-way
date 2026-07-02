@@ -34,10 +34,48 @@ NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 13
 
 `start-project.ps1` 已做以下处理：
 
+- 固定要求 Node.js `v24.15.0`，版本不一致时直接终止启动。
 - 固定解析系统 `node.exe` 路径。
 - 优先使用系统 Node 同目录的 `corepack.cmd pnpm` 执行 `pnpm rebuild better-sqlite3`。
 - 后端和前端子进程都使用同一个 Node 路径启动。
 - native 检查失败时打印完整尾部错误，不再只显示 `bindings.js:121`。
+
+项目根目录已提供版本声明：
+
+```text
+.node-version
+.nvmrc
+```
+
+两者都固定为：
+
+```text
+24.15.0
+```
+
+`backend/package.json` 和 `frontend/package.json` 也声明：
+
+```json
+"engines": {
+  "node": ">=24.15.0 <25"
+}
+```
+
+因此安装依赖、rebuild native 模块、启动服务必须使用同一个 Node 主版本：Node.js v24。
+
+本项目所有开发命令统一使用：
+
+```powershell
+corepack pnpm <command>
+```
+
+不要直接使用：
+
+```powershell
+pnpm <command>
+```
+
+原因是 PATH 中可能存在其他运行时附带的 `pnpm.cmd`，它可能绑定不同 Node 版本，导致 native 模块再次按错误 ABI 编译。
 
 ### 手动修复命令
 
@@ -102,4 +140,73 @@ http://localhost:3210/api/token-source
 
 ```text
 STARWAY_GITHUB_TOKEN=...
+```
+
+## 3. 直接运行 `pnpm` 出现 Node 版本不一致
+
+### 现象
+
+执行测试或构建时出现：
+
+```text
+Unsupported engine: wanted: {"node":">=24.15.0 <25"} (current: {"node":"v24.14.0","pnpm":"11.7.0"})
+```
+
+同时直接检查系统 Node 又显示：
+
+```powershell
+node -p "process.versions.node"
+```
+
+结果为：
+
+```text
+24.15.0
+```
+
+### 根因
+
+Windows PATH 中可能优先命中其他运行时附带的 `pnpm.cmd`。该 `pnpm.cmd` 自己绑定的 Node 版本可能不是系统 Node，因此会出现：
+
+- `node` 是 `24.15.0`。
+- `pnpm` 内部实际使用 `24.14.0` 或其他版本。
+- native rebuild、test、build 使用的 Node 与启动 Node 不一致。
+
+### 当前结论
+
+本项目后续统一使用：
+
+```powershell
+corepack pnpm <command>
+```
+
+常用命令：
+
+```powershell
+corepack pnpm install
+corepack pnpm test
+corepack pnpm run build
+corepack pnpm rebuild better-sqlite3
+```
+
+不要直接使用：
+
+```powershell
+pnpm install
+pnpm test
+pnpm run build
+pnpm rebuild better-sqlite3
+```
+
+### 验证命令
+
+```powershell
+node -p "process.versions.node"
+corepack pnpm exec node -p "process.versions.node"
+```
+
+两者都应输出：
+
+```text
+24.15.0
 ```

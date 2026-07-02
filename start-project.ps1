@@ -12,6 +12,7 @@ $BackendDir = Join-Path $ProjectRoot "backend"
 $FrontendDir = Join-Path $ProjectRoot "frontend"
 $RuntimeDir = Join-Path $ProjectRoot ".runtime"
 $PidFile = Join-Path $RuntimeDir "pids.json"
+$RequiredNodeVersion = "24.15.0"
 
 function Find-AvailablePort {
   param([int]$Start)
@@ -73,6 +74,14 @@ function Resolve-PnpmCommand {
   return @{ Command = $pnpm; PrefixArgs = @() }
 }
 
+function Assert-NodeVersion {
+  param([string]$NodeCmd, [string]$RequiredVersion)
+  $actualVersion = (& $NodeCmd -p "process.versions.node").Trim()
+  if ($actualVersion -ne $RequiredVersion) {
+    throw "Node.js version mismatch. Required v$RequiredVersion, current v$actualVersion at $NodeCmd. Use the project .node-version/.nvmrc and rerun corepack pnpm rebuild better-sqlite3."
+  }
+}
+
 function Initialize-LogFile {
   param([string]$Path, [string]$Prefix)
   try {
@@ -96,6 +105,7 @@ try {
   if (-not (Test-Path $BackendDir)) { throw "Missing backend dir: $BackendDir" }
   if (-not (Test-Path $FrontendDir)) { throw "Missing frontend dir: $FrontendDir" }
   $NodeCmd = Resolve-RequiredCommand "node"
+  Assert-NodeVersion $NodeCmd $RequiredNodeVersion
   $NodeDir = Split-Path -Parent $NodeCmd
   $PnpmRuntime = Resolve-PnpmCommand $NodeDir
   $PnpmCmd = $PnpmRuntime.Command
@@ -103,8 +113,8 @@ try {
   $env:PATH = "$NodeDir;$env:PATH"
   $env:STARWAY_NODE_CMD = $NodeCmd
   $env:STARWAY_PNPM_CMD = $PnpmCmd
-  if (-not (Test-Path (Join-Path $BackendDir "node_modules"))) { throw "Backend deps missing: cd backend && pnpm install" }
-  if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) { throw "Frontend deps missing: cd frontend && pnpm install" }
+  if (-not (Test-Path (Join-Path $BackendDir "node_modules"))) { throw "Backend deps missing: cd backend && corepack pnpm install" }
+  if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) { throw "Frontend deps missing: cd frontend && corepack pnpm install" }
   $BackendTsx = Join-Path $BackendDir "node_modules\tsx\dist\cli.mjs"
   $FrontendVite = Join-Path $FrontendDir "node_modules\vite\bin\vite.js"
   if (-not (Test-Path $BackendTsx)) { throw "Backend tsx CLI missing: $BackendTsx" }

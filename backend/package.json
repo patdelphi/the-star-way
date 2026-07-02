@@ -4,6 +4,9 @@
   "private": true,
   "description": "Backend for the-star-way: SQLite data layer, GitHub sync, classification, and export.",
   "type": "module",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",

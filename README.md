@@ -27,16 +27,18 @@
 
 ## 快速开始
 
+本项目固定使用 Node.js `24.15.0`，并统一通过 `corepack pnpm` 执行依赖安装、测试、构建和 native rebuild。不要直接使用 `npm` 或 PATH 中的 `pnpm.cmd`，避免 `better-sqlite3` 按错误 Node ABI 编译。
+
 ### 1. 安装依赖
 
-```bash
+```powershell
 # 前端
-cd frontend
-npm install
+cd "C:\Users\patde\Documents\GitHub\the-star-way\frontend"
+corepack pnpm install
 
 # 后端
-cd backend
-npm install
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+corepack pnpm install
 ```
 
 ### 1.1 环境变量
@@ -45,36 +47,36 @@ npm install
 
 ### 2. 初始化数据库（导入 Demo 数据）
 
-```bash
-cd backend
-npx tsx src/db/seed.ts
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+corepack pnpm exec tsx src/db/seed.ts
 ```
 
 将 691 条 GitHub 星标仓库导入 SQLite（`backend/data/starway.db`）。
 
 ### 3. 启动后端 API
 
-```bash
-cd backend
-npx tsx src/api/start.ts
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+corepack pnpm exec tsx src/api/start.ts
 ```
 
 API 服务运行在 `http://localhost:3210`。
 
 ### 4. 启动前端开发服务器
 
-```bash
-cd frontend
-npm run dev
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\frontend"
+corepack pnpm run dev
 ```
 
 前端运行在 `http://localhost:5173`，自动连接本地 API。
 
 ### 5. 生产构建
 
-```bash
-cd frontend
-npm run build
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\frontend"
+corepack pnpm run build
 ```
 
 构建产物在 `frontend/dist/` 目录。
@@ -130,10 +132,10 @@ the-star-way/
 
 ## 测试
 
-```bash
-cd backend
-npm test          # 运行全部测试（当前 94 个通过）
-npm run test:watch # 监听模式
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+corepack pnpm test             # 运行全部测试
+corepack pnpm run test:watch   # 监听模式
 ```
 
 测试覆盖：

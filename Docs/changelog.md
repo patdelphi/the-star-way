@@ -31,3 +31,5 @@
 - 当前本地真实数据验证样本：34 个真实用户、3632 个真实仓库、3779 条星标关系、64 个标签分类。
 - 验证通过：后端 99 个测试、后端 TypeScript 构建、前端 40 项 UI 静态校验、前端生产构建。
 - 新增 `troubleshooting.md`，记录 `better-sqlite3` native ABI 不匹配、系统 Node/Corepack pnpm 修复方式，以及 GitHub token 未加载导致匿名限流的排查步骤。
+- 统一项目 Node.js 版本到 `v24.15.0`：新增 `.node-version`、`.nvmrc`，后端和前端 `package.json` 声明 Node engines，启动脚本增加版本硬检查。
+- 统一开发命令为 `corepack pnpm`：更新 README、部署文档、故障排查文档和启动脚本依赖缺失提示，避免 PATH 中其他 pnpm 绑定不同 Node 版本。

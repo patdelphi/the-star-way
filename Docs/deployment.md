@@ -2,7 +2,30 @@
 
 ## 1. 首版运行方式
 
-首版优先本地运行：
+项目开发环境固定使用 Node.js `24.15.0`，并统一通过 `corepack pnpm` 执行依赖安装、测试、构建和 native rebuild。
+
+本地开发启动：
+
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way"
+.\start-project.ps1
+```
+
+手动启动：
+
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+corepack pnpm install
+corepack pnpm exec tsx src/api/start.ts
+```
+
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\frontend"
+corepack pnpm install
+corepack pnpm run dev
+```
+
+未来 npm 包形态：
 
 ```bash
 npx the-star-way import-demo
@@ -56,6 +79,7 @@ MVP 发布目标：
 
 ## 6. 生产注意事项
 
+- 依赖安装和构建统一使用 `corepack pnpm`，避免 PATH 中其他 pnpm 绑定不同 Node 版本。
 - 生产环境必须使用 sandbox 和最小权限 token。
 - 部署前必须跑 lint、test、type-check、build。
 - 数据库迁移必须单独确认并备份。

@@ -5,6 +5,9 @@
   "description": "Turn GitHub stars into your developer map, learning path, and open-source radar.",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
