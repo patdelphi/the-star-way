@@ -770,11 +770,6 @@ export default function Developers() {
                     <span className="text-sm font-semibold text-on-surface">
                       @{dev.name}
                     </span>
-                    {dev.isActive && (
-                      <Badge className="bg-primary text-on-primary text-[10px] px-1.5 py-0 shrink-0">
-                        {t("developers.current")}
-                      </Badge>
-                    )}
                   </div>
                   {/* 显示名称 */}
                   {dev.displayName && (
