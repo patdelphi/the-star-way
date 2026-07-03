@@ -498,30 +498,48 @@ export default function Developers() {
 
   // 加载 Star DNA 画像
   const loadStarDna = async (login: string, force = false) => {
-    setDnaLoading(true)
-    setStarDna(null)
+    // 仅在强制刷新时显示 loading 并清空旧数据
+    if (force) {
+      setDnaLoading(true)
+      setStarDna(null)
+    }
     try {
       const result = await getStarDna(login, force)
-      if (result?.dna) setStarDna(result.dna)
+      if (result?.dna) {
+        setStarDna(result.dna)
+      } else if (force) {
+        setStarDna(null)
+      }
     } catch { /* 忽略 */ }
-    finally { setDnaLoading(false) }
+    finally { if (force) setDnaLoading(false) }
   }
 
   // 加载学习路径
   const loadLearningPath = async (login: string, force = false) => {
-    setPathLoading(true)
-    setLearningPath(null)
+    if (force) {
+      setPathLoading(true)
+      setLearningPath(null)
+    }
     try {
       const result = await getLearningPath(login, force)
-      if (result?.path) setLearningPath(result.path)
+      if (result?.path) {
+        setLearningPath(result.path)
+      } else if (force) {
+        setLearningPath(null)
+      }
     } catch { /* 忽略 */ }
-    finally { setPathLoading(false) }
+    finally { if (force) setPathLoading(false) }
   }
 
   // 当前选中开发者变化时，加载同步历史和 Star DNA
   const activeDevName = activeDev?.name
   useEffect(() => {
     if (activeDevName) {
+      // 切换开发者时清空旧数据（上一个开发者的内容）
+      setStarDna(null)
+      setLearningPath(null)
+      setDnaLoading(false)
+      setPathLoading(false)
       loadSyncRuns(activeDevName)
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
