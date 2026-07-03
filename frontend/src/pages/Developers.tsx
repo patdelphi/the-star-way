@@ -457,7 +457,14 @@ export default function Developers() {
       ? searchInput.trim().slice(1)
       : searchInput.trim()
     if (!name) return
-    if (developers.find((d) => d.name === name)) return
+    if (developers.find((d) => d.name === name)) {
+      // 用户已存在，直接选中
+      setDevelopers((prev) => prev.map((d) => ({ ...d, isActive: d.name === name })))
+      setCurrentLogin(name)
+      setSearchInput("")
+      setSearchResult("")
+      return
+    }
     const newDev: Developer = {
       id: Date.now().toString(),
       name,
@@ -468,12 +475,13 @@ export default function Developers() {
       followers: null,
       publicRepos: null,
       stars: 0,
-      isActive: false,
+      isActive: true,
       avatar_url: null,
       profile_url: null,
       synced_at: null,
     }
-    setDevelopers((prev) => [...prev, newDev])
+    setDevelopers((prev) => [...prev.map((d) => ({ ...d, isActive: false })), newDev])
+    setCurrentLogin(name)
     setSearchInput("")
     setSearchResult("")
     // 自动同步一次星标，获取用户公开资料和星标列表
@@ -577,6 +585,7 @@ export default function Developers() {
         setSearchResult(t("developers.starUpdated", { name }))
         await loadSyncRuns(name)
         await loadStarDna(name)
+        await loadLearningPath(name)
         // 同步成功后刷新开发者列表，更新星标数
         await refreshDevelopers()
         // 刷新统计和标签
