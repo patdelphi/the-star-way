@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "Star Way",
-    "subtitle": "Stellar Navigator"
+    "subtitle": "Stellar Navigator",
+    "errorTitle": "Page failed to render",
+    "errorDescription": "The current page state is invalid. Refresh and try again.",
+    "errorAction": "Refresh page"
   },
   "nav": {
     "groupOverview": "Overview",

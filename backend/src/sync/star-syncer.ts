@@ -5,7 +5,7 @@
  */
 import type Database from 'better-sqlite3'
 import { createConnection, initDatabase, withTransaction } from '../db/connection.js'
-import { GitHubClient, type GitHubStarredRepo, type SyncResult, type RateLimitInfo } from './github-client.js'
+import { GitHubClient, type GitHubStarredRepo, type RateLimitInfo } from './github-client.js'
 import type { GitHubClientConfig } from './github-client.js'
 import { GitHubSyncError } from './errors.js'
 import { mkdirSync, existsSync } from 'node:fs'
@@ -54,7 +54,10 @@ export async function syncStars(
   const client = new GitHubClient(config)
   const now = new Date().toISOString()
 
-  // 先确保用户在 users 表中存在（满足 sync_runs 外键约束）
+  let profile
+  profile = await client.getUserProfile(username)
+
+  // GitHub 用户资料验证成功后再创建本地用户，避免搜索添加失败时污染用户列表。
   db.prepare(`
     INSERT INTO users (login, synced_at) VALUES (?, ?)
     ON CONFLICT(login) DO UPDATE SET synced_at = excluded.synced_at
@@ -68,24 +71,23 @@ export async function syncStars(
   const syncRunResult = insertSyncRun.run(username, now)
   const syncRunId = syncRunResult.lastInsertRowid as number
 
-  let profile
+  // 用于收集分页信息
+  let totalPages = 0
+  let rateLimit: RateLimitInfo | null = null
+
+  // 分页获取 starred repos
+  let syncResult: { repos: GitHubStarredRepo[]; rateLimit: RateLimitInfo | null }
   try {
-    profile = await client.getUserProfile(username)
+    syncResult = await client.listStarredRepos(username, (page) => {
+      totalPages = page
+    })
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     db.prepare(`UPDATE sync_runs SET status = 'failed', ended_at = ?, error_message = ? WHERE id = ?`)
       .run(new Date().toISOString(), errorMessage, syncRunId)
     throw err
   }
-
-  // 用于收集分页信息
-  let totalPages = 0
-  let rateLimit: RateLimitInfo | null = null
-
-  // 分页获取 starred repos
-  const { repos, rateLimit: rl } = await client.listStarredRepos(username, (page) => {
-    totalPages = page
-  })
+  const { repos, rateLimit: rl } = syncResult
   rateLimit = rl
 
   // 本次获取的仓库 full_name 集合

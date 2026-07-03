@@ -192,9 +192,12 @@ export default function RepositoryAnalysis() {
 
         if (cancelled) return
 
-        setApiRepos(reposResult.items)
+        const repoItems = Array.isArray(reposResult.items) ? reposResult.items : []
+        const tagItems = Array.isArray(tagsResult) ? tagsResult : []
+
+        setApiRepos(repoItems)
         setUserStats(statsResult)
-        setAllTags(tagsResult)
+        setAllTags(tagItems)
 
         // 优先使用 URL ?repo=xxx，其次 localStorage
         const storedRepo = urlRepo || localStorage.getItem("selected-star-repo")
@@ -202,8 +205,8 @@ export default function RepositoryAnalysis() {
           setSelectedRepo(storedRepo)
           setStatus(t("repoAnalysis.importedFromStarred", { repo: storedRepo }))
         } else {
-          setSelectedRepo(reposResult.items[0]?.full_name ?? "")
-          setStatus(buildStatusText(reposResult.items.length, tagsResult.length, statsResult))
+          setSelectedRepo(repoItems[0]?.full_name ?? "")
+          setStatus(buildStatusText(repoItems.length, tagItems.length, statsResult))
         }
       } catch (err) {
         if (cancelled) return
@@ -293,7 +296,7 @@ export default function RepositoryAnalysis() {
     }
     // 重新加载标签（后端返回带 label 的翻译版本）
     if (currentLogin) {
-      getTags(currentLogin).then(setAllTags).catch(() => {})
+      getTags(currentLogin).then((tags) => setAllTags(Array.isArray(tags) ? tags : [])).catch(() => {})
     }
   }, [i18n.language])
 
@@ -318,7 +321,7 @@ export default function RepositoryAnalysis() {
     }
     setSimilarRepos([])
     getSimilarRepos(selectedRepo)
-      .then(setSimilarRepos)
+      .then((repos) => setSimilarRepos(Array.isArray(repos) ? repos : []))
       .catch(() => setSimilarRepos([]))
   }, [selectedRepo])
 

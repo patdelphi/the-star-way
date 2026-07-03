@@ -366,14 +366,30 @@ describe('API 路由', () => {
   })
 
   it('resolveGitHubToken 应优先使用请求 token，其次使用环境变量', () => {
-    const old = process.env.STARWAY_GITHUB_TOKEN
+    const oldStarway = process.env.STARWAY_GITHUB_TOKEN
+    const oldGithub = process.env.GITHUB_TOKEN
+    const oldGh = process.env.GH_TOKEN
+    delete process.env.GITHUB_TOKEN
+    delete process.env.GH_TOKEN
     process.env.STARWAY_GITHUB_TOKEN = 'env-token'
 
     expect(resolveGitHubToken('payload-token')).toBe('payload-token')
     expect(resolveGitHubToken()).toBe('env-token')
 
-    if (old === undefined) delete process.env.STARWAY_GITHUB_TOKEN
-    else process.env.STARWAY_GITHUB_TOKEN = old
+    delete process.env.STARWAY_GITHUB_TOKEN
+    process.env.GITHUB_TOKEN = 'github-token'
+    expect(resolveGitHubToken()).toBe('github-token')
+
+    delete process.env.GITHUB_TOKEN
+    process.env.GH_TOKEN = 'gh-token'
+    expect(resolveGitHubToken()).toBe('gh-token')
+
+    if (oldStarway === undefined) delete process.env.STARWAY_GITHUB_TOKEN
+    else process.env.STARWAY_GITHUB_TOKEN = oldStarway
+    if (oldGithub === undefined) delete process.env.GITHUB_TOKEN
+    else process.env.GITHUB_TOKEN = oldGithub
+    if (oldGh === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = oldGh
   })
 
   it('POST/DELETE /api/repos/:fullName/tags 应支持手动标签增删', async () => {

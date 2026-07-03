@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "Star Way",
-    "subtitle": "星际领航员"
+    "subtitle": "星际领航员",
+    "errorTitle": "页面加载异常",
+    "errorDescription": "当前页面状态异常，请刷新后重试。",
+    "errorAction": "刷新页面"
   },
   "nav": {
     "groupOverview": "总览",

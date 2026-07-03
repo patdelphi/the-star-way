@@ -153,6 +153,53 @@ function encodeLogin(login: string): string {
   return encodeURIComponent(login.trim())
 }
 
+/** 统一把不可信 API 数组响应兜底为空数组，避免页面直接 map/length 白屏 */
+function safeArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : []
+}
+
+/** 兜底仓库列表结构，保证调用方总能读取 items/total */
+function normalizeRepoList(value: any): RepoListResult {
+  const items = safeArray<Repo & { starred_at?: string | null; tags?: string[] }>(value?.items).map((repo) => ({
+    ...repo,
+    starred_at: repo.starred_at || "",
+    tags: safeArray<string>(repo.tags),
+  })) as RepoListResult["items"]
+  return {
+    items,
+    total: Number.isFinite(value?.total) ? value.total : items.length,
+  }
+}
+
+/** 兜底用户统计结构，保证图表和列表读取数组字段时不崩溃 */
+function normalizeUserStats(value: any): UserStats {
+  return {
+    languages: safeArray(value?.languages),
+    topics: safeArray(value?.topics),
+    licenses: safeArray(value?.licenses),
+    repoCount: Number.isFinite(value?.repoCount) ? value.repoCount : 0,
+    activeRepoCount: Number.isFinite(value?.activeRepoCount) ? value.activeRepoCount : 0,
+    aiEnabled: Boolean(value?.aiEnabled),
+  }
+}
+
+/** 兜底全局概览结构，避免 Dashboard 处理半结构响应时白屏 */
+function normalizeGlobalOverview(value: any): GlobalOverview {
+  const stats = normalizeUserStats(value)
+  return {
+    ...stats,
+    userCount: Number.isFinite(value?.userCount) ? value.userCount : 0,
+    tagCount: Number.isFinite(value?.tagCount) ? value.tagCount : 0,
+    hiddenGemsCount: Number.isFinite(value?.hiddenGemsCount) ? value.hiddenGemsCount : 0,
+    sleepStarsCount: Number.isFinite(value?.sleepStarsCount) ? value.sleepStarsCount : 0,
+    licenseRiskCount: Number.isFinite(value?.licenseRiskCount) ? value.licenseRiskCount : 0,
+    lastSyncedAt: value?.lastSyncedAt ?? null,
+    recentStars: safeArray(value?.recentStars),
+    gemRepos: safeArray(value?.gemRepos),
+    starTrend: safeArray(value?.starTrend),
+  }
+}
+
 /**
  * 带超时的 fetch 封装
  * @param url 请求 URL
@@ -217,7 +264,7 @@ export async function getUsers(): Promise<UserInfo[]> {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users`)
       const data = await res.json()
-      return data.data as UserInfo[]
+      return safeArray<UserInfo>(data.data)
     }
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底
@@ -241,7 +288,7 @@ export async function getRepos(login: string, params: RepoQueryParams = {}): Pro
 
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos?${query}`)
       const data = await res.json()
-      return data.data as RepoListResult
+      return normalizeRepoList(data.data)
     }
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底 - 返回空列表
@@ -258,13 +305,15 @@ export async function getRepo(login: string, fullName: string): Promise<(Repo & 
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos/${encodeURIComponent(fullName)}`)
       if (res.ok) {
         const data = await res.json()
-        return data.data as (Repo & { starred_at: string; tags: string[] })
+        const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
+        return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
       }
       // 回退到全局仓库查询
       const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}`)
       if (globalRes.ok) {
         const data = await globalRes.json()
-        return data.data as (Repo & { starred_at: string; tags: string[] })
+        const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
+        return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
       }
       return null
     }
@@ -292,7 +341,7 @@ export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> 
       const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/similar`)
       if (res.ok) {
         const data = await res.json()
-        return data.data as SimilarRepo[]
+        return safeArray<SimilarRepo>(data.data)
       }
     }
   } catch { /* 忽略 */ }
@@ -307,7 +356,7 @@ export async function getStats(login: string): Promise<UserStats | null> {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/stats`)
       const data = await res.json()
-      return data.data as UserStats
+      return normalizeUserStats(data.data)
     }
   } catch { /* 忽略错误，降级到 mock */ }
   return null
@@ -321,7 +370,7 @@ export async function getUserStarTimeline(login: string): Promise<Array<{ month:
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-timeline`)
       const data = await res.json()
-      return data.data as Array<{ month: string; count: number }>
+      return safeArray<{ month: string; count: number }>(data.data)
     }
   } catch { /* 忽略错误 */ }
   return null
@@ -335,7 +384,7 @@ export async function getGlobalOverview(): Promise<GlobalOverview | null> {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/overview`)
       const data = await res.json()
-      return data.data as GlobalOverview
+      return normalizeGlobalOverview(data.data)
     }
   } catch { /* 忽略错误，降级到 mock */ }
   return null
@@ -351,7 +400,7 @@ export async function getTags(login: string): Promise<{ tag: string; count: numb
       params.set('lang', getLangParam())
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/tags?${params}`)
       const data = await res.json()
-      return data.data as { tag: string; count: number; label: string }[]
+      return safeArray<{ tag: string; count: number; label: string }>(data.data)
     }
   } catch { /* 忽略错误，降级到 mock */ }
   return []
@@ -443,7 +492,7 @@ export async function getSyncRuns(login: string): Promise<{
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/sync-runs`)
       const data = await res.json()
-      return data.data ?? []
+      return safeArray(data.data)
     }
   } catch { /* 忽略错误 */ }
   return []
@@ -457,7 +506,7 @@ export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
     if (await checkApiAvailable()) {
       const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/removed-stars`)
       const data = await res.json()
-      return (data.data ?? []).map((repo: Repo & { starred_at?: string | null; tags?: string[] }) => ({
+      return safeArray<Repo & { starred_at?: string | null; tags?: string[] }>(data.data).map((repo) => ({
         ...repo,
         starred_at: repo.starred_at || "",
         tags: repo.tags || [],

@@ -327,6 +327,7 @@ export default function Developers() {
   // 同步状态以 key 形式存储，便于翻译
   const [syncStatus, setSyncStatus] = useState("pending")
   const [syncError, setSyncError] = useState("")
+  const [syncMessage, setSyncMessage] = useState("")
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([])
   const [starDna, setStarDna] = useState<string | null>(null)
   const [dnaLoading, setDnaLoading] = useState(false)
@@ -470,6 +471,7 @@ export default function Developers() {
   const addDeveloper = async () => {
     const name = normalizeGitHubLogin(searchResult || searchInput)
     if (!name) return
+    setSyncMessage("")
     if (developers.find((d) => d.name === name)) {
       // 用户已存在，直接选中
       setDevelopers((prev) => prev.map((d) => ({ ...d, isActive: d.name === name })))
@@ -504,6 +506,7 @@ export default function Developers() {
   const handleSearch = () => {
     const name = normalizeGitHubLogin(searchInput)
     if (name) {
+      setSyncMessage("")
       setSearchResult(name)
     }
   }
@@ -586,8 +589,10 @@ export default function Developers() {
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
       getStats(activeDevName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
-      getTags(activeDevName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
-      getUserStarTimeline(activeDevName).then(setStarTimeline).catch(() => setStarTimeline([]))
+      getTags(activeDevName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
+      getUserStarTimeline(activeDevName)
+        .then((timeline) => setStarTimeline(Array.isArray(timeline) ? timeline : []))
+        .catch(() => setStarTimeline([]))
     } else {
       setSyncRuns([])
       setStarDna(null)
@@ -609,7 +614,7 @@ export default function Developers() {
       setPathError("")
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
-      getTags(activeDevName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
+      getTags(activeDevName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
     }
   }, [i18n.language])
 
@@ -617,13 +622,14 @@ export default function Developers() {
   const runSync = async (name: string) => {
     setSyncStatus("syncing")
     setSyncError("")
+    setSyncMessage("")
     try {
       const token = getGitHubToken()
       const result = await syncStars(name, token || undefined)
       if (result !== null) {
         const syncedName = result.username || name
         setSyncStatus(token ? "successToken" : "successAnon")
-        setSearchResult(t("developers.starUpdated", { name: syncedName }))
+        setSyncMessage(t("developers.starUpdated", { name: syncedName }))
         await loadSyncRuns(syncedName)
         await loadStarDna(syncedName)
         await loadLearningPath(syncedName)
@@ -631,13 +637,14 @@ export default function Developers() {
         await refreshDevelopers()
         // 刷新统计和标签
         getStats(syncedName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
-        getTags(syncedName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
+        getTags(syncedName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
       }
     } catch (err) {
       setSyncStatus("networkFail")
+      setSyncMessage("")
       const message = err instanceof Error ? err.message : ""
       setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
     }
@@ -686,7 +693,7 @@ export default function Developers() {
   )
   // 星标趋势图表数据（月份取 MM 格式）
   const trendData = useMemo(
-    () => starTimeline.map((item) => ({ label: item.month.slice(5), value: item.count })),
+    () => (Array.isArray(starTimeline) ? starTimeline : []).map((item) => ({ label: item.month.slice(5), value: item.count })),
     [starTimeline],
   )
 
@@ -719,6 +726,7 @@ export default function Developers() {
                 onChange={(e) => {
                   setSearchInput(e.target.value)
                   setSearchResult("")
+                  setSyncMessage("")
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSearch()
@@ -737,6 +745,7 @@ export default function Developers() {
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90 gap-2"
                 onClick={addDeveloper}
+                disabled={syncStatus === "syncing"}
               >
                 <UserPlus className="w-4 h-4" />
                 {t("developers.addBtn")}
@@ -1042,6 +1051,7 @@ export default function Developers() {
                 <span className="text-xs text-status-warning">{t("developers.syncingHint")}</span>
               )}
               {syncError && <span className="text-xs text-status-danger">{syncError}</span>}
+              {syncMessage && <span className="text-xs text-status-success">{syncMessage}</span>}
               {!isApiMode && syncStatus !== "syncing" && (
                 <span className="text-xs text-muted-foreground">{t("developers.simulateNotice")}</span>
               )}

@@ -248,13 +248,15 @@ export default function StarExplorer() {
         ])
         if (cancelled) return
 
+        const repoItems = Array.isArray(repoResult.items) ? repoResult.items : []
+
         // API 返回空列表视为不可用，回退到 Demo 数据
-        if (repoResult.items.length === 0) {
+        if (repoItems.length === 0) {
           setAllRepos([])
           setUsingFallback(true)
           setAnalysisStatus(t("starExplorer.apiUnavailable"))
         } else {
-          setAllRepos(repoResult.items.map((repo) => adaptApiRepo(repo, {
+          setAllRepos(repoItems.map((repo) => adaptApiRepo(repo, {
             unknown: t("starExplorer.unknown"),
             uncategorized: t("starExplorer.uncategorized"),
           })))
@@ -268,7 +270,7 @@ export default function StarExplorer() {
         if (summaryResult) {
           setSummary(summaryResult)
         }
-        setTags(tagsResult)
+        setTags(Array.isArray(tagsResult) ? tagsResult : [])
 
         // 加载中文摘要（非阻塞，失败不影响主流程）
         try {
@@ -593,7 +595,7 @@ export default function StarExplorer() {
 
   const openRemovedStars = async () => {
     const repos = await getRemovedStars(currentLogin)
-    setRemovedRepos(repos.map(adaptApiRepo))
+    setRemovedRepos((Array.isArray(repos) ? repos : []).map(adaptApiRepo))
     setRemovedOpen(true)
   }
 

@@ -153,15 +153,17 @@ function text(res: ServerResponse, content: string, contentType: string, status 
 
 /** 解析同步用 GitHub Token：请求 body 优先，其次读取环境变量 */
 export function resolveGitHubToken(payloadToken?: string): string | undefined {
-  return payloadToken || process.env.STARWAY_GITHUB_TOKEN || undefined
+  return payloadToken || process.env.STARWAY_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || undefined
 }
 
 /**
  * 获取当前后端 GitHub Token 的来源
- * @returns 来源标识：'STARWAY_GITHUB_TOKEN' | null
+ * @returns 来源标识：'STARWAY_GITHUB_TOKEN' | 'GITHUB_TOKEN' | 'GH_TOKEN' | null
  */
 export function getGitHubTokenSource(): string | null {
   if (process.env.STARWAY_GITHUB_TOKEN) return 'STARWAY_GITHUB_TOKEN'
+  if (process.env.GITHUB_TOKEN) return 'GITHUB_TOKEN'
+  if (process.env.GH_TOKEN) return 'GH_TOKEN'
   return null
 }
 

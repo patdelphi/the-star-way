@@ -100,16 +100,22 @@ const MOCK_REPOS: GitHubStarredRepo[] = [
 
 let db: Database.Database
 let callCount = 0
+let profileFailureLogin: string | null = null
 
 // Mock GitHubClient 的 listStarredRepos 方法
 vi.mock('../../sync/github-client.js', () => {
   return {
     GitHubClient: vi.fn().mockImplementation(() => ({
-      getUserProfile: vi.fn().mockImplementation((username: string) => Promise.resolve({
-        login: username,
-        avatar_url: `https://github.com/${username}-profile.png`,
-        html_url: `https://github.com/${username}`,
-      })),
+      getUserProfile: vi.fn().mockImplementation((username: string) => {
+        if (username === profileFailureLogin) {
+          return Promise.reject(createSyncError(404, 'Not Found'))
+        }
+        return Promise.resolve({
+          login: username,
+          avatar_url: `https://github.com/${username}-profile.png`,
+          html_url: `https://github.com/${username}`,
+        })
+      }),
       listStarredRepos: vi.fn().mockImplementation(() => {
         callCount++
         // callCount > 10 时返回 2 个仓库（用于 removed_at 测试）
@@ -131,6 +137,7 @@ vi.mock('../../sync/github-client.js', () => {
 describe('GitHub 同步', () => {
   beforeEach(() => {
     callCount = 0 // 每个测试重置 mock 调用计数
+    profileFailureLogin = null
     cleanup()
     db = createConnection(getTestDbPath())
     initDatabase(db)
@@ -260,6 +267,30 @@ describe('GitHub 同步', () => {
 })
 
 describe('GitHub 同步错误处理', () => {
+  beforeEach(() => {
+    callCount = 0
+    profileFailureLogin = null
+    cleanup()
+    db = createConnection(getTestDbPath())
+    initDatabase(db)
+  })
+
+  afterEach(() => {
+    db.close()
+    cleanup()
+  })
+
+  it('用户资料获取失败时不应残留失败用户', async () => {
+    profileFailureLogin = 'missing-user'
+
+    await expect(syncStars(db, 'missing-user')).rejects.toMatchObject({
+      code: 'GITHUB_NOT_FOUND',
+    })
+
+    expect(db.prepare('SELECT login FROM users WHERE login = ?').get('missing-user')).toBeUndefined()
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM sync_runs WHERE user_login = ?').get('missing-user')).toEqual({ cnt: 0 })
+  })
+
   it('createSyncError 应正确分类状态码', () => {
     const err401 = createSyncError(401, 'Unauthorized')
     expect(err401.code).toBe('GITHUB_UNAUTHORIZED')
