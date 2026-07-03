@@ -67,6 +67,52 @@ function error(res: ServerResponse, code: string, message: string, status = 400)
   json(res, { error: { code, message } }, status)
 }
 
+/** 校验用户存在，避免为不存在的 login 生成 AI 内容 */
+function ensureUserExists(db: Database.Database, login: string): boolean {
+  return !!db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+}
+
+/** 获取用户星标数量，用于 AI 内容生成前的空数据保护 */
+function getUserStarCount(db: Database.Database, login: string): number {
+  const row = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
+  return row.cnt
+}
+
+/** 缓存用户级 AI 文本，所有写入放在同一事务中 */
+function cacheUserAiTextPair(
+  db: Database.Database,
+  login: string,
+  zhKey: string,
+  zhText: string,
+  enKey: string,
+  enText: string,
+  updatedAt: string,
+): void {
+  const save = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, ?, ?, 'ai', ?)
+      ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+        translated_readme_summary = excluded.translated_readme_summary,
+        provider = excluded.provider,
+        updated_at = excluded.updated_at
+    `).run(`user:${login}`, zhKey, zhText, updatedAt)
+
+    if (enText) {
+      db.prepare(`
+        INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+        VALUES (?, ?, ?, 'ai', ?)
+        ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+          translated_readme_summary = excluded.translated_readme_summary,
+          provider = excluded.provider,
+          updated_at = excluded.updated_at
+      `).run(`user:${login}`, enKey, enText, updatedAt)
+    }
+  })
+
+  save()
+}
+
 /** 发送文本响应（用于导出） */
 function text(res: ServerResponse, content: string, contentType: string, status = 200): void {
   res.writeHead(status, {
@@ -473,6 +519,11 @@ export function createRouter(db: Database.Database) {
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
 
+        if (!ensureUserExists(db, login)) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+
         // 查缓存（非强制刷新时）
         if (!force) {
           const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `dna-${lang}`) as { translated_readme_summary: string } | undefined
@@ -480,6 +531,12 @@ export function createRouter(db: Database.Database) {
             json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
             return
           }
+        }
+
+        const starCount = getUserStarCount(db, login)
+        if (starCount === 0) {
+          error(res, 'EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
+          return
         }
 
         // 收集统计
@@ -495,7 +552,6 @@ export function createRouter(db: Database.Database) {
           GROUP BY tag ORDER BY count DESC LIMIT 8
         `).all(login) as { tag: string; count: number }[]
 
-        const repoCount = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
         const activeRepoCount = queryActiveRepoCount(db, login)
 
         // 获取代表性星标项目（按 stars 排序取前 5）
@@ -509,7 +565,7 @@ export function createRouter(db: Database.Database) {
         try {
           // 先生成中文
           const dnaZh = await generateStarDna(login, {
-            repoCount: repoCount.cnt,
+            repoCount: starCount,
             activeRepoCount,
             languages,
             tags,
@@ -518,30 +574,13 @@ export function createRouter(db: Database.Database) {
 
           const now = new Date().toISOString()
 
-          // 缓存中文
-          db.prepare(`
-            INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-            VALUES (?, 'dna-zh', ?, 'ai', ?)
-            ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-              translated_readme_summary = excluded.translated_readme_summary,
-              provider = excluded.provider,
-              updated_at = excluded.updated_at
-          `).run(`user:${login}`, dnaZh, now)
-
           // 自动翻译英文
           let dnaEn = ''
           try {
             dnaEn = await translateToEnglish(dnaZh)
-            db.prepare(`
-              INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-              VALUES (?, 'dna-en', ?, 'ai', ?)
-              ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-                translated_readme_summary = excluded.translated_readme_summary,
-                provider = excluded.provider,
-                updated_at = excluded.updated_at
-            `).run(`user:${login}`, dnaEn, now)
           } catch { /* 翻译失败不阻塞 */ }
 
+          cacheUserAiTextPair(db, login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
           json(res, { data: { dna: lang === 'en' ? (dnaEn || dnaZh) : dnaZh, cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成画像失败', 500)
@@ -587,6 +626,11 @@ export function createRouter(db: Database.Database) {
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
 
+        if (!ensureUserExists(db, login)) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+
         // 查缓存（非强制刷新时）
         if (!force) {
           const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `learning-${lang}`) as { translated_readme_summary: string } | undefined
@@ -594,6 +638,12 @@ export function createRouter(db: Database.Database) {
             json(res, { data: { path: cached.translated_readme_summary, cached: true } })
             return
           }
+        }
+
+        const starCount = getUserStarCount(db, login)
+        if (starCount === 0) {
+          error(res, 'EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
+          return
         }
 
         // 收集统计
@@ -609,8 +659,6 @@ export function createRouter(db: Database.Database) {
           GROUP BY tag ORDER BY count DESC LIMIT 10
         `).all(login) as { tag: string; count: number }[]
 
-        const repoCount = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
-
         // 获取代表性星标项目（按 stars 排序取前 8）
         const topRepos = db.prepare(`
           SELECT r.full_name, r.description, r.stars
@@ -622,7 +670,7 @@ export function createRouter(db: Database.Database) {
         try {
           // 先生成中文
           const pathZh = await generateLearningPath(login, {
-            repoCount: repoCount.cnt,
+            repoCount: starCount,
             languages,
             tags,
             topRepos,
@@ -630,30 +678,13 @@ export function createRouter(db: Database.Database) {
 
           const now = new Date().toISOString()
 
-          // 缓存中文
-          db.prepare(`
-            INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-            VALUES (?, 'learning-zh', ?, 'ai', ?)
-            ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-              translated_readme_summary = excluded.translated_readme_summary,
-              provider = excluded.provider,
-              updated_at = excluded.updated_at
-          `).run(`user:${login}`, pathZh, now)
-
           // 自动翻译英文
           let pathEn = ''
           try {
             pathEn = await translateToEnglish(pathZh)
-            db.prepare(`
-              INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-              VALUES (?, 'learning-en', ?, 'ai', ?)
-              ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-                translated_readme_summary = excluded.translated_readme_summary,
-                provider = excluded.provider,
-                updated_at = excluded.updated_at
-            `).run(`user:${login}`, pathEn, now)
           } catch { /* 翻译失败不阻塞 */ }
 
+          cacheUserAiTextPair(db, login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
           json(res, { data: { path: lang === 'en' ? (pathEn || pathZh) : pathZh, cached: false } })
         } catch (err: any) {
           error(res, 'AI_ERROR', err?.message || 'AI 生成学习路径失败', 500)

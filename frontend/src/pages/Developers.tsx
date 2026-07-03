@@ -5,7 +5,7 @@
  * 选中开发者在下方展开 Dashboard 详情面板，可同步该开发者星标
  * 改造：接入真实 API getUsers / syncStars，API 不可用时回退 Demo 数据
  */
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -320,11 +320,16 @@ export default function Developers() {
   const [syncRuns, setSyncRuns] = useState<SyncRun[]>([])
   const [starDna, setStarDna] = useState<string | null>(null)
   const [dnaLoading, setDnaLoading] = useState(false)
+  const [dnaError, setDnaError] = useState("")
   const [learningPath, setLearningPath] = useState<string | null>(null)
   const [pathLoading, setPathLoading] = useState(false)
+  const [pathError, setPathError] = useState("")
   const [developerStats, setDeveloperStats] = useState<UserStats | null>(null)
   const [developerTags, setDeveloperTags] = useState<{ tag: string; count: number }[]>([])
   const [starTimeline, setStarTimeline] = useState<Array<{ month: string; count: number }>>([])
+  // 请求序号用于防止切换开发者/语言时旧响应覆盖当前页面
+  const dnaRequestSeq = useRef(0)
+  const pathRequestSeq = useRef(0)
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -506,37 +511,55 @@ export default function Developers() {
 
   // 加载 Star DNA 画像
   const loadStarDna = async (login: string, force = false) => {
+    const requestSeq = ++dnaRequestSeq.current
     // 仅在强制刷新时显示 loading 并清空旧数据
     if (force) {
       setDnaLoading(true)
       setStarDna(null)
     }
+    setDnaError("")
     try {
       const result = await getStarDna(login, force)
+      if (requestSeq !== dnaRequestSeq.current) return
       if (result?.dna) {
         setStarDna(result.dna)
       } else if (force) {
         setStarDna(null)
       }
-    } catch { /* 忽略 */ }
-    finally { if (force) setDnaLoading(false) }
+    } catch (err) {
+      if (requestSeq !== dnaRequestSeq.current) return
+      setStarDna(null)
+      setDnaError(err instanceof Error ? err.message : t("developers.dnaEmpty"))
+    }
+    finally {
+      if (force && requestSeq === dnaRequestSeq.current) setDnaLoading(false)
+    }
   }
 
   // 加载学习路径
   const loadLearningPath = async (login: string, force = false) => {
+    const requestSeq = ++pathRequestSeq.current
     if (force) {
       setPathLoading(true)
       setLearningPath(null)
     }
+    setPathError("")
     try {
       const result = await getLearningPath(login, force)
+      if (requestSeq !== pathRequestSeq.current) return
       if (result?.path) {
         setLearningPath(result.path)
       } else if (force) {
         setLearningPath(null)
       }
-    } catch { /* 忽略 */ }
-    finally { if (force) setPathLoading(false) }
+    } catch (err) {
+      if (requestSeq !== pathRequestSeq.current) return
+      setLearningPath(null)
+      setPathError(err instanceof Error ? err.message : t("developers.pathEmpty"))
+    }
+    finally {
+      if (force && requestSeq === pathRequestSeq.current) setPathLoading(false)
+    }
   }
 
   // 当前选中开发者变化时，加载同步历史和 Star DNA
@@ -546,6 +569,8 @@ export default function Developers() {
       // 切换开发者时清空旧数据（上一个开发者的内容）
       setStarDna(null)
       setLearningPath(null)
+      setDnaError("")
+      setPathError("")
       setDnaLoading(false)
       setPathLoading(false)
       loadSyncRuns(activeDevName)
@@ -558,6 +583,8 @@ export default function Developers() {
       setSyncRuns([])
       setStarDna(null)
       setLearningPath(null)
+      setDnaError("")
+      setPathError("")
       setDeveloperStats(null)
       setDeveloperTags([])
       setStarTimeline([])
@@ -567,6 +594,10 @@ export default function Developers() {
   // 语言切换时重新加载 DNA、学习路径和标签
   useEffect(() => {
     if (activeDevName) {
+      setStarDna(null)
+      setLearningPath(null)
+      setDnaError("")
+      setPathError("")
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
       getTags(activeDevName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
@@ -1034,6 +1065,8 @@ export default function Developers() {
                     </div>
                   ) : starDna ? (
                     <p className="text-sm leading-relaxed text-on-surface">{starDna}</p>
+                  ) : dnaError ? (
+                    <p className="text-sm text-status-danger">{dnaError}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground">{t("developers.dnaEmpty")}</p>
                   )}
@@ -1076,6 +1109,8 @@ export default function Developers() {
                         return <p key={i}>{line}</p>
                       })}
                     </div>
+                  ) : pathError ? (
+                    <p className="text-sm text-status-danger">{pathError}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground">{t("developers.pathEmpty")}</p>
                   )}

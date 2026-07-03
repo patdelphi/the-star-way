@@ -110,6 +110,19 @@ const AI_TIMEOUT = 60000 // AI 生成接口可能需要 10-30 秒，放宽到 60
 const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
 const TOKEN_KEY = 'starway-github-token'
 
+// API 错误对象：AI 生成功能需要把后端错误展示给页面，而不是静默降级
+export class ApiRequestError extends Error {
+  code: string
+  status: number
+
+  constructor(code: string, message: string, status: number) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.code = code
+    this.status = status
+  }
+}
+
 /**
  * 获取当前 i18n 语言对应的后端 lang 参数
  */
@@ -153,6 +166,21 @@ async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * 读取 JSON API 响应；非 2xx 时抛出带后端 code/message 的异常
+ */
+async function readJsonDataOrThrow<T>(res: Response): Promise<T> {
+  const data = await res.json()
+  if (!res.ok) {
+    throw new ApiRequestError(
+      data?.error?.code || 'API_ERROR',
+      data?.error?.message || `请求失败 (${res.status})`,
+      res.status,
+    )
+  }
+  return data.data as T
 }
 
 /**
@@ -466,16 +494,13 @@ export async function getStarDna(login: string, force = false): Promise<{
   dna: string
   cached: boolean
 } | null> {
-  try {
-    if (await checkApiAvailable()) {
-      const params = new URLSearchParams()
-      if (force) params.set('force', '1')
-      params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna?${params}`, undefined, AI_TIMEOUT)
-      const data = await res.json()
-      return data.data
-    }
-  } catch { /* 忽略错误 */ }
+  if (await checkApiAvailable()) {
+    const params = new URLSearchParams()
+    if (force) params.set('force', '1')
+    params.set('lang', getLangParam())
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna?${params}`, undefined, AI_TIMEOUT)
+    return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
+  }
   return null
 }
 
@@ -500,16 +525,13 @@ export async function getLearningPath(login: string, force = false): Promise<{
   path: string
   cached: boolean
 } | null> {
-  try {
-    if (await checkApiAvailable()) {
-      const params = new URLSearchParams()
-      if (force) params.set('force', '1')
-      params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path?${params}`, undefined, AI_TIMEOUT)
-      const data = await res.json()
-      return data.data
-    }
-  } catch { /* 忽略错误 */ }
+  if (await checkApiAvailable()) {
+    const params = new URLSearchParams()
+    if (force) params.set('force', '1')
+    params.set('lang', getLangParam())
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path?${params}`, undefined, AI_TIMEOUT)
+    return readJsonDataOrThrow<{ path: string; cached: boolean }>(res)
+  }
   return null
 }
 

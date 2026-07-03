@@ -2,7 +2,7 @@
  * API 路由测试
  * 使用 mock 的 http 请求/响应对象测试路由逻辑
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createConnection, initDatabase } from '../../db/connection.js'
 import { parseCsv, importCsvRecords, DEMO_USER_LOGIN } from '../../import/csv-importer.js'
 import { createRouter, resolveGitHubToken } from '../routes.js'
@@ -11,6 +11,18 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+
+vi.mock('../../ai/client.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../ai/client.js')>()
+  return {
+    ...actual,
+    generateStarDna: vi.fn(async () => '测试 DNA 画像'),
+    generateLearningPath: vi.fn(async () => '## 阶段一：巩固基础\n- 测试学习路径'),
+    translateToEnglish: vi.fn(async (text: string) => `EN: ${text}`),
+  }
+})
+
+const aiClient = await import('../../ai/client.js')
 
 const TEST_DB_DIR = join(tmpdir(), 'starway-test-api-' + process.pid)
 function getTestDbPath() { return join(TEST_DB_DIR, 'test.db') }
@@ -58,6 +70,7 @@ function createMocks(url: string, method: string = 'GET', body?: string) {
 
 describe('API 路由', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     cleanup()
     db = createConnection(getTestDbPath())
     initDatabase(db)
@@ -159,6 +172,63 @@ describe('API 路由', () => {
     const data = JSON.parse(getBody())
     expect(data.data).toBeDefined()
     // 无分类时可能为空
+  })
+
+  it('GET /api/users/:login/star-dna 用户不存在应返回 404', async () => {
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks('/api/users/missing/star-dna')
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(404)
+    expect(data.error.code).toBe('USER_NOT_FOUND')
+    expect(vi.mocked(aiClient.generateStarDna)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/learning-path 无星标数据应返回 400', async () => {
+    db.prepare('INSERT INTO users (login) VALUES (?)').run('empty-user')
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks('/api/users/empty-user/learning-path')
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(400)
+    expect(data.error.code).toBe('EMPTY_STAR_DATA')
+    expect(vi.mocked(aiClient.generateLearningPath)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/star-dna 应优先返回缓存', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'dna-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存 DNA 画像', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/star-dna?lang=zh`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '缓存 DNA 画像', cached: true })
+    expect(vi.mocked(aiClient.generateStarDna)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/learning-path 应生成并缓存中英文结果', async () => {
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data.path).toContain('阶段一')
+    expect(data.data.cached).toBe(false)
+
+    const rows = db.prepare(`
+      SELECT target_lang, translated_readme_summary
+      FROM translations
+      WHERE repo_full_name = ?
+      ORDER BY target_lang
+    `).all(`user:${DEMO_USER_LOGIN}`) as Array<{ target_lang: string; translated_readme_summary: string }>
+    expect(rows.map(r => r.target_lang)).toEqual(['learning-en', 'learning-zh'])
+    expect(rows.find(r => r.target_lang === 'learning-en')?.translated_readme_summary).toContain('EN:')
   })
 
   it('GET /api/users/不存在的用户/repos 应返回 404', async () => {
