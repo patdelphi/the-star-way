@@ -578,12 +578,12 @@ export async function removeRepoTag(fullName: string, tag: string): Promise<bool
 
 /**
  * 导出数据
- * @param format 导出格式：csv | json | markdown
+ * @param format 导出格式：csv | json | markdown | html
  * @param login 用户名
  * @returns 导出内容的文本
  */
 export async function exportData(
-  format: 'csv' | 'json' | 'markdown',
+  format: 'csv' | 'json' | 'markdown' | 'html',
   login: string,
   params: Omit<RepoQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<string | null> {

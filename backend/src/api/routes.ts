@@ -21,7 +21,7 @@ import {
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
-import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../export/exporter.js'
+import { exportCsv, exportJson, exportMarkdown, exportHtml, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
 import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
 import { getTagLabel } from '../classification/tag-labels-bilingual.js'
@@ -900,6 +900,9 @@ export function createRouter(db: Database.Database) {
               return
             case 'markdown':
               text(res, exportMarkdown(db, login, params), 'text/markdown', 200)
+              return
+            case 'html':
+              text(res, exportHtml(db, login, params), 'text/html', 200)
               return
             default:
               error(res, 'INVALID_FORMAT', `不支持的导出格式: ${format}`)

@@ -525,13 +525,12 @@ export default function StarExplorer() {
 
   const handleConfirmExport = async () => {
     const fmtRaw = exportFormat.toLowerCase()
-    const supported = ["csv", "json", "markdown"] as const
+    const supported = ["csv", "json", "markdown", "html"] as const
     if (!supported.includes(fmtRaw as (typeof supported)[number])) {
-      setAnalysisStatus(t("starExplorer.htmlNotSupported"))
       setExportOpen(false)
       return
     }
-    const fmt = fmtRaw as "csv" | "json" | "markdown"
+    const fmt = fmtRaw as "csv" | "json" | "markdown" | "html"
 
     const params = {
       q: searchQuery || undefined,
@@ -545,11 +544,12 @@ export default function StarExplorer() {
       const content = await exportData(fmt, currentLogin, params)
       if (content) {
         // 触发浏览器下载
-        const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+        const ext = fmt === "markdown" ? "md" : fmt
+        const blob = new Blob([content], { type: fmt === "html" ? "text/html;charset=utf-8" : "text/plain;charset=utf-8" })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `star-repos-${currentLogin}.${fmt === "markdown" ? "md" : fmt}`
+        a.download = `star-repos-${currentLogin}.${ext}`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)

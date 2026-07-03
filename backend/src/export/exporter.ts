@@ -1,7 +1,7 @@
 /**
  * 导出模块
- * 将仓库查询结果导出为 CSV / JSON / Markdown 格式
- * 导出内容与当前筛选条件一致，不修改业务数据
+ * 将仓库查询结果导出为 CSV / JSON / Markdown / HTML 格式
+ * 四种格式字段完全一致，导出内容与当前筛选条件一致
  */
 import type Database from 'better-sqlite3'
 import { queryRepos } from '../repository/repo-queries.js'
@@ -13,28 +13,35 @@ export interface ExportParams extends RepoQueryParams {
   login: string
 }
 
-// ===== CSV 导出 =====
+// ===== 统一字段定义 =====
+// 所有格式导出完全相同的字段集
+const EXPORT_FIELDS = [
+  'full_name',
+  'description',
+  'language',
+  'license',
+  'stars',
+  'forks',
+  'open_issues',
+  'html_url',
+  'pushed_at',
+  'starred_at',
+  'tags',
+] as const
+
+// CSV 导出 =====
 
 /**
  * 将仓库数据导出为 CSV（UTF-8 BOM）
- * @param db 数据库连接
- * @param login 用户名
- * @param params 查询参数
- * @returns CSV 文本（UTF-8 BOM + CRLF 换行）
  */
 export function exportCsv(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
-  // 导出时取消分页限制，导出全部筛选结果
   const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
 
   const BOM = '\uFEFF'
-  const header = [
-    'full_name', 'description', 'language', 'license',
-    'stars', 'forks', 'open_issues', 'pushed_at', 'starred_at', 'tags',
-  ].join(',')
+  const header = EXPORT_FIELDS.join(',')
 
   const rows = result.items.map(item => {
     const repo = item.repo
-    // CSV 字段中若包含逗号或引号，需用双引号包裹并转义内部引号
     const esc = (v: string | null | undefined) => {
       if (v == null) return ''
       const s = String(v)
@@ -51,24 +58,20 @@ export function exportCsv(db: Database.Database, login: string, params: Omit<Rep
       repo.stars,
       repo.forks,
       repo.open_issues,
+      esc(repo.html_url),
       esc(repo.pushed_at),
       esc(item.starred_at),
       esc(item.tags.join(';')),
     ].join(',')
   })
 
-  // 使用 CRLF 换行
   return BOM + [header, ...rows].join('\r\n') + '\r\n'
 }
 
-// ===== JSON 导出 =====
+// JSON 导出 =====
 
 /**
  * 将仓库数据导出为 JSON
- * @param db 数据库连接
- * @param login 用户名
- * @param params 查询参数
- * @returns JSON 字符串
  */
 export function exportJson(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
   const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
@@ -77,6 +80,7 @@ export function exportJson(db: Database.Database, login: string, params: Omit<Re
     login,
     exported_at: new Date().toISOString(),
     total: result.total,
+    fields: EXPORT_FIELDS,
     repos: result.items.map(item => ({
       full_name: item.repo.full_name,
       description: item.repo.description,
@@ -95,45 +99,127 @@ export function exportJson(db: Database.Database, login: string, params: Omit<Re
   return JSON.stringify(data, null, 2)
 }
 
-// ===== Markdown 导出 =====
+// Markdown 导出 =====
 
 /**
  * 将仓库数据导出为 Markdown 表格
- * @param db 数据库连接
- * @param login 用户名
- * @param params 查询参数
- * @returns Markdown 文本（CRLF 换行）
  */
 export function exportMarkdown(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
   const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
 
   const lines: string[] = []
 
-  // 标题
   lines.push(`# ${login} - Starred Repositories`)
   lines.push('')
   lines.push(`> Exported at ${new Date().toISOString()}`)
   lines.push(`> Total: ${result.total} repos`)
   lines.push('')
 
-  // 表格头
-  lines.push('| Repository | Language | Stars | Forks | License | Tags |')
-  lines.push('| --- | --- | --- | --- | --- | --- |')
+  // 表格头（统一字段）
+  lines.push('| Repository | Description | Language | License | Stars | Forks | Issues | URL | Pushed At | Starred At | Tags |')
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
 
-  // 表格行
   for (const item of result.items) {
     const repo = item.repo
-    // Markdown 表格中 | 需转义
     const esc = (v: string | null | undefined) => {
       if (v == null) return ''
-      return String(v).replace(/\|/g, '\\|')
+      return String(v).replace(/\|/g, '\\|').replace(/\n/g, ' ')
     }
     lines.push(
-      `| ${esc(repo.full_name)} | ${esc(repo.language)} | ${repo.stars} | ${repo.forks} | ${esc(repo.license)} | ${esc(item.tags.join(', '))} |`
+      `| ${esc(repo.full_name)} | ${esc(repo.description)} | ${esc(repo.language)} | ${esc(repo.license)} | ${repo.stars} | ${repo.forks} | ${repo.open_issues} | ${esc(repo.html_url)} | ${esc(repo.pushed_at?.slice(0, 10))} | ${esc(item.starred_at?.slice(0, 10))} | ${esc(item.tags.join(', '))} |`
     )
   }
 
   return lines.join('\r\n') + '\r\n'
+}
+
+// HTML 导出 =====
+
+/**
+ * 将仓库数据导出为 HTML 表格
+ */
+export function exportHtml(db: Database.Database, login: string, params: Omit<RepoQueryParams, 'limit' | 'offset'> = {}): string {
+  const result = queryRepos(db, { ...params, userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
+  const now = new Date().toISOString()
+
+  const escHtml = (v: string | null | undefined) => {
+    if (v == null) return ''
+    return String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+  }
+
+  const rows = result.items.map(item => {
+    const repo = item.repo
+    return `      <tr>
+        <td><a href="${escHtml(repo.html_url)}" target="_blank">${escHtml(repo.full_name)}</a></td>
+        <td>${escHtml(repo.description)}</td>
+        <td>${escHtml(repo.language)}</td>
+        <td>${escHtml(repo.license)}</td>
+        <td style="text-align:right">${repo.stars}</td>
+        <td style="text-align:right">${repo.forks}</td>
+        <td style="text-align:right">${repo.open_issues}</td>
+        <td><a href="${escHtml(repo.html_url)}" target="_blank">${escHtml(repo.html_url)}</a></td>
+        <td>${escHtml(repo.pushed_at?.slice(0, 10))}</td>
+        <td>${escHtml(item.starred_at?.slice(0, 10))}</td>
+        <td>${escHtml(item.tags.join(', '))}</td>
+      </tr>`
+  }).join('\n')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escHtml(login)} - Starred Repositories</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .meta { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    .meta span { margin-right: 16px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    thead { background: #f1f5f9; }
+    th { padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap; }
+    td { padding: 10px 16px; font-size: 13px; border-top: 1px solid #e2e8f0; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td:nth-child(2) { white-space: normal; }
+    tr:hover { background: #f8fafc; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin: 1px; }
+    @media (max-width: 768px) { table { font-size: 12px } td, th { padding: 8px } }
+  </style>
+</head>
+<body>
+  <h1>${escHtml(login)} - Starred Repositories</h1>
+  <div class="meta">
+    <span>Exported at ${now}</span>
+    <span>Total: ${result.total} repos</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Repository</th>
+        <th>Description</th>
+        <th>Language</th>
+        <th>License</th>
+        <th>Stars</th>
+        <th>Forks</th>
+        <th>Issues</th>
+        <th>URL</th>
+        <th>Pushed At</th>
+        <th>Starred At</th>
+        <th>Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+</body>
+</html>`
 }
 
 // ===== 分析报告导出 =====
@@ -147,9 +233,6 @@ import {
 
 /**
  * 生成面向阅读的分析报告（Markdown）
- * @param db 数据库连接
- * @param login 用户名
- * @returns Markdown 文本
  */
 export function exportReportMarkdown(db: Database.Database, login: string): string {
   const now = new Date().toISOString()
@@ -284,22 +367,22 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
     lines.push('')
   }
 
-  // 完整列表
+  // 完整列表（统一字段）
   const result = queryRepos(db, { userLogin: login, limit: Number.MAX_SAFE_INTEGER, offset: 0 })
   lines.push(`## 完整仓库列表`)
   lines.push('')
   lines.push(`共 ${result.total} 个仓库`)
   lines.push('')
-  lines.push('| Repository | Language | Stars | Forks | License | Tags |')
-  lines.push('| --- | --- | --- | --- | --- | --- |')
+  lines.push('| Repository | Description | Language | License | Stars | Forks | Issues | URL | Pushed At | Starred At | Tags |')
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const item of result.items) {
     const repo = item.repo
     const esc = (v: string | null | undefined) => {
       if (v == null) return ''
-      return String(v).replace(/\|/g, '\\|')
+      return String(v).replace(/\|/g, '\\|').replace(/\n/g, ' ')
     }
     lines.push(
-      `| ${esc(repo.full_name)} | ${esc(repo.language)} | ${repo.stars} | ${repo.forks} | ${esc(repo.license)} | ${esc(item.tags.join(', '))} |`
+      `| ${esc(repo.full_name)} | ${esc(repo.description)} | ${esc(repo.language)} | ${esc(repo.license)} | ${repo.stars} | ${repo.forks} | ${repo.open_issues} | ${esc(repo.html_url)} | ${esc(repo.pushed_at?.slice(0, 10))} | ${esc(item.starred_at?.slice(0, 10))} | ${esc(item.tags.join(', '))} |`
     )
   }
 
