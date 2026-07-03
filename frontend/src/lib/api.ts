@@ -483,10 +483,11 @@ export async function getStarDna(login: string, force = false): Promise<{
  * 下载分析报告（Markdown）
  */
 export function downloadReport(login: string): void {
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const url = `${API_BASE}/api/users/${login}/report`
   const a = document.createElement('a')
   a.href = url
-  a.download = `${login}-star-report.md`
+  a.download = `${login}-star-report-${ts}.md`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

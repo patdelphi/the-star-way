@@ -545,11 +545,12 @@ export default function StarExplorer() {
       if (content) {
         // 触发浏览器下载
         const ext = fmt === "markdown" ? "md" : fmt
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
         const blob = new Blob([content], { type: fmt === "html" ? "text/html;charset=utf-8" : "text/plain;charset=utf-8" })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `star-repos-${currentLogin}.${ext}`
+        a.download = `star-repos-${currentLogin}-${ts}.${ext}`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
