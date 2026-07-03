@@ -538,11 +538,12 @@ export default function Developers() {
     }
   }, [activeDevName])
 
-  // 语言切换时重新加载 DNA 和学习路径
+  // 语言切换时重新加载 DNA、学习路径和标签
   useEffect(() => {
     if (activeDevName) {
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
+      getTags(activeDevName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
     }
   }, [i18n.language])
 
@@ -1276,7 +1277,7 @@ export default function Developers() {
                 <CompactStatGrid
                   total={developerTags.reduce((sum, item) => sum + item.count, 0)}
                   items={pickTopItems(developerTags, 16).map((item, i) => ({
-                    label: item.tag,
+                    label: item.label || item.tag,
                     count: item.count,
                     color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length],
                   }))}

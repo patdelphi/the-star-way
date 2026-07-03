@@ -311,12 +311,14 @@ export async function getGlobalOverview(): Promise<GlobalOverview | null> {
 /**
  * 获取标签列表
  */
-export async function getTags(login: string): Promise<{ tag: string; count: number }[]> {
+export async function getTags(login: string): Promise<{ tag: string; count: number; label: string }[]> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/tags`)
+      const params = new URLSearchParams()
+      params.set('lang', getLangParam())
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/tags?${params}`)
       const data = await res.json()
-      return data.data as { tag: string; count: number }[]
+      return data.data as { tag: string; count: number; label: string }[]
     }
   } catch { /* 忽略错误，降级到 mock */ }
   return []

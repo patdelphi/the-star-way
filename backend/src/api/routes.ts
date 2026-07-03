@@ -24,6 +24,7 @@ import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
 import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
+import { getTagLabel } from '../classification/tag-labels-bilingual.js'
 
 // ===== 工具函数 =====
 
@@ -431,6 +432,7 @@ export function createRouter(db: Database.Database) {
       const tagsMatch = matchRoute('/api/users/:login/tags', url.split('?')[0])
       if (method === 'GET' && tagsMatch) {
         const { login } = tagsMatch
+        const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -443,9 +445,15 @@ export function createRouter(db: Database.Database) {
           WHERE repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
           GROUP BY tag
           ORDER BY count DESC
-        `).all(login)
+        `).all(login) as { tag: string; count: number }[]
 
-        json(res, { data: tags })
+        // 返回带 label 字段的标签列表（label 根据语言翻译）
+        const tagsWithLabel = tags.map(t => ({
+          ...t,
+          label: getTagLabel(t.tag, lang as 'zh' | 'en'),
+        }))
+
+        json(res, { data: tagsWithLabel })
         return
       }
 

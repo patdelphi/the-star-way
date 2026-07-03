@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport, getCnSummaries } from "@/lib/api"
+import { getTagLabel } from "@/lib/tag-labels"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Badge } from "@/components/ui/badge"
@@ -154,7 +155,7 @@ function adaptApiRepo(apiRepo: RepoListResult["items"][number], fallback: { unkn
 
 export default function StarExplorer() {
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentLogin } = useDeveloper()
 
   // === 移到组件内部的 i18n 静态数据 ===
@@ -791,7 +792,7 @@ export default function StarExplorer() {
                         setCurrentPage(1)
                       }}
                     >
-                      <span className="truncate text-sm font-medium">{tag}</span>
+                      <span className="truncate text-sm font-medium">{getTagLabel(tag, i18n.language)}</span>
                       <span className="shrink-0 font-mono text-xs opacity-80">{count}</span>
                     </button>
                   ))}
@@ -904,7 +905,7 @@ export default function StarExplorer() {
                   <SelectOption value="">{t("starExplorer.topic")}</SelectOption>
                   {filterCounts.topics.map(([topic, count]) => (
                     <SelectOption key={topic} value={topic.toLowerCase()}>
-                      {topic} ({count})
+                      {getTagLabel(topic, i18n.language)} ({count})
                     </SelectOption>
                   ))}
                 </Select>

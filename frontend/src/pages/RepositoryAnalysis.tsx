@@ -291,6 +291,10 @@ export default function RepositoryAnalysis() {
       setReuseAdvice(null)
       loadSummary(selectedRepo)
     }
+    // 重新加载标签（后端返回带 label 的翻译版本）
+    if (currentLogin) {
+      getTags(currentLogin).then(setAllTags).catch(() => {})
+    }
   }, [i18n.language])
 
   useEffect(() => {
