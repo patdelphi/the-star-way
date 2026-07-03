@@ -165,6 +165,45 @@ describe('API 路由', () => {
     expect(data.data.aiEnabled).toBeDefined()
   })
 
+  it('用户级 API 应统一兼容带 @ 的用户名', async () => {
+    const router = createRouter(db)
+
+    const stats = createMocks(`/api/users/@${DEMO_USER_LOGIN}/stats`)
+    await router(stats.req, stats.res)
+    expect(stats.getStatusCode()).toBe(200)
+    expect(JSON.parse(stats.getBody()).data.repoCount).toBe(2)
+
+    const repos = createMocks(`/api/users/@${DEMO_USER_LOGIN}/repos`)
+    await router(repos.req, repos.res)
+    expect(repos.getStatusCode()).toBe(200)
+    expect(JSON.parse(repos.getBody()).data.total).toBe(2)
+
+    const repo = createMocks(`/api/users/@${DEMO_USER_LOGIN}/repos/torvalds/linux`)
+    await router(repo.req, repo.res)
+    expect(repo.getStatusCode()).toBe(200)
+    expect(JSON.parse(repo.getBody()).data.full_name).toBe('torvalds/linux')
+
+    const summary = createMocks(`/api/users/@${DEMO_USER_LOGIN}/summary`)
+    await router(summary.req, summary.res)
+    expect(summary.getStatusCode()).toBe(200)
+    expect(JSON.parse(summary.getBody()).data.repoCount).toBe(2)
+
+    const timeline = createMocks(`/api/users/@${DEMO_USER_LOGIN}/star-timeline`)
+    await router(timeline.req, timeline.res)
+    expect(timeline.getStatusCode()).toBe(200)
+    expect(JSON.parse(timeline.getBody()).data.length).toBeGreaterThan(0)
+
+    const exportJson = createMocks(`/api/export?format=json&login=@${DEMO_USER_LOGIN}`)
+    await router(exportJson.req, exportJson.res)
+    expect(exportJson.getStatusCode()).toBe(200)
+    expect(JSON.parse(exportJson.getBody()).login).toBe(DEMO_USER_LOGIN)
+
+    const report = createMocks(`/api/users/@${DEMO_USER_LOGIN}/report`)
+    await router(report.req, report.res)
+    expect(report.getStatusCode()).toBe(200)
+    expect(report.getBody()).toContain(`**用户**: \`${DEMO_USER_LOGIN}\``)
+  })
+
   it('GET /api/users/:login/tags 应返回标签列表', async () => {
     const router = createRouter(db)
     const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/tags`)
@@ -212,6 +251,35 @@ describe('API 路由', () => {
     expect(vi.mocked(aiClient.generateStarDna)).not.toHaveBeenCalled()
   })
 
+  it('GET /api/users/:login/star-dna 应兼容带 @ 的用户名', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'dna-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存 DNA 画像', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/@${DEMO_USER_LOGIN}/star-dna?lang=zh`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '缓存 DNA 画像', cached: true })
+  })
+
+  it('GET /api/users/:login/star-dna 强制生成失败时应回退已有缓存', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'dna-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存 DNA 画像', new Date().toISOString())
+    vi.mocked(aiClient.generateStarDna).mockRejectedValueOnce(new Error('AI unavailable'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/star-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '缓存 DNA 画像', cached: true })
+  })
+
   it('GET /api/users/:login/learning-path 应生成并缓存中英文结果', async () => {
     const router = createRouter(db)
     const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?force=1`)
@@ -229,6 +297,21 @@ describe('API 路由', () => {
     `).all(`user:${DEMO_USER_LOGIN}`) as Array<{ target_lang: string; translated_readme_summary: string }>
     expect(rows.map(r => r.target_lang)).toEqual(['learning-en', 'learning-zh'])
     expect(rows.find(r => r.target_lang === 'learning-en')?.translated_readme_summary).toContain('EN:')
+  })
+
+  it('GET /api/users/:login/learning-path 强制生成失败时应回退已有缓存', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'learning-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存学习路径', new Date().toISOString())
+    vi.mocked(aiClient.generateLearningPath).mockRejectedValueOnce(new Error('AI unavailable'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/@${DEMO_USER_LOGIN}/learning-path?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ path: '缓存学习路径', cached: true })
   })
 
   it('GET /api/users/不存在的用户/repos 应返回 404', async () => {

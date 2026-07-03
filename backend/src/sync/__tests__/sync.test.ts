@@ -180,6 +180,15 @@ describe('GitHub 同步', () => {
     expect(user.profile_url).toBe('https://github.com/testuser')
   })
 
+  it('应规范化带 @ 或 GitHub URL 的用户名', async () => {
+    const result = await syncStars(db, ' https://github.com/@testuser ')
+
+    expect(result.username).toBe('testuser')
+    expect(db.prepare('SELECT login FROM users WHERE login = ?').get('testuser')).toBeDefined()
+    expect(db.prepare('SELECT login FROM users WHERE login = ?').get('@testuser')).toBeUndefined()
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get('testuser')).toEqual({ cnt: 3 })
+  })
+
   it('重复同步不应产生重复数据', async () => {
     const first = await syncStars(db, 'testuser')
     const second = await syncStars(db, 'testuser')

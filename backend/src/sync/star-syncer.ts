@@ -7,6 +7,7 @@ import type Database from 'better-sqlite3'
 import { createConnection, initDatabase, withTransaction } from '../db/connection.js'
 import { GitHubClient, type GitHubStarredRepo, type SyncResult, type RateLimitInfo } from './github-client.js'
 import type { GitHubClientConfig } from './github-client.js'
+import { GitHubSyncError } from './errors.js'
 import { mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
@@ -24,6 +25,16 @@ export interface StarSyncResult {
 }
 
 /**
+ * 规范化 GitHub 用户名输入：支持 @login、GitHub 用户主页 URL 和首尾空白。
+ */
+export function normalizeGitHubUsername(input: string): string {
+  let value = input.trim()
+  value = value.replace(/^https?:\/\/github\.com\//i, '')
+  value = value.split(/[/?#]/)[0] || value
+  return value.replace(/^@+/, '').trim()
+}
+
+/**
  * 执行 GitHub Star 同步
  * @param db 数据库连接（如果未传则自动创建）
  * @param username GitHub 用户名
@@ -35,6 +46,11 @@ export async function syncStars(
   username: string,
   config: GitHubClientConfig = {},
 ): Promise<StarSyncResult> {
+  username = normalizeGitHubUsername(username)
+  if (!username) {
+    throw new GitHubSyncError('缺少有效的 GitHub 用户名', 'GITHUB_INVALID_USERNAME', undefined, false)
+  }
+
   const client = new GitHubClient(config)
   const now = new Date().toISOString()
 

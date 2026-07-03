@@ -273,7 +273,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
     WHERE s.user_login = ? AND r.stars <= ? AND r.pushed_at > ?
     ORDER BY r.stars DESC
     LIMIT 20
-  `).all(login, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
+  `).all(login, 1000, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
 
   const lines: string[] = []
 

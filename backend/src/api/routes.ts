@@ -72,6 +72,35 @@ function ensureUserExists(db: Database.Database, login: string): boolean {
   return !!db.prepare('SELECT login FROM users WHERE login = ?').get(login)
 }
 
+/** 规范化 GitHub login，兼容用户输入 @login 的习惯 */
+function normalizeGitHubLogin(login: string): string {
+  return login.trim().replace(/^@+/, '')
+}
+
+/** 安全解码路径参数，避免异常编码直接打断整个请求 */
+function decodePathParam(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+/** 规范化路由中的用户 login，确保所有用户级 API 行为一致 */
+function normalizeRouteLogin(login: string): string {
+  return normalizeGitHubLogin(decodePathParam(login))
+}
+
+/** 读取用户级 AI 文本缓存 */
+function getUserAiTextCache(db: Database.Database, login: string, key: string): string | null {
+  const cached = db.prepare(`
+    SELECT translated_readme_summary
+    FROM translations
+    WHERE repo_full_name = ? AND target_lang = ?
+  `).get(`user:${login}`, key) as { translated_readme_summary: string } | undefined
+  return cached?.translated_readme_summary || null
+}
+
 /** 获取用户星标数量，用于 AI 内容生成前的空数据保护 */
 function getUserStarCount(db: Database.Database, login: string): number {
   const row = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
@@ -370,7 +399,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/repos =====
       const reposMatch = matchRoute('/api/users/:login/repos', url.split('?')[0])
       if (method === 'GET' && reposMatch) {
-        const { login } = reposMatch
+        const login = normalizeRouteLogin(reposMatch.login)
         const query = parseQuery(url)
 
         // 验证用户是否存在
@@ -408,7 +437,7 @@ export function createRouter(db: Database.Database) {
       const repoMatch = matchRoute('/api/users/:login/repos/*', url.split('?')[0])
       if (method === 'GET' && repoMatch) {
         const fullName = decodeURIComponent(repoMatch['*'] || '')
-        const { login } = repoMatch
+        const login = normalizeRouteLogin(repoMatch.login)
         const repo = queryRepoByNameForUser(db, login, fullName)
         if (!repo) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${fullName} 不存在`, 404)
@@ -427,7 +456,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/stats =====
       const statsMatch = matchRoute('/api/users/:login/stats', url.split('?')[0])
       if (method === 'GET' && statsMatch) {
-        const { login } = statsMatch
+        const login = normalizeRouteLogin(statsMatch.login)
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -450,7 +479,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/star-timeline =====
       const timelineMatch = matchRoute('/api/users/:login/star-timeline', url.split('?')[0])
       if (method === 'GET' && timelineMatch) {
-        const { login } = timelineMatch
+        const login = normalizeRouteLogin(timelineMatch.login)
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -463,7 +492,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/summary =====
       const summaryMatch = matchRoute('/api/users/:login/summary', url.split('?')[0])
       if (method === 'GET' && summaryMatch) {
-        const { login } = summaryMatch
+        const login = normalizeRouteLogin(summaryMatch.login)
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -477,7 +506,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/tags =====
       const tagsMatch = matchRoute('/api/users/:login/tags', url.split('?')[0])
       if (method === 'GET' && tagsMatch) {
-        const { login } = tagsMatch
+        const login = normalizeRouteLogin(tagsMatch.login)
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
         if (!user) {
@@ -506,7 +535,11 @@ export function createRouter(db: Database.Database) {
       // ===== POST /api/users/:login/classify =====
       const classifyMatch = matchRoute('/api/users/:login/classify', url.split('?')[0])
       if (method === 'POST' && classifyMatch) {
-        const { login } = classifyMatch
+        const login = normalizeRouteLogin(classifyMatch.login)
+        if (!ensureUserExists(db, login)) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
         const result = classifyReposForUser(db, login)
         json(res, { data: result })
         return
@@ -515,9 +548,11 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/star-dna =====
       const starDnaMatch = matchRoute('/api/users/:login/star-dna', url.split('?')[0])
       if (method === 'GET' && starDnaMatch) {
-        const { login } = starDnaMatch
+        const login = normalizeRouteLogin(starDnaMatch.login)
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
+        const cacheKey = `dna-${lang}`
+        const cachedText = getUserAiTextCache(db, login, cacheKey)
 
         if (!ensureUserExists(db, login)) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -525,12 +560,9 @@ export function createRouter(db: Database.Database) {
         }
 
         // 查缓存（非强制刷新时）
-        if (!force) {
-          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `dna-${lang}`) as { translated_readme_summary: string } | undefined
-          if (cached?.translated_readme_summary) {
-            json(res, { data: { dna: cached.translated_readme_summary, cached: true } })
-            return
-          }
+        if (!force && cachedText) {
+          json(res, { data: { dna: cachedText, cached: true } })
+          return
         }
 
         const starCount = getUserStarCount(db, login)
@@ -583,6 +615,10 @@ export function createRouter(db: Database.Database) {
           cacheUserAiTextPair(db, login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
           json(res, { data: { dna: lang === 'en' ? (dnaEn || dnaZh) : dnaZh, cached: false } })
         } catch (err: any) {
+          if (cachedText) {
+            json(res, { data: { dna: cachedText, cached: true } })
+            return
+          }
           error(res, 'AI_ERROR', err?.message || 'AI 生成画像失败', 500)
         }
         return
@@ -591,7 +627,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/cn-summaries =====
       const cnSumMatch = matchRoute('/api/users/:login/cn-summaries', url.split('?')[0])
       if (method === 'GET' && cnSumMatch) {
-        const { login } = cnSumMatch
+        const login = normalizeRouteLogin(cnSumMatch.login)
         const rows = db.prepare(`
           SELECT t.repo_full_name, t.translated_readme_summary
           FROM translations t
@@ -622,9 +658,11 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/learning-path =====
       const learningMatch = matchRoute('/api/users/:login/learning-path', url.split('?')[0])
       if (method === 'GET' && learningMatch) {
-        const { login } = learningMatch
+        const login = normalizeRouteLogin(learningMatch.login)
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
+        const cacheKey = `learning-${lang}`
+        const cachedText = getUserAiTextCache(db, login, cacheKey)
 
         if (!ensureUserExists(db, login)) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
@@ -632,12 +670,9 @@ export function createRouter(db: Database.Database) {
         }
 
         // 查缓存（非强制刷新时）
-        if (!force) {
-          const cached = db.prepare(`SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?`).get(`user:${login}`, `learning-${lang}`) as { translated_readme_summary: string } | undefined
-          if (cached?.translated_readme_summary) {
-            json(res, { data: { path: cached.translated_readme_summary, cached: true } })
-            return
-          }
+        if (!force && cachedText) {
+          json(res, { data: { path: cachedText, cached: true } })
+          return
         }
 
         const starCount = getUserStarCount(db, login)
@@ -687,6 +722,10 @@ export function createRouter(db: Database.Database) {
           cacheUserAiTextPair(db, login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
           json(res, { data: { path: lang === 'en' ? (pathEn || pathZh) : pathZh, cached: false } })
         } catch (err: any) {
+          if (cachedText) {
+            json(res, { data: { path: cachedText, cached: true } })
+            return
+          }
           error(res, 'AI_ERROR', err?.message || 'AI 生成学习路径失败', 500)
         }
         return
@@ -695,7 +734,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/removed-stars =====
       const removedMatch = matchRoute('/api/users/:login/removed-stars', url.split('?')[0])
       if (method === 'GET' && removedMatch) {
-        const { login } = removedMatch
+        const login = normalizeRouteLogin(removedMatch.login)
         const repos = db.prepare(`
           SELECT r.*, s.starred_at, s.removed_at
           FROM repos r
@@ -711,7 +750,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/sync-runs =====
       const syncRunsMatch = matchRoute('/api/users/:login/sync-runs', url.split('?')[0])
       if (method === 'GET' && syncRunsMatch) {
-        const { login } = syncRunsMatch
+        const login = normalizeRouteLogin(syncRunsMatch.login)
         const runs = db.prepare(`
           SELECT id, user_login, started_at, ended_at, status,
                  repos_upserted, stars_upserted, repos_removed, pages_fetched,
@@ -903,7 +942,7 @@ export function createRouter(db: Database.Database) {
           ORDER BY synced_at DESC, login
           LIMIT 1
         `).get(SYSTEM_DEMO_LOGIN) as { login: string } | undefined
-        const login = query.login || defaultUser?.login || ''
+        const login = normalizeGitHubLogin(query.login || defaultUser?.login || '')
 
         // 验证用户是否存在
         const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
@@ -948,7 +987,11 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/report =====
       const reportMatch = matchRoute('/api/users/:login/report', url.split('?')[0])
       if (method === 'GET' && reportMatch) {
-        const { login } = reportMatch
+        const login = normalizeRouteLogin(reportMatch.login)
+        if (!ensureUserExists(db, login)) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
         try {
           const md = exportReportMarkdown(db, login)
           text(res, md, 'text/markdown', 200)

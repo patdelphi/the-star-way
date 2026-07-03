@@ -230,6 +230,16 @@ function pickTopItems<T extends { count: number }>(items: T[], limit: number): T
 }
 
 /**
+ * 规范化 GitHub 用户名输入：支持 @login、GitHub 用户主页 URL 和首尾空白。
+ */
+function normalizeGitHubLogin(input: string): string {
+  let value = input.trim()
+  value = value.replace(/^https?:\/\/github\.com\//i, "")
+  value = value.split(/[/?#]/)[0] || value
+  return value.replace(/^@+/, "").trim()
+}
+
+/**
  * 星标时间趋势组件：统计卡片 + 面积图
  */
 function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string } }) {
@@ -458,9 +468,7 @@ export default function Developers() {
 
   // 添加开发者（补全默认值，添加后自动同步星标）
   const addDeveloper = async () => {
-    const name = searchInput.trim().startsWith("@")
-      ? searchInput.trim().slice(1)
-      : searchInput.trim()
+    const name = normalizeGitHubLogin(searchResult || searchInput)
     if (!name) return
     if (developers.find((d) => d.name === name)) {
       // 用户已存在，直接选中
@@ -494,8 +502,9 @@ export default function Developers() {
   }
 
   const handleSearch = () => {
-    if (searchInput.trim()) {
-      setSearchResult(searchInput.trim())
+    const name = normalizeGitHubLogin(searchInput)
+    if (name) {
+      setSearchResult(name)
     }
   }
 
@@ -612,16 +621,17 @@ export default function Developers() {
       const token = getGitHubToken()
       const result = await syncStars(name, token || undefined)
       if (result !== null) {
+        const syncedName = result.username || name
         setSyncStatus(token ? "successToken" : "successAnon")
-        setSearchResult(t("developers.starUpdated", { name }))
-        await loadSyncRuns(name)
-        await loadStarDna(name)
-        await loadLearningPath(name)
+        setSearchResult(t("developers.starUpdated", { name: syncedName }))
+        await loadSyncRuns(syncedName)
+        await loadStarDna(syncedName)
+        await loadLearningPath(syncedName)
         // 同步成功后刷新开发者列表，更新星标数
         await refreshDevelopers()
         // 刷新统计和标签
-        getStats(name).then(setDeveloperStats).catch(() => setDeveloperStats(null))
-        getTags(name).then(setDeveloperTags).catch(() => setDeveloperTags([]))
+        getStats(syncedName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
+        getTags(syncedName).then(setDeveloperTags).catch(() => setDeveloperTags([]))
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
@@ -737,7 +747,7 @@ export default function Developers() {
             <div className="mt-3 flex items-center gap-2 text-sm text-on-surface-variant">
               <span>{t("developers.found")}</span>
               <Badge variant="outline" className="font-mono text-xs">
-                {searchResult.startsWith("@") ? searchResult : `@${searchResult}`}
+                @{searchResult}
               </Badge>
               <Button
                 variant="ghost"

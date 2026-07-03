@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createConnection, initDatabase } from '../../db/connection.js'
 import { parseCsv, importCsvRecords, DEMO_USER_LOGIN } from '../../import/csv-importer.js'
-import { exportCsv, exportJson, exportMarkdown } from '../exporter.js'
+import { exportCsv, exportJson, exportMarkdown, exportReportMarkdown } from '../exporter.js'
 import type Database from 'better-sqlite3'
 import { rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -109,7 +109,7 @@ describe('导出功能', () => {
     it('应返回 Markdown 表格', () => {
       const md = exportMarkdown(db, DEMO_USER_LOGIN)
       expect(md).toContain('# ' + DEMO_USER_LOGIN)
-      expect(md).toContain('| Repository | Language | Stars |')
+      expect(md).toContain('| Repository | Description | Language | License | Stars | Forks | Issues | URL | Pushed At | Starred At | Tags |')
       expect(md).toContain('torvalds/linux')
     })
 
@@ -128,6 +128,17 @@ describe('导出功能', () => {
       const md = exportMarkdown(db, DEMO_USER_LOGIN, { search: 'vscode' })
       expect(md).toContain('microsoft/vscode')
       expect(md).not.toContain('torvalds/linux')
+    })
+  })
+
+  describe('exportReportMarkdown', () => {
+    it('应生成完整分析报告', () => {
+      const md = exportReportMarkdown(db, DEMO_USER_LOGIN)
+
+      expect(md).toContain('the-star-way 星标分析报告')
+      expect(md).toContain(`**用户**: \`${DEMO_USER_LOGIN}\``)
+      expect(md).toContain('## 完整仓库列表')
+      expect(md).toContain('octocat/Hello-World')
     })
   })
 })

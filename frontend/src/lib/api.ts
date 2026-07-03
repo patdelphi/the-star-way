@@ -148,6 +148,11 @@ export function clearGitHubToken(): void {
 
 // ===== 工具函数 =====
 
+/** 编码用户 login，避免 @、空格等字符破坏路径参数 */
+function encodeLogin(login: string): string {
+  return encodeURIComponent(login.trim())
+}
+
 /**
  * 带超时的 fetch 封装
  * @param url 请求 URL
@@ -234,7 +239,7 @@ export async function getRepos(login: string, params: RepoQueryParams = {}): Pro
       if (params.page) query.set('page', String(params.page))
       if (params.pageSize) query.set('pageSize', String(params.pageSize))
 
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/repos?${query}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos?${query}`)
       const data = await res.json()
       return data.data as RepoListResult
     }
@@ -250,7 +255,7 @@ export async function getRepo(login: string, fullName: string): Promise<(Repo & 
   try {
     if (await checkApiAvailable()) {
       // 先尝试从当前用户获取
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/repos/${encodeURIComponent(fullName)}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos/${encodeURIComponent(fullName)}`)
       if (res.ok) {
         const data = await res.json()
         return data.data as (Repo & { starred_at: string; tags: string[] })
@@ -300,7 +305,7 @@ export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> 
 export async function getStats(login: string): Promise<UserStats | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/stats`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/stats`)
       const data = await res.json()
       return data.data as UserStats
     }
@@ -314,7 +319,7 @@ export async function getStats(login: string): Promise<UserStats | null> {
 export async function getUserStarTimeline(login: string): Promise<Array<{ month: string; count: number }> | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-timeline`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-timeline`)
       const data = await res.json()
       return data.data as Array<{ month: string; count: number }>
     }
@@ -344,7 +349,7 @@ export async function getTags(login: string): Promise<{ tag: string; count: numb
     if (await checkApiAvailable()) {
       const params = new URLSearchParams()
       params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/tags?${params}`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/tags?${params}`)
       const data = await res.json()
       return data.data as { tag: string; count: number; label: string }[]
     }
@@ -358,7 +363,7 @@ export async function getTags(login: string): Promise<{ tag: string; count: numb
 export async function classifyRepos(login: string): Promise<{ classified: number; errors: number } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/classify`, {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/classify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -409,7 +414,7 @@ export async function getUserSummary(login: string): Promise<{
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/summary`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/summary`)
       const data = await res.json()
       return data.data
     }
@@ -436,7 +441,7 @@ export async function getSyncRuns(login: string): Promise<{
 }[]> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/sync-runs`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/sync-runs`)
       const data = await res.json()
       return data.data ?? []
     }
@@ -450,7 +455,7 @@ export async function getSyncRuns(login: string): Promise<{
 export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/removed-stars`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/removed-stars`)
       const data = await res.json()
       return (data.data ?? []).map((repo: Repo & { starred_at?: string | null; tags?: string[] }) => ({
         ...repo,
@@ -498,7 +503,7 @@ export async function getStarDna(login: string, force = false): Promise<{
     const params = new URLSearchParams()
     if (force) params.set('force', '1')
     params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/star-dna?${params}`, undefined, AI_TIMEOUT)
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-dna?${params}`, undefined, AI_TIMEOUT)
     return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
   }
   return null
@@ -509,7 +514,7 @@ export async function getStarDna(login: string, force = false): Promise<{
  */
 export function downloadReport(login: string): void {
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  const url = `${API_BASE}/api/users/${login}/report`
+  const url = `${API_BASE}/api/users/${encodeLogin(login)}/report`
   const a = document.createElement('a')
   a.href = url
   a.download = `${login}-star-report-${ts}.md`
@@ -529,7 +534,7 @@ export async function getLearningPath(login: string, force = false): Promise<{
     const params = new URLSearchParams()
     if (force) params.set('force', '1')
     params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/learning-path?${params}`, undefined, AI_TIMEOUT)
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/learning-path?${params}`, undefined, AI_TIMEOUT)
     return readJsonDataOrThrow<{ path: string; cached: boolean }>(res)
   }
   return null
@@ -541,7 +546,7 @@ export async function getLearningPath(login: string, force = false): Promise<{
 export async function getCnSummaries(login: string): Promise<Record<string, string>> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${login}/cn-summaries`)
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/cn-summaries`)
       const data = await res.json()
       return data.data ?? {}
     }
