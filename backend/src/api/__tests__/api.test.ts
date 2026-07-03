@@ -153,6 +153,13 @@ describe('API 路由', () => {
     expect(['REPO_NOT_FOUND', 'NOT_FOUND']).toContain(data.error.code)
   })
 
+  it('路径参数编码异常时不应返回 500', async () => {
+    const router = createRouter(db)
+    const { req, res, getStatusCode } = createMocks('/api/repos/%E0%A4%A')
+    await router(req, res)
+    expect(getStatusCode()).toBe(404)
+  })
+
   it('GET /api/users/:login/stats 应返回统计数据', async () => {
     const router = createRouter(db)
     const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/stats`)

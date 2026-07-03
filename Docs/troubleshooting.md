@@ -210,3 +210,65 @@ corepack pnpm exec node -p "process.versions.node"
 ```text
 24.15.0
 ```
+
+## 4. 开发者页生成 DNA/学习路径时白屏
+
+### 现象
+
+在一个用户正在生成 Star DNA 画像或学习路径时，搜索并添加另一个用户，开发者页面可能白屏。
+
+### 根因
+
+前端部分页面默认后端响应一定是完整数组或完整统计结构。例如时间线接口异常、用户不存在、接口短暂不可用时，页面仍直接执行 `.map()`、`.reduce()` 或读取嵌套字段，React 渲染阶段抛错后会导致整页白屏。
+
+另一个关联问题是 API 可用性探测曾把离线状态永久缓存在前端进程里。后端恢复后，页面仍可能继续走离线兜底，造成搜索、添加和刷新状态不一致。
+
+### 当前修复
+
+- `frontend/src/lib/api.ts` 统一归一化 API 响应：
+  - 仓库列表始终返回 `{ items, total }`。
+  - 用户统计、全局概览始终返回可读数组字段。
+  - 标签、同步记录、时间线和已移除星标统一用空数组兜底。
+- `frontend/src/pages/Developers.tsx` 对 Star 时间线、标签和统计加载增加防御。
+- `frontend/src/pages/RepositoryAnalysis.tsx` 和 `frontend/src/pages/StarExplorer.tsx` 对仓库列表和标签结果增加防御。
+- `frontend/src/components/ErrorBoundary.tsx` 捕获渲染异常，避免单个页面状态异常导致整站白屏。
+- API 可用性探测只缓存成功状态；失败状态会在后续调用继续重试。
+
+### 验证命令
+
+```powershell
+cd "C:\Users\patde\Documents\GitHub\the-star-way\frontend"
+pnpm test
+pnpm build
+
+cd "C:\Users\patde\Documents\GitHub\the-star-way\backend"
+pnpm test
+pnpm build
+```
+
+当前期望：
+
+- 前端 UI 校验通过 47 项。
+- 后端测试通过 111 项。
+
+## 5. 异常 URL 编码导致 API 500
+
+### 现象
+
+访问包含非法百分号编码的仓库通配路径时，后端可能因为 `decodeURIComponent` 抛错返回 500。
+
+### 根因
+
+部分通配路由直接调用 `decodeURIComponent`，没有复用安全解码函数。
+
+### 当前修复
+
+通配路由统一使用 `decodePathParam()`。编码异常时保留原始路径段继续走正常查询，最终返回 404，而不是内部错误。
+
+### 验证
+
+后端测试已覆盖：
+
+```text
+路径参数编码异常时不应返回 500
+```

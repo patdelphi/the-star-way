@@ -261,7 +261,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/repos/*fullName/similar（相似项目推荐，必须在通配路由之前匹配） =====
       const similarMatch = matchRoute('/api/repos/*/similar', url.split('?')[0])
       if (method === 'GET' && similarMatch) {
-        const repoFullName = decodeURIComponent(similarMatch['*'] || '')
+        const repoFullName = decodePathParam(similarMatch['*'] || '')
         const repo = db.prepare(`SELECT * FROM repos WHERE full_name = ?`).get(repoFullName) as any
         if (!repo) {
           error(res, 'REPO_NOT_FOUND', `仓库 ${repoFullName} 不存在`, 404)
@@ -357,7 +357,7 @@ export function createRouter(db: Database.Database) {
       // 排除 /similar、/readme-summary、/tags 等子路由（它们有自己的处理逻辑）
       const globalRepoMatch = matchRoute('/api/repos/*', url.split('?')[0])
       if (method === 'GET' && globalRepoMatch) {
-        const fullName = decodeURIComponent(globalRepoMatch['*'] || '')
+        const fullName = decodePathParam(globalRepoMatch['*'] || '')
         // 如果路径包含子路由后缀，跳过此路由
         if (fullName.endsWith('/similar') || fullName.endsWith('/readme-summary') || fullName.includes('/tags/')) {
           // 不处理，继续后续路由
@@ -438,7 +438,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/users/:login/repos/*fullName（支持 owner/repo 格式） =====
       const repoMatch = matchRoute('/api/users/:login/repos/*', url.split('?')[0])
       if (method === 'GET' && repoMatch) {
-        const fullName = decodeURIComponent(repoMatch['*'] || '')
+        const fullName = decodePathParam(repoMatch['*'] || '')
         const login = normalizeRouteLogin(repoMatch.login)
         const repo = queryRepoByNameForUser(db, login, fullName)
         if (!repo) {
@@ -816,7 +816,7 @@ export function createRouter(db: Database.Database) {
       // ===== GET /api/repos/*fullName/readme-summary =====
       const readmeMatch = matchRoute('/api/repos/*/readme-summary', url.split('?')[0])
       if (method === 'GET' && readmeMatch) {
-        const fullName = decodeURIComponent(readmeMatch['*'] || '')
+        const fullName = decodePathParam(readmeMatch['*'] || '')
         const query = parseQuery(url)
         const force = query.force === '1'
         const lang = query.lang === 'en' ? 'en' : 'zh'
@@ -893,7 +893,7 @@ export function createRouter(db: Database.Database) {
       // ===== POST /api/repos/*fullName/tags =====
       const addTagMatch = matchRoute('/api/repos/*/tags', url.split('?')[0])
       if (method === 'POST' && addTagMatch) {
-        const fullName = decodeURIComponent(addTagMatch['*'] || '')
+        const fullName = decodePathParam(addTagMatch['*'] || '')
         const body = await readBody(req)
         let payload: { tag?: string }
         try {
@@ -924,8 +924,8 @@ export function createRouter(db: Database.Database) {
       // ===== DELETE /api/repos/*fullName/tags/:tag =====
       const delTagMatch = matchRoute('/api/repos/*/tags/:tag', url.split('?')[0])
       if (method === 'DELETE' && delTagMatch) {
-        const fullName = decodeURIComponent(delTagMatch['*'] || '')
-        const tag = decodeURIComponent(delTagMatch.tag)
+        const fullName = decodePathParam(delTagMatch['*'] || '')
+        const tag = decodePathParam(delTagMatch.tag)
         const deleteTag = db.transaction((repoFullName: string, tagName: string) => {
           db.prepare(`DELETE FROM repo_tags WHERE repo_full_name = ? AND tag = ?`).run(repoFullName, tagName)
         })

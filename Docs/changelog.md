@@ -33,3 +33,16 @@
 - 新增 `troubleshooting.md`，记录 `better-sqlite3` native ABI 不匹配、系统 Node/Corepack pnpm 修复方式，以及 GitHub token 未加载导致匿名限流的排查步骤。
 - 统一项目 Node.js 版本到 `v24.15.0`：新增 `.node-version`、`.nvmrc`，后端和前端 `package.json` 声明 Node engines，启动脚本增加版本硬检查。
 - 统一开发命令为 `corepack pnpm`：更新 README、部署文档、故障排查文档和启动脚本依赖缺失提示，避免 PATH 中其他 pnpm 绑定不同 Node 版本。
+
+## 2026-07-03
+
+- 修复开发者搜索添加用户链路：GitHub 用户名统一规范化，支持 `@login`、GitHub 用户主页 URL 和首尾空白。
+- 修复同步失败污染用户列表的问题：只有 GitHub 用户资料验证成功后才写入本地 `users` 和 `sync_runs`。
+- 恢复 GitHub token fallback 顺序：请求 token 优先，其次读取 `STARWAY_GITHUB_TOKEN`、`GITHUB_TOKEN`、`GH_TOKEN`。
+- 修复 DNA 画像/学习路径生成中切换或添加其他用户导致白屏的问题：前端对时间线、标签、统计和列表响应增加空值兜底。
+- 新增全局 React `ErrorBoundary`，单页渲染异常不再导致整站白屏。
+- 前端 API 客户端增加集中响应归一化：仓库列表、用户统计、全局概览、标签、同步记录和已移除星标都返回稳定结构。
+- 修复 API 可用性探测缓存问题：后端曾短暂离线后，前端不会永久停留在 Demo/离线判断，会在后续调用继续重试。
+- 修复后端通配路径参数解码异常：异常 URL 编码不再触发 500。
+- 更新前端静态校验规则，移除旧 `RepoDetail` 页面检查，改为校验当前仓库分析页和跨页面开发者上下文。
+- 验证通过：前端 47 项 UI 静态校验、前端生产构建、后端 111 个测试、后端 TypeScript 构建。

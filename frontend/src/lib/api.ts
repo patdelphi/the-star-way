@@ -241,7 +241,7 @@ async function readJsonDataOrThrow<T>(res: Response): Promise<T> {
 let apiAvailable: boolean | null = null
 
 async function checkApiAvailable(): Promise<boolean> {
-  if (apiAvailable !== null) return apiAvailable
+  if (apiAvailable === true) return true
   try {
     const response = await fetchWithTimeout(`${API_BASE}/api/users`, {
       method: 'GET',

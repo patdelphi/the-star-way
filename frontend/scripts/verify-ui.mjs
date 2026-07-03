@@ -242,6 +242,7 @@ const checks = [
   ["GitHub 同步长超时和错误透出", files.api.includes("SYNC_TIMEOUT") && files.developers.includes("syncError") && getByPath(locales.zh, "developers.syncUnknownError")],
   ["全局渲染异常兜底", files.app.includes("ErrorBoundary") && getByPath(locales.zh, "app.errorTitle") && getByPath(locales.en, "app.errorTitle")],
   ["API 客户端集中兜底数组响应", files.api.includes("function safeArray") && files.api.includes("normalizeRepoList") && files.api.includes("normalizeUserStats") && files.api.includes("normalizeGlobalOverview")],
+  ["API 可用性离线后会重试", files.api.includes("if (apiAvailable === true) return true") && !files.api.includes("if (apiAvailable !== null) return apiAvailable")],
   ["API 仓库列表不会返回空结构", !files.api.includes("return data.data as RepoListResult") && files.api.includes("return normalizeRepoList(data.data)")],
   ["API 统计数据不会返回半结构", !files.api.includes("return data.data as UserStats") && files.api.includes("return normalizeUserStats(data.data)")],
   ["开发者搜索结果不复用同步成功提示", !files.developers.includes('setSearchResult(t("developers.starUpdated"')],
