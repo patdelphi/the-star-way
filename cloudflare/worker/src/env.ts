@@ -16,6 +16,10 @@ export interface Env {
   // GitHub Token（secret）
   STARWAY_GITHUB_TOKEN?: string
 
+  // 前端 URL（非敏感，配置在 wrangler.toml [vars]）
+  // 用于根路径 / 重定向到前端 Pages
+  STARWAY_FRONTEND_URL?: string
+
   // AI 配置（第二阶段启用，MVP 不使用）
   STARWAY_AI_BASE_URL?: string
   STARWAY_AI_API_KEY?: string

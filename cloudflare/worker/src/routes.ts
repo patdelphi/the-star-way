@@ -196,6 +196,17 @@ export async function handleRequest(
     })
   }
 
+  // 根路径和非 /api/* 路径重定向到前端 Pages
+  // Worker 仅处理 /api/* 路由，其他路径统一引导到前端
+  if (!pathname.startsWith('/api/')) {
+    const frontendUrl = env.STARWAY_FRONTEND_URL || 'https://the-star-way.pages.dev/'
+    // 拼接原始路径到前端 URL（保持 query string）
+    const target = new URL(frontendUrl)
+    target.pathname = pathname
+    target.search = url.search
+    return Response.redirect(target.toString(), 302)
+  }
+
   const repo = new D1StarRepository(env.DB)
   const aiEnabled = isAiConfigured(env)
 
