@@ -8,9 +8,7 @@ import { parseCsv, importCsvRecords, DEMO_USER_LOGIN } from '../../import/csv-im
 import { createRouter, resolveGitHubToken } from '../routes.js'
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { rmSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+
 
 vi.mock('../../ai/client.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../ai/client.js')>()
@@ -24,9 +22,7 @@ vi.mock('../../ai/client.js', async (importOriginal) => {
 
 const aiClient = await import('../../ai/client.js')
 
-const TEST_DB_DIR = join(tmpdir(), 'starway-test-api-' + process.pid)
-function getTestDbPath() { return join(TEST_DB_DIR, 'test.db') }
-function cleanup() { if (existsSync(TEST_DB_DIR)) rmSync(TEST_DB_DIR, { recursive: true, force: true }) }
+// 使用 :memory: 内存数据库：每个测试独立连接，彻底隔离，避免文件锁导致的数据残留
 
 const MOCK_CSV = `序号,项目名称,星星数量,简介,中文简介,URL,编程语言,License,Forks,Open Issues,Topics,标星时间,最近更新
 1,octocat/Hello-World,100,A simple Hello World repo,简单的 Hello World 仓库,https://github.com/octocat/Hello-World,JavaScript,MIT,50,10,"hello, world",2025-06-01,2026-01-15
@@ -71,8 +67,8 @@ function createMocks(url: string, method: string = 'GET', body?: string) {
 describe('API 路由', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    cleanup()
-    db = createConnection(getTestDbPath())
+    // :memory: 数据库：每个测试全新实例，无需文件清理
+    db = createConnection(':memory:')
     initDatabase(db)
     const records = parseCsv(MOCK_CSV)
     importCsvRecords(db, records)
@@ -81,7 +77,6 @@ describe('API 路由', () => {
 
   afterEach(() => {
     db.close()
-    cleanup()
   })
 
   it('GET /api/users 应返回用户列表', async () => {
@@ -95,6 +90,29 @@ describe('API 路由', () => {
     expect(data.data.some((u: any) => u.login === 'octocat' && u.repoCount === 2)).toBe(true)
   })
 
+  it('DELETE /api/users/:login 应逻辑删除用户并在重新同步时恢复', async () => {
+    const router = createRouter(db)
+    const del = createMocks('/api/users/octocat', 'DELETE')
+    await router(del.req, del.res)
+    expect(del.getStatusCode()).toBe(200)
+
+    let users = createMocks('/api/users')
+    await router(users.req, users.res)
+    let list = JSON.parse(users.getBody())
+    expect(list.data.some((u: any) => u.login === 'octocat')).toBe(false)
+
+    db.prepare(`
+      INSERT INTO users (login, synced_at, deleted_at)
+      VALUES (?, ?, NULL)
+      ON CONFLICT(login) DO UPDATE SET deleted_at = NULL
+    `).run('octocat', new Date().toISOString())
+
+    users = createMocks('/api/users')
+    await router(users.req, users.res)
+    list = JSON.parse(users.getBody())
+    expect(list.data.some((u: any) => u.login === 'octocat')).toBe(true)
+  })
+
   it('GET /api/overview 应返回排除 demo-user 的全局概览', async () => {
     const router = createRouter(db)
     const { req, res, getBody } = createMocks('/api/overview')
@@ -104,6 +122,76 @@ describe('API 路由', () => {
     expect(data.data.repoCount).toBe(2)
     expect(data.data.languages.length).toBeGreaterThan(0)
     expect(data.data.recentStars.length).toBeGreaterThan(0)
+  })
+
+  it('GET /api/status 未配置 token 和 AI 时应返回未配置状态', async () => {
+    const oldStarway = process.env.STARWAY_GITHUB_TOKEN
+    const oldGithub = process.env.GITHUB_TOKEN
+    const oldGh = process.env.GH_TOKEN
+    const oldAiBase = process.env.STARWAY_AI_BASE_URL
+    const oldAiKey = process.env.STARWAY_AI_API_KEY
+    const oldAiModel = process.env.STARWAY_AI_MODEL
+    process.env.STARWAY_GITHUB_TOKEN = ''
+    process.env.GITHUB_TOKEN = ''
+    process.env.GH_TOKEN = ''
+    process.env.STARWAY_AI_BASE_URL = ''
+    process.env.STARWAY_AI_API_KEY = ''
+    process.env.STARWAY_AI_MODEL = ''
+
+    const router = createRouter(db)
+    const { req, res, getStatusCode, getBody } = createMocks('/api/status')
+    await router(req, res)
+    expect(getStatusCode()).toBe(200)
+    const data = JSON.parse(getBody())
+    expect(data.data.github.configured).toBe(false)
+    expect(data.data.github.valid).toBe(false)
+    expect(data.data.ai.configured).toBe(false)
+    expect(data.data.ai.valid).toBe(false)
+
+    if (oldStarway === undefined) delete process.env.STARWAY_GITHUB_TOKEN
+    else process.env.STARWAY_GITHUB_TOKEN = oldStarway
+    if (oldGithub === undefined) delete process.env.GITHUB_TOKEN
+    else process.env.GITHUB_TOKEN = oldGithub
+    if (oldGh === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = oldGh
+    if (oldAiBase === undefined) delete process.env.STARWAY_AI_BASE_URL
+    else process.env.STARWAY_AI_BASE_URL = oldAiBase
+    if (oldAiKey === undefined) delete process.env.STARWAY_AI_API_KEY
+    else process.env.STARWAY_AI_API_KEY = oldAiKey
+    if (oldAiModel === undefined) delete process.env.STARWAY_AI_MODEL
+    else process.env.STARWAY_AI_MODEL = oldAiModel
+  })
+
+  // ===== 业务阈值 query 参数测试（验证参数解析与回退，数值精确性由 threshold.test.ts 覆盖） =====
+  it('GET /api/overview?sleepDays=365&gemStarsMin=200&gemStarsMax=50000 合法参数应正常返回', async () => {
+    const router = createRouter(db)
+    const { req, res, getStatusCode, getBody } = createMocks('/api/overview?sleepDays=365&gemStarsMin=200&gemStarsMax=50000')
+    await router(req, res)
+    expect(getStatusCode()).toBe(200)
+    const data = JSON.parse(getBody())
+    expect(data.data.activeRepoCount).toBeDefined()
+    expect(data.data.sleepStarsCount).toBeDefined()
+    expect(data.data.hiddenGemsCount).toBeDefined()
+  })
+
+  it('GET /api/overview?sleepDays=abc&gemStarsMin=xyz&gemStarsMax=-5 非法参数应回退默认不报错', async () => {
+    const router = createRouter(db)
+    const { req, res, getStatusCode, getBody } = createMocks('/api/overview?sleepDays=abc&gemStarsMin=xyz&gemStarsMax=-5')
+    await router(req, res)
+    expect(getStatusCode()).toBe(200)
+    const data = JSON.parse(getBody())
+    // 非法参数回退默认，与无参请求结果一致
+    expect(data.data.activeRepoCount).toBeDefined()
+  })
+
+  it('GET /api/users/:login/summary?sleepDays=30&gemStarsMax=200 合法参数应正常返回', async () => {
+    const router = createRouter(db)
+    const { req, res, getStatusCode, getBody } = createMocks(`/api/users/octocat/summary?sleepDays=30&gemStarsMax=200`)
+    await router(req, res)
+    expect(getStatusCode()).toBe(200)
+    const data = JSON.parse(getBody())
+    expect(data.data.hiddenGemsCount).toBeDefined()
+    expect(data.data.sleepStarsCount).toBeDefined()
   })
 
   it('GET /api/users/:login/repos 应返回仓库列表', async () => {

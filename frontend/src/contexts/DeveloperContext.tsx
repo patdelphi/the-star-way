@@ -22,7 +22,7 @@ export function DeveloperProvider({ children }: { children: ReactNode }) {
   })
 
   const setCurrentLogin = (login: string) => {
-    const normalized = login.trim() || DEFAULT_LOGIN
+    const normalized = login.trim()
     const safeLogin = normalized === "demo-user" ? DEFAULT_LOGIN : normalized
     setCurrentLoginState(safeLogin)
     if (typeof window !== "undefined") {

@@ -18,6 +18,7 @@ import {
   queryGlobalOverview,
   queryUserStarTimeline,
   SYSTEM_DEMO_LOGIN,
+  type ThresholdOptions,
 } from '../repository/repo-queries.js'
 import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
@@ -25,6 +26,7 @@ import { exportCsv, exportJson, exportMarkdown, exportHtml, exportReportMarkdown
 import { loadAiConfig } from '../ai/config.js'
 import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
 import { getTagLabel } from '../classification/tag-labels-bilingual.js'
+import { loadEnv } from '../config/env.js'
 
 // ===== 工具函数 =====
 
@@ -38,6 +40,36 @@ function parseQuery(url: string): Record<string, string> {
   } catch {
     return {}
   }
+}
+
+/**
+ * 从 query 解析业务阈值，非法或越界值回退 undefined（走默认常量）
+ * 范围与前端 settings.ts 保持一致：sleepDays 30-365, gemStarsMin 0-10000, gemStarsMax 1-50000
+ */
+function parseThresholdOptions(query: Record<string, string>): ThresholdOptions | undefined {
+  const opts: ThresholdOptions = {}
+  let hasAny = false
+  const sleepDays = parseInt(query.sleepDays, 10)
+  if (Number.isInteger(sleepDays) && sleepDays >= 30 && sleepDays <= 365) {
+    opts.sleepDays = sleepDays
+    hasAny = true
+  }
+  const gemStarsMin = parseInt(query.gemStarsMin, 10)
+  if (Number.isInteger(gemStarsMin) && gemStarsMin >= 0 && gemStarsMin <= 10000) {
+    opts.gemStarsMin = gemStarsMin
+    hasAny = true
+  }
+  const gemStarsMax = parseInt(query.gemStarsMax, 10)
+  if (Number.isInteger(gemStarsMax) && gemStarsMax >= 1 && gemStarsMax <= 50000) {
+    opts.gemStarsMax = gemStarsMax
+    hasAny = true
+  }
+  // 交叉校验：若 min/max 同时提供但 min >= max，则两者都丢弃走默认
+  if (typeof opts.gemStarsMin === 'number' && typeof opts.gemStarsMax === 'number' && opts.gemStarsMin >= opts.gemStarsMax) {
+    opts.gemStarsMin = undefined
+    opts.gemStarsMax = undefined
+  }
+  return hasAny ? opts : undefined
 }
 
 /** 读取 POST 请求 body（JSON） */
@@ -69,7 +101,7 @@ function error(res: ServerResponse, code: string, message: string, status = 400)
 
 /** 校验用户存在，避免为不存在的 login 生成 AI 内容 */
 function ensureUserExists(db: Database.Database, login: string): boolean {
-  return !!db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+  return !!db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
 }
 
 /** 规范化 GitHub login，兼容用户输入 @login 的习惯 */
@@ -167,6 +199,92 @@ export function getGitHubTokenSource(): string | null {
   return null
 }
 
+/** 短超时 fetch，用于设置页状态检测，避免外部服务阻塞页面 */
+async function fetchStatusWithTimeout(url: string, options: RequestInit, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** 给任意状态探测 Promise 增加超时保护 */
+function withStatusTimeout<T>(promise: Promise<T>, timeoutMs = 5000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('状态检测超时')), timeoutMs)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
+
+/** 校验 OpenAI-compatible 配置是否可访问 */
+async function validateAiApi(): Promise<{ configured: boolean; valid: boolean; message: string | null }> {
+  const config = loadAiConfig()
+  if (!config.enabled) {
+    return { configured: false, valid: false, message: 'AI API 未配置完整' }
+  }
+
+  try {
+    const res = await fetchStatusWithTimeout(`${config.base_url.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.api_key}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+        temperature: 0,
+      }),
+    })
+    return {
+      configured: true,
+      valid: res.ok,
+      message: res.ok ? null : `HTTP ${res.status}`,
+    }
+  } catch (err: any) {
+    return { configured: true, valid: false, message: err?.message || 'AI API 校验失败' }
+  }
+}
+
+/** 校验后端环境变量中的 GitHub Token 是否有效 */
+async function validateGitHubToken(): Promise<{ configured: boolean; valid: boolean; source: string | null; message: string | null }> {
+  const token = resolveGitHubToken()
+  const source = getGitHubTokenSource()
+  if (!token) {
+    return { configured: false, valid: false, source, message: 'GitHub Token 未配置' }
+  }
+
+  try {
+    const res = await withStatusTimeout(fetchStatusWithTimeout('https://api.github.com/user', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'the-star-way',
+      },
+    }))
+    if (!res.ok) {
+      return { configured: true, valid: false, source, message: `HTTP ${res.status}` }
+    }
+    const profile = await res.json() as { login?: string }
+    return { configured: true, valid: true, source, message: profile.login || null }
+  } catch (err: any) {
+    return { configured: true, valid: false, source, message: err?.message || 'GitHub Token 校验失败' }
+  }
+}
+
 /** 从 URL 路径中提取动态参数（支持 :login, :fullName 等） */
 function matchRoute(pattern: string, pathname: string): Record<string, string> | null {
   const patternParts = pattern.split('/')
@@ -252,9 +370,42 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== GET /api/overview =====
-      if (method === 'GET' && url === '/api/overview') {
-        json(res, { data: { ...queryGlobalOverview(db), aiEnabled: aiConfig.enabled } })
+      // ===== DELETE /api/users/:login =====
+      const deleteUserMatch = matchRoute('/api/users/:login', url.split('?')[0])
+      if (method === 'DELETE' && deleteUserMatch) {
+        const login = normalizeRouteLogin(deleteUserMatch.login)
+        const result = db.transaction(() => {
+          return db.prepare(`
+            UPDATE users
+            SET deleted_at = ?
+            WHERE login = ? AND deleted_at IS NULL
+          `).run(new Date().toISOString(), login)
+        })()
+
+        if (result.changes === 0) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+
+        json(res, { data: { login, deleted: true } })
+        return
+      }
+
+      // ===== GET /api/overview（支持 sleepDays/gemStarsMin/gemStarsMax query 参数） =====
+      if (method === 'GET' && url.split('?')[0] === '/api/overview') {
+        const thresholdOpts = parseThresholdOptions(parseQuery(url))
+        json(res, { data: { ...queryGlobalOverview(db, thresholdOpts), aiEnabled: aiConfig.enabled } })
+        return
+      }
+
+      // ===== GET /api/status =====
+      if (method === 'GET' && url === '/api/status') {
+        loadEnv({ force: true })
+        const [github, ai] = await Promise.all([
+          validateGitHubToken(),
+          validateAiApi(),
+        ])
+        json(res, { data: { github, ai } })
         return
       }
 
@@ -405,7 +556,7 @@ export function createRouter(db: Database.Database) {
         const query = parseQuery(url)
 
         // 验证用户是否存在
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
@@ -459,7 +610,7 @@ export function createRouter(db: Database.Database) {
       const statsMatch = matchRoute('/api/users/:login/stats', url.split('?')[0])
       if (method === 'GET' && statsMatch) {
         const login = normalizeRouteLogin(statsMatch.login)
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
@@ -482,7 +633,7 @@ export function createRouter(db: Database.Database) {
       const timelineMatch = matchRoute('/api/users/:login/star-timeline', url.split('?')[0])
       if (method === 'GET' && timelineMatch) {
         const login = normalizeRouteLogin(timelineMatch.login)
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
@@ -491,17 +642,18 @@ export function createRouter(db: Database.Database) {
         return
       }
 
-      // ===== GET /api/users/:login/summary =====
+      // ===== GET /api/users/:login/summary（支持 sleepDays/gemStarsMin/gemStarsMax query 参数） =====
       const summaryMatch = matchRoute('/api/users/:login/summary', url.split('?')[0])
       if (method === 'GET' && summaryMatch) {
         const login = normalizeRouteLogin(summaryMatch.login)
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
         }
 
-        json(res, { data: queryUserSummary(db, login) })
+        const thresholdOpts = parseThresholdOptions(parseQuery(url))
+        json(res, { data: queryUserSummary(db, login, thresholdOpts) })
         return
       }
 
@@ -510,7 +662,7 @@ export function createRouter(db: Database.Database) {
       if (method === 'GET' && tagsMatch) {
         const login = normalizeRouteLogin(tagsMatch.login)
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
@@ -947,7 +1099,7 @@ export function createRouter(db: Database.Database) {
         const login = normalizeGitHubLogin(query.login || defaultUser?.login || '')
 
         // 验证用户是否存在
-        const user = db.prepare('SELECT login FROM users WHERE login = ?').get(login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
         if (!user) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return

@@ -59,8 +59,8 @@ export async function syncStars(
 
   // GitHub 用户资料验证成功后再创建本地用户，避免搜索添加失败时污染用户列表。
   db.prepare(`
-    INSERT INTO users (login, synced_at) VALUES (?, ?)
-    ON CONFLICT(login) DO UPDATE SET synced_at = excluded.synced_at
+    INSERT INTO users (login, synced_at, deleted_at) VALUES (?, ?, NULL)
+    ON CONFLICT(login) DO UPDATE SET synced_at = excluded.synced_at, deleted_at = NULL
   `).run(username, now)
 
   // 创建 sync_runs 记录
@@ -97,8 +97,8 @@ export async function syncStars(
   const result = withTransaction(db, () => {
     // upsert 用户（保存 GitHub 公开资料扩展字段）
     const upsertUser = db.prepare(`
-      INSERT INTO users (login, avatar_url, profile_url, synced_at, name, bio, company, location, followers, public_repos)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (login, avatar_url, profile_url, synced_at, name, bio, company, location, followers, public_repos, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       ON CONFLICT(login) DO UPDATE SET
         avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
         profile_url = COALESCE(excluded.profile_url, users.profile_url),
@@ -108,7 +108,8 @@ export async function syncStars(
         company = COALESCE(excluded.company, users.company),
         location = COALESCE(excluded.location, users.location),
         followers = COALESCE(excluded.followers, users.followers),
-        public_repos = COALESCE(excluded.public_repos, users.public_repos)
+        public_repos = COALESCE(excluded.public_repos, users.public_repos),
+        deleted_at = NULL
     `)
 
     upsertUser.run(

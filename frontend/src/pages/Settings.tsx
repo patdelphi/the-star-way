@@ -1,35 +1,131 @@
 /**
  * Settings.tsx
- * 设置页 - 后端连接、数据库、导出目录等配置信息
+ * 设置页 - 管理本地前端偏好，并显示后端、GitHub Token、AI API 的真实状态。
+ * 所有设置 onChange 即保存，提供"重置为默认值"。
  */
 import { useEffect, useState } from "react"
-import { useTranslation, Trans } from "react-i18next"
+import { useTranslation } from "react-i18next"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
 import {
   Server,
-  Database,
-  FolderOpen,
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Key,
-  Eye,
-  EyeOff,
+  Clock,
+  Globe,
+  Bot,
+  SlidersHorizontal,
+  RotateCcw,
 } from "lucide-react"
-import { getGitHubToken, setGitHubToken, clearGitHubToken, getTokenSource } from "@/lib/api"
+import { getServiceStatus, type ServiceStatus } from "@/lib/api"
+import {
+  getSettings,
+  saveSettings,
+  resetSettings,
+  applyTheme,
+  resolveLanguage,
+  type AppSettings,
+} from "@/lib/settings"
 
 const API_BASE = import.meta.env.VITE_API_BASE || ""
 
+// 数字夹紧到 [min, max]
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(Math.max(v, min), max)
+}
+
+/**
+ * 数字输入组件：内部用本地 state 管理输入显示，onBlur 时 clamp 并 commit。
+ * 避免输入过程中被实时 clamp 导致体验问题（如输入 100 中间态被截断为 30）。
+ */
+function NumberInput({
+  value,
+  onCommit,
+  min,
+  max,
+  step,
+  className,
+}: {
+  value: number
+  onCommit: (v: number) => void
+  min: number
+  max: number
+  step?: number
+  className?: string
+}) {
+  const [display, setDisplay] = useState(String(value))
+  // 外部值变化（如重置）时同步显示
+  useEffect(() => {
+    setDisplay(String(value))
+  }, [value])
+  return (
+    <Input
+      type="number"
+      value={display}
+      onChange={(e) => setDisplay(e.target.value)}
+      onBlur={() => {
+        const num = Number(display)
+        if (!Number.isFinite(num)) {
+          setDisplay(String(value))
+          return
+        }
+        const clamped = clamp(num, min, max)
+        setDisplay(String(clamped))
+        if (clamped !== value) onCommit(clamped)
+      }}
+      min={min}
+      max={max}
+      step={step}
+      className={className || "w-24"}
+    />
+  )
+}
+
+// 布尔开关：用 Button 变体区分开/关
+function Toggle({
+  value,
+  onChange,
+  labelOn,
+  labelOff,
+}: {
+  value: boolean
+  onChange: (v: boolean) => void
+  labelOn: string
+  labelOff: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={value ? labelOn : labelOff}
+      className={`relative h-6 w-11 rounded-full border transition-colors ${
+        value ? "border-primary bg-primary" : "border-outline-variant bg-surface-container-high"
+      }`}
+      onClick={() => onChange(!value)}
+    >
+      <span
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+          value ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  )
+}
+
 export default function Settings() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const [form, setForm] = useState<AppSettings>(() => getSettings())
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [backendStatus, setBackendStatus] = useState<"checking" | "online" | "offline">("checking")
-  const [backendInfo, setBackendInfo] = useState<string>("")
-  const [token, setToken] = useState(getGitHubToken() || "")
-  const [showToken, setShowToken] = useState(false)
-  const [tokenSource, setTokenSource] = useState<{ source: string | null; hasToken: boolean; envVar: string | null } | null>(null)
+  const [backendUserCount, setBackendUserCount] = useState<number | null>(null)
+  const [backendError, setBackendError] = useState<string>("")
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null)
 
   const checkBackend = async () => {
     setBackendStatus("checking")
@@ -39,23 +135,87 @@ export default function Settings() {
         const data = await res.json()
         const users = data.data || []
         setBackendStatus("online")
-        setBackendInfo(t("settings.onlineUsers", { count: users.length }))
+        setBackendUserCount(Array.isArray(users) ? users.length : 0)
+        setBackendError("")
       } else {
         setBackendStatus("offline")
-        setBackendInfo(`HTTP ${res.status}`)
+        setBackendUserCount(null)
+        setBackendError(`HTTP ${res.status}`)
       }
     } catch {
       setBackendStatus("offline")
-      setBackendInfo(t("settings.offline"))
+      setBackendUserCount(null)
+      setBackendError(t("settings.offline"))
     }
   }
 
-  const loadTokenSource = async () => {
-    const source = await getTokenSource()
-    setTokenSource(source)
+  const loadServiceStatus = async () => {
+    const status = await getServiceStatus()
+    setServiceStatus(status)
   }
 
-  useEffect(() => { checkBackend(); loadTokenSource() }, [])
+  // 临时通知（2 秒后消失）
+  const showNotice = (msg: string) => {
+    setNotice(msg)
+    setTimeout(() => setNotice(null), 2000)
+  }
+
+  // Select/Toggle 类字段：onChange 即保存
+  const updateField = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    setError(null)
+    const next = { ...form, [key]: value }
+    setForm(next)
+    saveSettings({ [key]: value })
+    showNotice(t("settings.common.saved"))
+    // 语言切换同步 i18n
+    if (key === "language") {
+      i18n.changeLanguage(resolveLanguage(next))
+    }
+    // 主题切换同步 documentElement
+    if (key === "theme") {
+      applyTheme(value as "light" | "dark" | "auto")
+    }
+  }
+
+  // 数字字段：onBlur commit（NumberInput 已 clamp），含阈值交叉校验
+  const commitNumber = (key: keyof AppSettings, value: number) => {
+    if (key === "gemStarsMin" && value >= form.gemStarsMax) {
+      setError(t("settings.thresholds.invalidRange"))
+      return
+    }
+    if (key === "gemStarsMax" && value <= form.gemStarsMin) {
+      setError(t("settings.thresholds.invalidRange"))
+      return
+    }
+    setError(null)
+    setForm({ ...form, [key]: value })
+    saveSettings({ [key]: value } as Partial<AppSettings>)
+    showNotice(t("settings.common.saved"))
+  }
+
+  // 重置为默认值
+  const handleReset = () => {
+    if (!window.confirm(t("settings.reset.confirmDesc"))) return
+    const defaults = resetSettings()
+    setForm(defaults)
+    setError(null)
+    applyTheme(defaults.theme)
+    i18n.changeLanguage(resolveLanguage(defaults))
+    showNotice(t("settings.reset.done"))
+  }
+
+  useEffect(() => {
+    checkBackend()
+    loadServiceStatus()
+  }, [])
+
+  // 排序选项
+  const sortOptions = [
+    { value: "starred_at:desc", label: t("settings.browsing.sortStarredDesc") },
+    { value: "stars:desc", label: t("settings.browsing.sortStarsDesc") },
+    { value: "pushed_at:desc", label: t("settings.browsing.sortPushedDesc") },
+    { value: "full_name:asc", label: t("settings.browsing.sortNameAsc") },
+  ]
 
   return (
     <div className="space-y-6">
@@ -75,6 +235,13 @@ export default function Settings() {
           </p>
         </div>
       </section>
+
+      {/* 临时通知 */}
+      {notice && (
+        <div className="fixed top-20 right-6 z-50 rounded-lg bg-status-safe text-white px-4 py-2 text-sm shadow-lg">
+          {notice}
+        </div>
+      )}
 
       {/* 配置卡片网格 */}
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -107,10 +274,16 @@ export default function Settings() {
                 </span>
               </div>
             </div>
-            {backendInfo && (
+            {backendStatus === "online" && backendUserCount !== null && (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{t("settings.info")}</span>
-                <span className="text-xs text-muted-foreground">{backendInfo}</span>
+                <span className="text-sm text-muted-foreground">{t("settings.backendUsers")}</span>
+                <span className="text-xs text-muted-foreground">{t("settings.onlineUsers", { count: backendUserCount })}</span>
+              </div>
+            )}
+            {backendStatus === "offline" && backendError && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">{t("settings.error")}</span>
+                <span className="text-xs text-muted-foreground">{backendError}</span>
               </div>
             )}
             <Button variant="outline" size="sm" className="w-full gap-2" onClick={checkBackend}>
@@ -120,162 +293,284 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* 数据库 */}
+        {/* 服务状态 */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Database className="h-5 w-5 text-primary" />
-              {t("settings.database")}
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              {t("settings.serviceStatus.title")}
             </CardTitle>
-            <CardDescription>{t("settings.databaseDesc")}</CardDescription>
+            <CardDescription>{t("settings.serviceStatus.desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.dbType")}</span>
-              <Badge variant="outline" className="font-mono text-xs">SQLite (WAL)</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.dbLocation")}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[180px]">backend/data/starway.db</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.dbMode")}</span>
-              <Badge variant={backendStatus === "online" ? "secondary" : "outline"} className="font-mono text-xs">
-                {backendStatus === "online" ? t("settings.dbModeSynced") : t("settings.dbModeUnavailable")}
+              <span className="text-sm text-muted-foreground">{t("settings.serviceStatus.githubToken")}</span>
+              <Badge variant={serviceStatus?.github.valid ? "secondary" : "outline"} className="font-mono text-xs">
+                {serviceStatus?.github.valid
+                  ? t("settings.serviceStatus.valid")
+                  : serviceStatus?.github.configured
+                    ? t("settings.serviceStatus.invalid")
+                    : t("settings.serviceStatus.notConfigured")}
               </Badge>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{t("settings.serviceStatus.githubSource")}</span>
+              <span className="text-xs text-muted-foreground">{serviceStatus?.github.source || t("settings.serviceStatus.none")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{t("settings.serviceStatus.aiApi")}</span>
+              <Badge variant={serviceStatus?.ai.valid ? "secondary" : "outline"} className="font-mono text-xs">
+                {serviceStatus?.ai.valid
+                  ? t("settings.serviceStatus.valid")
+                  : serviceStatus?.ai.configured
+                    ? t("settings.serviceStatus.invalid")
+                    : t("settings.serviceStatus.notConfigured")}
+              </Badge>
+            </div>
+            {(serviceStatus?.github.message || serviceStatus?.ai.message) && (
+              <p className="text-xs text-muted-foreground">
+                {serviceStatus?.github.message || serviceStatus?.ai.message}
+              </p>
+            )}
+            <Button variant="outline" size="sm" className="w-full gap-2" onClick={loadServiceStatus}>
+              <RefreshCw className="h-4 w-4" />
+              {t("settings.reCheck")}
+            </Button>
           </CardContent>
         </Card>
 
-        {/* GitHub Token */}
+        {/* ===== 以下为新增的可调整设置卡片 ===== */}
+
+        {/* API 超时设置 */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Key className="h-5 w-5 text-primary" />
-              {t("settings.githubToken")}
+              <Clock className="h-5 w-5 text-primary" />
+              {t("settings.timeouts.title")}
             </CardTitle>
-            <CardDescription>{t("settings.githubTokenDesc")}</CardDescription>
+            <CardDescription>{t("settings.timeouts.desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.status")}</span>
-              <Badge variant={token ? "default" : "outline"} className="font-mono text-xs">
-                {token ? t("settings.tokenConfigured") : t("settings.tokenNotConfigured")}
-              </Badge>
-            </div>
-            {tokenSource && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{t("settings.tokenSource")}</span>
+            {/* AI 生成超时：显示秒，存储毫秒 */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.timeouts.ai")}</span>
                 <div className="flex items-center gap-1.5">
-                  {token ? (
-                    <>
-                      <Badge variant="secondary" className="text-[10px]">{t("settings.sourceBrowser")}</Badge>
-                      {tokenSource.hasToken && (
-                        <span className="text-[10px] text-muted-foreground">+ {tokenSource.envVar}</span>
-                      )}
-                    </>
-                  ) : tokenSource.hasToken ? (
-                    <Badge variant="secondary" className="text-[10px]">{tokenSource.envVar}</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px]">{t("settings.sourceAnonymous")}</Badge>
-                  )}
+                  <NumberInput
+                    value={form.aiTimeout / 1000}
+                    onCommit={(v) => commitNumber("aiTimeout", v * 1000)}
+                    min={30}
+                    max={180}
+                    step={10}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("settings.timeouts.seconds")}</span>
                 </div>
               </div>
-            )}
-            <div className="relative">
-              <Input
-                type={showToken ? "text" : "password"}
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                className="pr-10 font-mono text-xs"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken(!showToken)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-on-surface"
-              >
-                {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+              <p className="text-xs text-muted-foreground">{t("settings.timeouts.aiDesc")}</p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1"
-                onClick={() => { setGitHubToken(token); setBackendInfo(t("settings.tokenSaved")) }}
-              >
-                {t("settings.save")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => { clearGitHubToken(); setToken(""); setBackendInfo(t("settings.tokenCleared")) }}
-              >
-                {t("settings.clear")}
-              </Button>
+            {/* 同步超时 */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.timeouts.sync")}</span>
+                <div className="flex items-center gap-1.5">
+                  <NumberInput
+                    value={form.syncTimeout / 1000}
+                    onCommit={(v) => commitNumber("syncTimeout", v * 1000)}
+                    min={60}
+                    max={600}
+                    step={30}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("settings.timeouts.seconds")}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.timeouts.syncDesc")}</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              <Trans
-                i18nKey="settings.tokenHint"
-                components={{
-                  a: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />,
-                  code: <code />,
-                }}
-              />
-            </p>
+            {/* 普通 API 超时 */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.timeouts.api")}</span>
+                <div className="flex items-center gap-1.5">
+                  <NumberInput
+                    value={form.apiTimeout / 1000}
+                    onCommit={(v) => commitNumber("apiTimeout", v * 1000)}
+                    min={3}
+                    max={30}
+                    step={1}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("settings.timeouts.seconds")}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.timeouts.apiDesc")}</p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* 导出目录 */}
+        {/* 浏览体验 */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <FolderOpen className="h-5 w-5 text-primary" />
-              {t("settings.export")}
+              <Globe className="h-5 w-5 text-primary" />
+              {t("settings.browsing.title")}
             </CardTitle>
-            <CardDescription>{t("settings.exportDesc")}</CardDescription>
+            <CardDescription>{t("settings.browsing.desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.exportFormats")}</span>
-              <div className="flex gap-1.5">
-                <Badge variant="outline" className="text-[10px]">CSV</Badge>
-                <Badge variant="outline" className="text-[10px]">JSON</Badge>
-                <Badge variant="outline" className="text-[10px]">Markdown</Badge>
+              <span className="text-sm text-on-surface">{t("settings.browsing.pageSize")}</span>
+              <Select
+                value={String(form.pageSize)}
+                onChange={(e) => updateField("pageSize", Number(e.target.value))}
+                className="w-28"
+              >
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-on-surface">{t("settings.browsing.defaultSort")}</span>
+              <Select
+                value={form.defaultSort}
+                onChange={(e) => updateField("defaultSort", e.target.value)}
+                className="w-44"
+              >
+                {sortOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-on-surface">{t("settings.browsing.language")}</span>
+              <Select
+                value={form.language}
+                onChange={(e) => updateField("language", e.target.value as AppSettings["language"])}
+                className="w-32"
+              >
+                <option value="auto">{t("settings.browsing.langAuto")}</option>
+                <option value="zh-CN">{t("settings.browsing.langZh")}</option>
+                <option value="en-US">{t("settings.browsing.langEn")}</option>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-on-surface">{t("settings.browsing.theme")}</span>
+              <Select
+                value={form.theme}
+                onChange={(e) => updateField("theme", e.target.value as AppSettings["theme"])}
+                className="w-32"
+              >
+                <option value="auto">{t("settings.browsing.themeAuto")}</option>
+                <option value="light">{t("settings.browsing.themeLight")}</option>
+                <option value="dark">{t("settings.browsing.themeDark")}</option>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AI 行为 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Bot className="h-5 w-5 text-primary" />
+              {t("settings.aiBehavior.title")}
+            </CardTitle>
+            <CardDescription>{t("settings.aiBehavior.desc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.aiBehavior.autoGenSummary")}</span>
+                <Toggle
+                  value={form.autoGenSummary}
+                  onChange={(v) => updateField("autoGenSummary", v)}
+                  labelOn={t("settings.common.on")}
+                  labelOff={t("settings.common.off")}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.aiBehavior.autoGenSummaryDesc")}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.aiBehavior.confirmForceRegen")}</span>
+                <Toggle
+                  value={form.confirmForceRegen}
+                  onChange={(v) => updateField("confirmForceRegen", v)}
+                  labelOn={t("settings.common.on")}
+                  labelOff={t("settings.common.off")}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.aiBehavior.confirmForceRegenDesc")}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 业务阈值 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <SlidersHorizontal className="h-5 w-5 text-primary" />
+              {t("settings.thresholds.title")}
+            </CardTitle>
+            <CardDescription>{t("settings.thresholds.desc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.thresholds.sleepDays")}</span>
+                <NumberInput
+                  value={form.sleepDays}
+                  onCommit={(v) => commitNumber("sleepDays", v)}
+                  min={30}
+                  max={365}
+                  step={1}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.thresholds.sleepDaysDesc")}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.thresholds.gemStarsMin")}</span>
+                <NumberInput
+                  value={form.gemStarsMin}
+                  onCommit={(v) => commitNumber("gemStarsMin", v)}
+                  min={0}
+                  max={100000}
+                  step={10}
+                />
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.encoding")}</span>
-              <span className="text-xs text-muted-foreground">UTF-8 BOM</span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-on-surface">{t("settings.thresholds.gemStarsMax")}</span>
+                <NumberInput
+                  value={form.gemStarsMax}
+                  onCommit={(v) => commitNumber("gemStarsMax", v)}
+                  min={0}
+                  max={100000}
+                  step={100}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t("settings.thresholds.gemStarsDesc")}</p>
             </div>
+            {error && (
+              <p className="text-xs text-status-danger">{error}</p>
+            )}
           </CardContent>
         </Card>
+      </section>
 
-        {/* AI 增强 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <RefreshCw className="h-5 w-5 text-primary" />
-              {t("settings.aiEnhance")}
-            </CardTitle>
-            <CardDescription>{t("settings.aiEnhanceDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.status")}</span>
-              <Badge variant="outline" className="text-xs">{t("settings.aiReady")}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t("settings.aiProvider")}</span>
-              <span className="text-xs text-muted-foreground">OpenAI-compatible / Ollama</span>
-            </div>
-            <p className="text-xs text-muted-foreground pt-1">
-              {t("settings.aiHint")}
-            </p>
-          </CardContent>
-        </Card>
+      {/* 重置区 */}
+      <section className="flex items-center justify-between rounded-xl border border-outline-variant bg-surface-container-low p-4">
+        <div className="flex items-center gap-3">
+          <RotateCcw className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium text-on-surface">{t("settings.reset.title")}</p>
+            <p className="text-xs text-muted-foreground">{t("settings.reset.confirmDesc")}</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleReset}>
+          <RotateCcw className="h-4 w-4" />
+          {t("settings.reset.button")}
+        </Button>
       </section>
     </div>
   )

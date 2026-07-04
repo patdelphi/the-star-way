@@ -1,7 +1,10 @@
 /**
  * 前端 API 客户端
  * 封装对后端 API 的 fetch 调用，API 不可用时返回静态 mock 数据（Demo 模式兜底）
+ * 超时、Token、语言偏好、业务阈值均从统一设置（settings.ts）读取。
  */
+import { getSettings, saveSettings, resolveLanguage } from '@/lib/settings'
+
 // ===== 类型定义 =====
 
 // 仓库基本信息
@@ -78,6 +81,20 @@ export type GlobalOverview = UserStats & {
   starTrend: { label: string; value: number }[]
 }
 
+export interface ServiceStatus {
+  github: {
+    configured: boolean
+    valid: boolean
+    source: string | null
+    message: string | null
+  }
+  ai: {
+    configured: boolean
+    valid: boolean
+    message: string | null
+  }
+}
+
 // 用户信息
 export interface UserInfo {
   login: string
@@ -105,10 +122,9 @@ export interface ApiError {
 // ===== 配置 =====
 
 const API_BASE = import.meta.env.VITE_API_BASE || ''
-const API_TIMEOUT = 8000 // 普通 API 8 秒超时
-const AI_TIMEOUT = 60000 // AI 生成接口可能需要 10-30 秒，放宽到 60 秒
-const SYNC_TIMEOUT = 180000 // GitHub 同步可能需要多页请求，单独放宽到 3 分钟
-const TOKEN_KEY = 'starway-github-token'
+
+// 超时统一从 settings 读取（用户可在设置页调整），默认值见 settings.ts
+// 旧代码中显式传超时的调用点（如 syncStars / getReadmeSummary）已改为依赖 fetchWithTimeout 内部的 URL 自动判定
 
 // API 错误对象：AI 生成功能需要把后端错误展示给页面，而不是静默降级
 export class ApiRequestError extends Error {
@@ -124,26 +140,41 @@ export class ApiRequestError extends Error {
 }
 
 /**
- * 获取当前 i18n 语言对应的后端 lang 参数
+ * 根据请求 URL 自动判定超时时长。
+ * - /sync：多页同步，用 syncTimeout
+ * - readme-summary / star-dna / learning-path：AI 生成，用 aiTimeout
+ * - 其他：普通查询，用 apiTimeout
  */
-function getLangParam(): string {
-  // 从 localStorage 读取语言偏好（与 i18n detection 配置一致）
-  const lang = typeof window !== 'undefined' ? localStorage.getItem('starway-lang') : null
-  return lang && lang.startsWith('en') ? 'en' : 'zh'
+function resolveTimeout(url: string): number {
+  const s = getSettings()
+  if (url.includes('/sync')) return s.syncTimeout
+  if (url.includes('readme-summary') || url.includes('star-dna') || url.includes('learning-path')) {
+    return s.aiTimeout
+  }
+  return s.apiTimeout
 }
 
-// ===== Token 管理 =====
+/**
+ * 获取当前 i18n 语言对应的后端 lang 参数。
+ * 从统一设置读取，'auto' 模式跟随 navigator.language。
+ */
+function getLangParam(): string {
+  return resolveLanguage(getSettings()).startsWith('en') ? 'en' : 'zh'
+}
+
+// ===== Token 管理（统一存储到 settings） =====
 
 export function getGitHubToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  const token = getSettings().githubToken
+  return token || null
 }
 
 export function setGitHubToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
+  saveSettings({ githubToken: token })
 }
 
 export function clearGitHubToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
+  saveSettings({ githubToken: '' })
 }
 
 // ===== 工具函数 =====
@@ -204,10 +235,12 @@ function normalizeGlobalOverview(value: any): GlobalOverview {
  * 带超时的 fetch 封装
  * @param url 请求 URL
  * @param options fetch 选项
+ * @param timeoutMs 显式超时；不传时按 URL 自动判定（sync→syncTimeout，AI→aiTimeout，其他→apiTimeout）
  */
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = API_TIMEOUT): Promise<Response> {
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs?: number): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const resolved = timeoutMs ?? resolveTimeout(url)
+  const timer = setTimeout(() => controller.abort(), resolved)
 
   try {
     const response = await fetch(url, {
@@ -269,6 +302,35 @@ export async function getUsers(): Promise<UserInfo[]> {
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底
   return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null, repoCount: 0, tagCount: 0 }]
+}
+
+/**
+ * 逻辑删除用户；后端保留数据，重新同步同一 login 时恢复。
+ */
+export async function deleteUser(login: string): Promise<boolean> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}`, {
+        method: 'DELETE',
+      })
+      return res.ok
+    }
+  } catch { /* 忽略错误 */ }
+  return false
+}
+
+/**
+ * 获取后端连接、GitHub Token、AI API 的真实可用状态。
+ */
+export async function getServiceStatus(): Promise<ServiceStatus | null> {
+  try {
+    if (await checkApiAvailable()) {
+      const res = await fetchWithTimeout(`${API_BASE}/api/status`)
+      const data = await res.json()
+      return data.data as ServiceStatus
+    }
+  } catch { /* 忽略错误 */ }
+  return null
 }
 
 /**
@@ -382,7 +444,13 @@ export async function getUserStarTimeline(login: string): Promise<Array<{ month:
 export async function getGlobalOverview(): Promise<GlobalOverview | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/overview`)
+      // 带上用户自定义的业务阈值
+      const s = getSettings()
+      const params = new URLSearchParams()
+      params.set('sleepDays', String(s.sleepDays))
+      params.set('gemStarsMin', String(s.gemStarsMin))
+      params.set('gemStarsMax', String(s.gemStarsMax))
+      const res = await fetchWithTimeout(`${API_BASE}/api/overview?${params}`)
       const data = await res.json()
       return normalizeGlobalOverview(data.data)
     }
@@ -436,7 +504,7 @@ export async function syncStars(username: string, token?: string): Promise<any |
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }, SYNC_TIMEOUT)
+      })
       const data = await res.json()
       if (!res.ok) {
         throw new Error(data?.error?.message || 'SYNC_FAILED')
@@ -463,7 +531,13 @@ export async function getUserSummary(login: string): Promise<{
 } | null> {
   try {
     if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/summary`)
+      // 带上用户自定义的业务阈值（Sleep Stars 天数、Hidden Gems stars 区间）
+      const s = getSettings()
+      const params = new URLSearchParams()
+      params.set('sleepDays', String(s.sleepDays))
+      params.set('gemStarsMin', String(s.gemStarsMin))
+      params.set('gemStarsMax', String(s.gemStarsMax))
+      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/summary?${params}`)
       const data = await res.json()
       return data.data
     }
@@ -533,7 +607,7 @@ export async function getReadmeSummary(fullName: string, force = false): Promise
       const params = new URLSearchParams()
       if (force) params.set('force', '1')
       params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary?${params}`, undefined, AI_TIMEOUT)
+      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary?${params}`)
       const data = await res.json()
       return data.data
     }
@@ -552,7 +626,7 @@ export async function getStarDna(login: string, force = false): Promise<{
     const params = new URLSearchParams()
     if (force) params.set('force', '1')
     params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-dna?${params}`, undefined, AI_TIMEOUT)
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-dna?${params}`)
     return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
   }
   return null
@@ -583,7 +657,7 @@ export async function getLearningPath(login: string, force = false): Promise<{
     const params = new URLSearchParams()
     if (force) params.set('force', '1')
     params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/learning-path?${params}`, undefined, AI_TIMEOUT)
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/learning-path?${params}`)
     return readJsonDataOrThrow<{ path: string; cached: boolean }>(res)
   }
   return null

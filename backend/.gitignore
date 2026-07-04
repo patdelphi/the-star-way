@@ -5,7 +5,7 @@ node_modules/
 dist/
 
 # Database files
-data/*.db
+# starway.db 主文件入库（含已提交数据快照），WAL/SHM 是运行时临时文件不入库
 data/*.db-wal
 data/*.db-shm
 

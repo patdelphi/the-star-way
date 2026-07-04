@@ -24,6 +24,31 @@ export const GEM_STARS_MAX = 1000
 export const GEM_STARS_MIN = 50
 export const GEM_STARS_UPPER = 10000
 
+/**
+ * 业务阈值可选项
+ * 由前端 settings 透传，无值时回退到默认常量，保证向后兼容
+ */
+export interface ThresholdOptions {
+  sleepDays?: number    // 沉睡星标判定天数，默认 90
+  gemStarsMin?: number  // gemRepos stars 下限，默认 GEM_STARS_MIN
+  gemStarsMax?: number  // hiddenGemsCount stars 上限，默认 GEM_STARS_MAX
+}
+
+// 解析阈值 options，非法或缺失时回退到默认常量
+function resolveThresholds(options?: ThresholdOptions) {
+  const sleepDays = options?.sleepDays
+  const sleepMs = typeof sleepDays === 'number' && Number.isFinite(sleepDays) && sleepDays > 0
+    ? sleepDays * 24 * 60 * 60 * 1000
+    : ACTIVE_DAYS_MS
+  const gemStarsMax = typeof options?.gemStarsMax === 'number' && Number.isFinite(options.gemStarsMax) && options.gemStarsMax > 0
+    ? options.gemStarsMax
+    : GEM_STARS_MAX
+  const gemStarsMin = typeof options?.gemStarsMin === 'number' && Number.isFinite(options.gemStarsMin) && options.gemStarsMin >= 0
+    ? options.gemStarsMin
+    : GEM_STARS_MIN
+  return { sleepMs, gemStarsMin, gemStarsMax }
+}
+
 // ===== 列表查询 =====
 
 /**
@@ -286,10 +311,12 @@ export function queryRepoCount(db: Database.Database, userLogin?: string): numbe
 }
 
 /**
- * 活跃仓库统计（最近 90 天有 pushed_at 更新的仓库）
+ * 活跃仓库统计（最近 sleepDays 天有 pushed_at 更新的仓库）
+ * options 透传时使用自定义阈值，否则回退默认 90 天
  */
-export function queryActiveRepoCount(db: Database.Database, userLogin?: string): number {
-  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
+export function queryActiveRepoCount(db: Database.Database, userLogin?: string, options?: ThresholdOptions): number {
+  const { sleepMs } = resolveThresholds(options)
+  const cutoffDate = new Date(Date.now() - sleepMs).toISOString()
   const join = userLogin ? 'JOIN stars s ON r.full_name = s.repo_full_name' : ''
   const userWhere = userLogin ? 'AND s.user_login = ?' : ''
   const row = db
@@ -300,7 +327,7 @@ export function queryActiveRepoCount(db: Database.Database, userLogin?: string):
       WHERE r.pushed_at >= ?
       ${userWhere}
     `)
-    .get(...(userLogin ? [ninetyDaysAgo, userLogin] : [ninetyDaysAgo])) as { cnt: number }
+    .get(...(userLogin ? [cutoffDate, userLogin] : [cutoffDate])) as { cnt: number }
   return row.cnt
 }
 
@@ -308,7 +335,7 @@ export function queryActiveRepoCount(db: Database.Database, userLogin?: string):
  * 用户级统一摘要统计
  * 返回：仓库总数、活跃数、标签数、隐藏宝石数、沉睡星标数、协议风险数、最后同步时间
  */
-export function queryUserSummary(db: Database.Database, userLogin: string): {
+export function queryUserSummary(db: Database.Database, userLogin: string, options?: ThresholdOptions): {
   repoCount: number
   activeRepoCount: number
   tagCount: number
@@ -317,13 +344,14 @@ export function queryUserSummary(db: Database.Database, userLogin: string): {
   licenseRiskCount: number
   lastSyncedAt: string | null
 } {
-  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
+  const { sleepMs, gemStarsMax } = resolveThresholds(options)
+  const cutoffDate = new Date(Date.now() - sleepMs).toISOString()
 
   // 仓库总数
   const repoCount = queryRepoCount(db, userLogin)
 
-  // 活跃仓库数
-  const activeRepoCount = queryActiveRepoCount(db, userLogin)
+  // 活跃仓库数（透传 options 保持阈值一致）
+  const activeRepoCount = queryActiveRepoCount(db, userLogin, options)
 
   // 唯一标签数（该用户星标仓库上的标签）
   const tagRow = db.prepare(`
@@ -333,22 +361,22 @@ export function queryUserSummary(db: Database.Database, userLogin: string): {
   `).get(userLogin) as { cnt: number }
   const tagCount = tagRow.cnt
 
-  // 隐藏宝石：stars <= 1000 且最近 90 天有更新
+  // 隐藏宝石：stars <= gemStarsMax 且最近 sleepDays 天有更新
   const gemRow = db.prepare(`
     SELECT COUNT(*) as cnt
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE s.user_login = ? AND r.stars <= ? AND r.pushed_at >= ?
-  `).get(userLogin, GEM_STARS_MAX, ninetyDaysAgo) as { cnt: number }
+  `).get(userLogin, gemStarsMax, cutoffDate) as { cnt: number }
   const hiddenGemsCount = gemRow.cnt
 
-  // 沉睡星标：超过 90 天未更新
+  // 沉睡星标：超过 sleepDays 天未更新
   const sleepRow = db.prepare(`
     SELECT COUNT(*) as cnt
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE s.user_login = ? AND r.pushed_at < ?
-  `).get(userLogin, ninetyDaysAgo) as { cnt: number }
+  `).get(userLogin, cutoffDate) as { cnt: number }
   const sleepStarsCount = sleepRow.cnt
 
   // 协议风险：GPL 或未知协议
@@ -413,7 +441,7 @@ export function queryUserListSummaries(db: Database.Database): Array<{
     FROM users u
     LEFT JOIN stars s ON s.user_login = u.login
     LEFT JOIN repo_tags rt ON rt.repo_full_name = s.repo_full_name AND s.removed_at IS NULL
-    WHERE u.login != ?
+    WHERE u.login != ? AND u.deleted_at IS NULL
     GROUP BY u.login, u.avatar_url, u.profile_url, u.synced_at, u.name, u.bio, u.company, u.location, u.followers, u.public_repos
     ORDER BY u.login
   `).all(SYSTEM_DEMO_LOGIN) as Array<{
@@ -435,8 +463,9 @@ export function queryUserListSummaries(db: Database.Database): Array<{
 /**
  * 查询全库概览统计
  * 只统计真实用户的有效星标，避免 demo-user 和 removed_at 记录污染总览。
+ * options 透传时使用自定义阈值，否则回退默认 90 天 / 默认 gem stars 区间
  */
-export function queryGlobalOverview(db: Database.Database): {
+export function queryGlobalOverview(db: Database.Database, options?: ThresholdOptions): {
   userCount: number
   repoCount: number
   activeRepoCount: number
@@ -464,7 +493,8 @@ export function queryGlobalOverview(db: Database.Database): {
   }>
   starTrend: Array<{ label: string; value: number }>
 } {
-  const ninetyDaysAgo = new Date(Date.now() - ACTIVE_DAYS_MS).toISOString()
+  const { sleepMs, gemStarsMin, gemStarsMax } = resolveThresholds(options)
+  const cutoffDate = new Date(Date.now() - sleepMs).toISOString()
   const baseWhere = `s.removed_at IS NULL AND s.user_login != ?`
 
   const userRow = db.prepare(`
@@ -484,7 +514,7 @@ export function queryGlobalOverview(db: Database.Database): {
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE ${baseWhere} AND r.pushed_at >= ?
-  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+  `).get(SYSTEM_DEMO_LOGIN, cutoffDate) as { cnt: number }
 
   const tagRow = db.prepare(`
     SELECT COUNT(DISTINCT rt.tag) as cnt
@@ -498,14 +528,14 @@ export function queryGlobalOverview(db: Database.Database): {
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE ${baseWhere} AND r.stars <= ? AND r.pushed_at >= ?
-  `).get(SYSTEM_DEMO_LOGIN, GEM_STARS_MAX, ninetyDaysAgo) as { cnt: number }
+  `).get(SYSTEM_DEMO_LOGIN, gemStarsMax, cutoffDate) as { cnt: number }
 
   const sleepRow = db.prepare(`
     SELECT COUNT(DISTINCT r.full_name) as cnt
     FROM repos r
     JOIN stars s ON r.full_name = s.repo_full_name
     WHERE ${baseWhere} AND (r.pushed_at IS NULL OR r.pushed_at < ?)
-  `).get(SYSTEM_DEMO_LOGIN, ninetyDaysAgo) as { cnt: number }
+  `).get(SYSTEM_DEMO_LOGIN, cutoffDate) as { cnt: number }
 
   const riskRow = db.prepare(`
     SELECT COUNT(DISTINCT r.full_name) as cnt
@@ -578,7 +608,7 @@ export function queryGlobalOverview(db: Database.Database): {
       AND r.pushed_at >= ?
     ORDER BY r.stars DESC
     LIMIT 3
-  `).all(SYSTEM_DEMO_LOGIN, GEM_STARS_MIN, GEM_STARS_UPPER, ninetyDaysAgo) as Array<{
+  `).all(SYSTEM_DEMO_LOGIN, gemStarsMin, GEM_STARS_UPPER, cutoffDate) as Array<{
     full_name: string
     description: string | null
     html_url: string

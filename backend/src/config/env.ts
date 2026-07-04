@@ -8,8 +8,8 @@ import { config } from 'dotenv'
 
 let loaded = false
 
-export function loadEnv(): void {
-  if (loaded) return
+export function loadEnv(options: { force?: boolean } = {}): void {
+  if (loaded && !options.force) return
   loaded = true
 
   // 不覆盖系统环境变量；backend/.env 优先，根目录 .env 用于补充缺失项。

@@ -41,8 +41,9 @@ import {
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline, deleteUser } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
+import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Select, SelectOption } from "@/components/ui/select"
 
@@ -454,12 +455,21 @@ export default function Developers() {
   }
 
   // 删除开发者
-  const removeDeveloper = (id: string) => {
+  const removeDeveloper = async (id: string) => {
     const target = developers.find((d) => d.id === id)
     if (!target) return
+    if (!window.confirm(t("developers.confirmRemove", { name: target.name }))) return
+    const success = await deleteUser(target.name)
+    if (!success) {
+      setSyncError(t("developers.removeFailed"))
+      return
+    }
     const remaining = developers.filter((d) => d.id !== id)
     if (target.isActive && remaining.length > 0) {
       remaining[0] = { ...remaining[0], isActive: true }
+      setCurrentLogin(remaining[0].name)
+    } else if (remaining.length === 0) {
+      setCurrentLogin("")
     }
     setDevelopers(remaining)
     // 重新计算当前页
@@ -1070,7 +1080,11 @@ export default function Developers() {
                       size="sm"
                       className="gap-1.5 text-xs shrink-0"
                       disabled={dnaLoading}
-                      onClick={() => loadStarDna(activeDev.name, true)}
+                      onClick={() => {
+                        // 强制重生成二次确认开关
+                        if (getSettings().confirmForceRegen && !window.confirm(t("developers.confirmRegen"))) return
+                        loadStarDna(activeDev.name, true)
+                      }}
                     >
                       <RefreshCw className={`h-3.5 w-3.5 ${dnaLoading ? "animate-spin" : ""}`} />
                       {dnaLoading ? t("developers.dnaLoading") : t("developers.regenerateDna")}
@@ -1107,7 +1121,11 @@ export default function Developers() {
                       size="sm"
                       className="gap-1.5 text-xs shrink-0"
                       disabled={pathLoading}
-                      onClick={() => loadLearningPath(activeDev.name, true)}
+                      onClick={() => {
+                        // 强制重生成二次确认开关
+                        if (getSettings().confirmForceRegen && !window.confirm(t("developers.confirmRegen"))) return
+                        loadLearningPath(activeDev.name, true)
+                      }}
                     >
                       <RefreshCw className={`h-3.5 w-3.5 ${pathLoading ? "animate-spin" : ""}`} />
                       {pathLoading ? t("developers.pathLoading") : t("developers.regeneratePath")}

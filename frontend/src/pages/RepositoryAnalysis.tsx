@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
 import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos, type SimilarRepo } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
+import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 /* ========== 常量 ========== */
@@ -285,6 +286,14 @@ export default function RepositoryAnalysis() {
       .finally(() => setSummaryLoading(false))
   }, [])
 
+  // 重新生成：根据设置决定是否弹出二次确认
+  const handleRegenerate = (repo: string) => {
+    if (getSettings().confirmForceRegen) {
+      if (!window.confirm(t("repoAnalysis.confirmRegen"))) return
+    }
+    loadSummary(repo, true)
+  }
+
   // 语言切换时清空前端缓存，重新加载
   useEffect(() => {
     summaryCache.current = {}
@@ -292,7 +301,8 @@ export default function RepositoryAnalysis() {
       setReadmeSummary(null)
       setStarReason(null)
       setReuseAdvice(null)
-      loadSummary(selectedRepo)
+      // autoGenSummary=false 时不自动加载，等用户手动点击
+      if (getSettings().autoGenSummary) loadSummary(selectedRepo)
     }
     // 重新加载标签（后端返回带 label 的翻译版本）
     if (currentLogin) {
@@ -310,7 +320,8 @@ export default function RepositoryAnalysis() {
     setReadmeSummary(null)
     setStarReason(null)
     setReuseAdvice(null)
-    loadSummary(selectedRepo)
+    // autoGenSummary=false 时不自动加载，等用户手动点击
+    if (getSettings().autoGenSummary) loadSummary(selectedRepo)
   }, [selectedRepo, loadSummary])
 
   // 加载相似项目
@@ -596,10 +607,14 @@ export default function RepositoryAnalysis() {
                   size="sm"
                   className="gap-1.5 text-xs shrink-0"
                   disabled={summaryLoading || !selectedRepo}
-                  onClick={() => loadSummary(selectedRepo, true)}
+                  onClick={() => handleRegenerate(selectedRepo)}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${summaryLoading ? "animate-spin" : ""}`} />
-                  {summaryLoading ? t("repoAnalysis.summaryLoading") : t("repoAnalysis.regenerateSummary")}
+                  {summaryLoading
+                    ? t("repoAnalysis.summaryLoading")
+                    : readmeSummary
+                      ? t("repoAnalysis.regenerateSummary")
+                      : t("repoAnalysis.generateSummary")}
                 </Button>
               </div>
             </CardHeader>
@@ -612,7 +627,11 @@ export default function RepositoryAnalysis() {
               ) : readmeSummary ? (
                 <p className="text-sm leading-7 text-on-surface">{readmeSummary}</p>
               ) : (
-                <p className="text-sm leading-7 text-muted-foreground">{t("repoAnalysis.summaryEmpty")}</p>
+                <p className="text-sm leading-7 text-muted-foreground">
+                  {getSettings().autoGenSummary
+                    ? t("repoAnalysis.summaryEmpty")
+                    : t("repoAnalysis.autoGenOff")}
+                </p>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniFact icon={FileText} label={t("repoAnalysis.suitableFor")} value={activeRepo.category} />

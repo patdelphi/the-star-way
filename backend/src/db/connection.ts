@@ -48,6 +48,11 @@ export function createConnection(dbPath?: string): Database.Database {
  */
 export function initDatabase(db: Database.Database): void {
   db.exec(SCHEMA_SQL)
+  const userColumns = db.pragma('table_info(users)') as Array<{ name: string }>
+  if (!userColumns.some((col) => col.name === 'deleted_at')) {
+    // 兼容旧数据库：新增用户逻辑删除字段，不改动既有数据。
+    db.prepare('ALTER TABLE users ADD COLUMN deleted_at TEXT').run()
+  }
 }
 
 /**

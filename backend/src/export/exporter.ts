@@ -265,7 +265,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
     LIMIT 20
   `).all(login) as Array<{ full_name: string; description: string; language: string; stars: number; license: string }>
 
-  // Hidden Gems（星标 <= 1000 且 90天内有更新）
+  // Hidden Gems（星标 <= GEM_STARS_MAX 且 90天内有更新）
   const hiddenGems = db.prepare(`
     SELECT r.full_name, r.description, r.language, r.stars, r.pushed_at
     FROM repos r
@@ -273,7 +273,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
     WHERE s.user_login = ? AND r.stars <= ? AND r.pushed_at > ?
     ORDER BY r.stars DESC
     LIMIT 20
-  `).all(login, 1000, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
+  `).all(login, GEM_STARS_MAX, ninetyDaysAgo) as Array<{ full_name: string; description: string; language: string; stars: number; pushed_at: string }>
 
   const lines: string[] = []
 
@@ -357,7 +357,7 @@ export function exportReportMarkdown(db: Database.Database, login: string): stri
   if (hiddenGems.length > 0) {
     lines.push(`## 隐藏宝石`)
     lines.push('')
-    lines.push('星标数 <= 1000 且近期活跃的值得关注项目：')
+    lines.push(`星标数 <= ${GEM_STARS_MAX} 且近期活跃的值得关注项目：`)
     lines.push('')
     lines.push('| 仓库 | 语言 | Stars | 最后更新 |')
     lines.push('| --- | --- | --- | --- |')

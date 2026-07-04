@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
   company       TEXT,
   location      TEXT,
   followers     INTEGER,
-  public_repos  INTEGER
+  public_repos  INTEGER,
+  deleted_at    TEXT
 );
 
 

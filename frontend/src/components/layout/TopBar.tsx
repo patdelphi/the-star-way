@@ -5,30 +5,32 @@
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { Search, Sun, Moon, ChevronDown } from "lucide-react"
+import { Search, Sun, Moon, Monitor, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { getRepos, type Repo } from "@/lib/api"
+import { getSettings, saveSettings, applyTheme } from "@/lib/settings"
 
 function useTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light"
-    if (document.documentElement.classList.contains("dark")) return "dark"
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-  })
+  // 主题三态：light / dark / auto（跟随系统），从统一设置读取
+  const [theme, setTheme] = useState<"light" | "dark" | "auto">(() => getSettings().theme)
 
   useEffect(() => {
-    const root = document.documentElement
-    if (theme === "dark") {
-      root.classList.add("dark")
-    } else {
-      root.classList.remove("dark")
+    applyTheme(theme)
+    saveSettings({ theme })
+    // auto 模式监听系统主题变化，切换时自动跟随
+    if (theme === "auto") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)")
+      const handler = () => applyTheme("auto")
+      mq.addEventListener("change", handler)
+      return () => mq.removeEventListener("change", handler)
     }
   }, [theme])
 
-  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"))
-  return { theme, toggleTheme }
+  // 三态循环：light → dark → auto → light
+  const cycleTheme = () => setTheme((t) => (t === "light" ? "dark" : t === "dark" ? "auto" : "light"))
+  return { theme, cycleTheme }
 }
 
 const languages = [
@@ -37,7 +39,7 @@ const languages = [
 ]
 
 export function TopBar() {
-  const { theme, toggleTheme } = useTheme()
+  const { theme, cycleTheme } = useTheme()
   const { t, i18n } = useTranslation()
   const { currentLogin } = useDeveloper()
   const navigate = useNavigate()
@@ -148,16 +150,22 @@ export function TopBar() {
           @{currentLogin}
         </span>
 
-        {/* Theme toggle */}
+        {/* Theme toggle: light → dark → auto → light 三态循环 */}
         <Button
           variant="ghost"
           size="icon"
           className="text-on-surface-variant hover:text-primary"
-          onClick={toggleTheme}
-          title={theme === "light" ? t('topBar.switchDark') : t('topBar.switchLight')}
+          onClick={cycleTheme}
+          title={
+            theme === "light" ? t('topBar.switchDark')
+            : theme === "dark" ? t('topBar.switchAuto')
+            : t('topBar.switchLight')
+          }
         >
           {theme === "light" ? (
             <Moon className="w-5 h-5" />
+          ) : theme === "dark" ? (
+            <Monitor className="w-5 h-5" />
           ) : (
             <Sun className="w-5 h-5" />
           )}

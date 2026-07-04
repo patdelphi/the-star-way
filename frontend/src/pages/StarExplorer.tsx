@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react"
 import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport, getCnSummaries } from "@/lib/api"
+import { getSettings } from "@/lib/settings"
 import { getTagLabel } from "@/lib/tag-labels"
 import type { UserStats, RepoListResult } from "@/lib/api"
 import { useDeveloper } from "@/contexts/DeveloperContext"
@@ -181,12 +182,13 @@ export default function StarExplorer() {
   // === 原有筛选/分页/弹窗状态 ===
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  // 初始值从统一设置读取：pageSize 和 sortKey（从 'field:direction' 解析字段名）
+  const [pageSize, setPageSize] = useState(() => getSettings().pageSize)
   const [selectedLanguage, setSelectedLanguage] = useState("")
   const [selectedTopic, setSelectedTopic] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedLicense, setSelectedLicense] = useState("")
-  const [sortKey, setSortKey] = useState("starred_at")
+  const [sortKey, setSortKey] = useState(() => getSettings().defaultSort.split(":")[0])
   const [quickFilter, setQuickFilter] = useState<"none" | "hiddenGems" | "sleepStars">("none")
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFormat, setExportFormat] = useState("Markdown")

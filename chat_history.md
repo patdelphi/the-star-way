@@ -114,3 +114,23 @@
 
 - 用户：更新文档，commit
 - Codex：更新 changelog 和 troubleshooting，记录 2026-07-03 开发者页、同步添加用户、白屏兜底、API 重试和异常路径编码修复；准备连同未提交代码修复一起提交。
+
+## 2026-07-04 07:08:45 +08:00
+
+- 用户：要求修复用户删除、调整设置页、AI 行为开关、显示 GitHub Token / AI API 有效性，并检查设置项是否真实影响功能。
+- Codex：新增用户逻辑删除字段和 DELETE /api/users/:login，重新同步可恢复；设置页移除 GitHub Token、导出、AI 增强配置卡，新增服务状态卡；AI 行为改为滑动开关；补前后端 API、i18n、静态校验和后端测试。验证 frontend pnpm test/build、backend pnpm test/build 通过。
+
+## 2026-07-04 07:19:39 +08:00
+
+- 用户：设置页删除数据库卡；服务状态要读取 .env 并验证可用性。
+- Codex：移除设置页数据库卡；/api/status 每次检测前强制补读 backend/.env 和项目根 .env，GitHub Token 与 AI API 均做真实可用性校验；补前端静态校验。验证 frontend pnpm test/build、backend pnpm test/build 通过。
+
+## 2026-07-04 07:43:30 +08:00
+
+- 用户：Backend API 的 Info 显示用户数含义不清且语言无法切换；Service Status 显示不对，GitHub Token 和 AI API 实际都可用。
+- Codex：把 Backend API 的 Info 改成动态翻译的用户数字段；服务状态改为 GitHub /user 短超时校验，AI 改用 OpenAI-compatible /chat/completions 轻量请求校验，继续补读 .env。验证 frontend pnpm test/build、backend pnpm test/build 通过。
+
+## 2026-07-04 07:52:59 +08:00
+
+- 用户：要求实际测试，杀掉进程重启；用户数去掉“在线”，改为“已加载”。
+- Codex：将用户数文案改为“已加载 {{count}} 个用户 / Loaded {{count}} users”；停止本项目后端/前端旧进程，使用 start-project.ps1 重启；实测 /api/status 返回 GitHub Token 与 AI API 均 valid，用户数 17；验证 frontend pnpm test/build、backend pnpm test/build 通过。
