@@ -13,7 +13,7 @@ name: Deploy to Cloudflare
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - 'cloudflare/**'
       - 'shared/**'
