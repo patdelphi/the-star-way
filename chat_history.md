@@ -348,3 +348,27 @@
 ### 验证结果
 - 无代码改动，无需 tsc/build 验证
 - README 双语互链已就位
+
+## 2026-07-04 修复添加新开发者用户不成功（竞态条件）
+
+### 问题现象
+点击添加新开发者后，列表中没有出现新用户。
+
+### 根因
+竞态条件导致新用户被从 state 中覆盖删除：
+1. addDeveloper 把 newDev 加入 state（synced_at: null）
+2. addDeveloper 调 setCurrentLogin(name) 切换到新用户
+3. setCurrentLogin 触发 useEffect（依赖 [t, currentLogin]）→ refreshDevelopers()
+4. refreshDevelopers 调 getUsers() → 后端此时还没新用户（sync 尚未完成）
+5. setDevelopers(mapped) 用后端返回的列表覆盖 state → newDev 被删除
+
+### 修复
+useEffect 依赖从 [t, currentLogin] 改为 [t]，避免 currentLogin 变化触发 refreshDevelopers。
+切换用户不需要重新拉取整个用户列表，runSync 成功后会单独调用 refreshDevelopers。
+
+### 改动文件
+- frontend/src/pages/Developers.tsx: useEffect 依赖改为 [t]
+
+### 验证
+- tsc --noEmit: 通过
+- npm run build: 成功

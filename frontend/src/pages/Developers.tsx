@@ -417,9 +417,11 @@ export default function Developers() {
   }
 
   // 页面加载时调用真实 API 获取用户列表
+  // 仅在语言切换时刷新开发者列表（避免 currentLogin 变化触发竞态）
+  // 切换用户不需要重新拉取整个用户列表，runSync 成功后会单独调用 refreshDevelopers
   useEffect(() => {
     refreshDevelopers()
-  }, [t, currentLogin])
+  }, [t])
 
   // 刷新开发者列表数据（从 API 加载并映射）
   const refreshDevelopers = async () => {
