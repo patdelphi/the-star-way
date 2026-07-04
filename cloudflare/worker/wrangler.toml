@@ -7,6 +7,13 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 自定义域名绑定（Cloudflare 会自动创建 DNS 记录指向 Worker）
+# 前提：patdelphi.xyz 域名需托管在当前 Cloudflare 账户下
+# 注意：routes 是顶级字段，必须放在所有 table（[vars]/[[d1_databases]] 等）之前
+routes = [
+  { pattern = "starway.patdelphi.xyz", custom_domain = true }
+]
+
 # D1 数据库绑定
 [[d1_databases]]
 binding = "DB"
@@ -30,7 +37,3 @@ name = "the-star-way-api-dev"
 # 生产环境配置
 [env.production]
 name = "the-star-way-api"
-# 生产环境路由（部署时配置）
-# routes = [
-#   { pattern = "api.your-domain.com/*", zone_name = "your-domain.com" }
-# ]
