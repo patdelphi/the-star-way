@@ -247,6 +247,15 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
 
+  // X 轴智能显示：第一个月或跨年时显示完整 YYYY-MM，同年其他月份只显示 MM，避免横向拥挤
+  const formatTick = (value: unknown) => {
+    const v = String(value)
+    const idx = data.findIndex(d => d.label === v)
+    if (idx <= 0) return v
+    const prev = data[idx - 1]
+    return prev.label.slice(0, 4) !== v.slice(0, 4) ? v : v.slice(5)
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -266,7 +275,7 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
       <ResponsiveContainer width="100%" height={180}>
         <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+          <XAxis dataKey="label" tickFormatter={formatTick} tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip content={<ThemedChartTooltip />} />
           <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
@@ -701,9 +710,9 @@ export default function Developers() {
     () => (developerStats?.languages ?? []).slice(0, 8).reduce((sum, l) => sum + l.count, 0),
     [developerStats]
   )
-  // 星标趋势图表数据（月份取 MM 格式）
+  // 星标趋势图表数据：保留完整 YYYY-MM，前端按需截短显示（同年只显示 MM，跨年显示完整）
   const trendData = useMemo(
-    () => (Array.isArray(starTimeline) ? starTimeline : []).map((item) => ({ label: item.month.slice(5), value: item.count })),
+    () => (Array.isArray(starTimeline) ? starTimeline : []).map((item) => ({ label: item.month, value: item.count })),
     [starTimeline],
   )
 

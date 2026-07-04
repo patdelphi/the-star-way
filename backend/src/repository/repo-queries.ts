@@ -639,7 +639,8 @@ export function queryGlobalOverview(db: Database.Database, options?: ThresholdOp
     licenses,
     recentStars,
     gemRepos,
-    starTrend: trendRows.slice(-12).map(row => ({ label: row.label.slice(5), value: row.value })),
+    // 保留完整 YYYY-MM，前端按需截短显示（同年只显示 MM，跨年显示完整）
+    starTrend: trendRows.slice(-12).map(row => ({ label: row.label, value: row.value })),
   }
 }
 
