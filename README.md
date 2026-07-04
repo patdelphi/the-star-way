@@ -1,275 +1,193 @@
 # the-star-way
 
-> 你的 GitHub Stars 可视化管理工具
+> [English](./README.en.md) | 简体中文
 
-把混乱的 GitHub 星标仓库变成结构化的技术资产地图。
+> 从探索知名开发者的 GitHub 星标仓库中，发现自己下一步该学什么、该用什么。
 
-## 功能特性
+## 为什么值得用
 
-- **星标同步** — 支持匿名和 Token 模式同步 GitHub 星标仓库，增量更新，标记已取消星标的仓库
-- **智能分类** — 基于 Topic、仓库名称、描述的规则自动打标签（AI/LLM、前端框架、DevOps、工具等 60+ 分类）
+每个开发者都曾对着自己的 GitHub Stars 列表发呆——上千个仓库堆在一起，谁也说不清自己到底收藏了什么、为什么收藏。更有意思的是，当我们去看那些我们佩服的开发者的星标列表时，往往能发现一条隐藏的学习路径：他们关注什么技术、读过什么书、用什么工具链、最近在折腾什么新东西。
+
+**the-star-way** 把这种"翻看别人收藏夹"的本能变成一个结构化的工具。它不只是另一个 Stars 管理器——它要回答的问题是：
+
+- 我（或某个开发者）的兴趣版图长什么样？
+- 那些星标仓库背后，藏着怎样的学习模式和成长轨迹？
+- 如果要补齐某个技术方向，下一步该学什么、做什么？
+
+把混乱的星标列表变成一张可检索、可分析、可推导的技术资产地图——这就是 the-star-way 想做的。
+
+## 核心功能
+
+- **星标同步** — 同步任意 GitHub 用户的星标仓库，增量更新，标记已取消星标的仓库
+- **智能分类** — 基于 Topic、仓库名、描述的规则自动打标签（AI/LLM、前端框架、DevOps、工具等 60+ 分类）
 - **多维筛选** — 按语言、标签、关键词搜索、排序和分页浏览
-- **统计分析** — 语言分布、主题聚类、协议分布、活跃/沉睡仓库统计
-- **仓库详情** — 单个仓库的深度信息页
-- **数据导出** — 支持 CSV、JSON、Markdown、HTML 格式导出
-- **AI 增强** — Star DNA 画像、学习路径推荐、README 智能摘要（OpenAI-compatible / Ollama）
-- **多语言 UI** — 中文/英文切换（react-i18next）
-- **主题三态** — 浅色/深色/跟随系统
+- **统计分析** — 语言分布、主题聚类、协议分布、活跃/沉睡仓库统计、星标时间轴趋势
+- **仓库分析** — 单个仓库的深度信息页，含协议合规分析（MIT/Apache/GPL/CC 等 12 类）
+- **AI 增强** —
+  - **Star DNA**：基于星标仓库生成开发者技术画像
+  - **Learning Path**：个性化学习路径推荐
+  - **README 摘要**：仓库 README 的智能摘要
+- **数据导出** — CSV / JSON / Markdown / HTML 四种格式
+- **多语言 UI** — 中文 / 英文切换
+- **主题三态** — 浅色 / 深色 / 跟随系统
 - **Demo 模式** — 内置真实星标仓库数据，无后端也能体验
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 前端 | React 19 + Vite + TypeScript + Tailwind CSS 4 + Radix UI + Lucide Icons + recharts |
-| 后端 | Node.js + TypeScript + better-sqlite3（WAL 模式） |
-| API | Node.js 内置 http 模块（零依赖 HTTP 服务） |
-| 测试 | Vitest（后端 132 个测试通过） |
+| 前端 | React 19 · Vite · TypeScript · Tailwind CSS 4 · Radix UI · recharts |
+| 后端（本地） | Node.js · TypeScript · better-sqlite3（WAL 模式） |
+| 后端（Cloudflare） | Cloudflare Workers · D1（SQLite） |
+| 共享层 | TypeScript 类型 + 纯逻辑（阈值函数、分类规则、标签字典） |
+| AI | OpenAI 兼容接口（支持智谱 GLM、阿里 dashscope、商汤 SenseNova、OpenAI、Ollama 等） |
+| 测试 | Vitest（后端 132 个测试 + Worker 85 个测试） |
 
-## 环境要求
+## 多平台部署
 
-- **Node.js** `v24.15.0`（必须，native 模块 ABI 一致性要求）
-- **pnpm** `11.7.0`（通过 corepack 启用，无需单独安装）
-- **操作系统**：Windows / macOS / Linux
+the-star-way 支持两种部署形态，按需选择。
 
-### Node 版本管理
+### 方式一：本地 / VPS 部署（Node.js + SQLite）
 
-项目根目录已提供 `.nvmrc` 和 `.node-version`，固定为 `24.15.0`。
+适合个人使用、数据完全本地化、离线场景。
 
-```bash
-# 使用 nvm（macOS/Linux）
-nvm install 24.15.0
-nvm use 24.15.0
-
-# 使用 fnm（Windows/macOS/Linux）
-fnm install 24.15.0
-fnm use 24.15.0
-```
-
-启用 corepack（Node.js 自带）：
+**环境要求**：Node.js `v24.15.0` + pnpm `11.7.0`（通过 corepack 启用）。
 
 ```bash
-corepack enable
-corepack prepare pnpm@11.7.0 --activate
-```
-
-## 快速开始
-
-本项目统一通过 `corepack pnpm` 执行依赖安装、测试、构建和 native rebuild。**不要直接使用 `npm` 或 PATH 中的 `pnpm.cmd`**，避免 `better-sqlite3` 按错误 Node ABI 编译。
-
-### 一键启动（推荐）
-
-项目根目录提供启动脚本，自动检查 Node 版本、native 模块、清理旧进程并启动前后端。
-
-#### Windows（PowerShell）
-
-```powershell
+# Windows
 .\start.ps1
-```
 
-#### macOS / Linux（Bash）
-
-```bash
+# macOS / Linux
 ./start.sh
 ```
 
-可选参数：
+启动脚本会自动检查 Node 版本、编译 native 模块、启动前后端。
 
-```bash
-# 指定端口 + 自动打开浏览器
-./start.sh --backend-port 3210 --frontend-port 5173 --open-browser
-```
-
-启动后：
 - 后端 API：`http://localhost:3210`
 - 前端 UI：`http://localhost:5173`
 
-### 手动安装与启动
+手动启动详见 [Docs/deployment.md](./Docs/deployment.md)。
 
-#### 1. 安装依赖
+### 方式二：Cloudflare 部署（Workers + D1 + Pages）
 
-```bash
-# 前端
-cd frontend
-corepack pnpm install
+适合在线服务、免运维、全球边缘加速。
 
-# 后端
-cd ../backend
-corepack pnpm install
+**架构**：
+
+```
+前端 (Cloudflare Pages)  ──HTTPS──▶  Worker API (Cloudflare Workers)  ──绑定──▶  D1 数据库
 ```
 
-#### 2. 环境变量
-
-根目录提供 `sample.env`。需要 GitHub Token 或 AI Provider 时，复制为 `.env` 后按需填写；基础本地功能不依赖 AI。
+**部署步骤**（详见 [Docs/cloudflare-deployment.md](./Docs/cloudflare-deployment.md)）：
 
 ```bash
-cp sample.env .env
-# 按需编辑 .env
+# 1. 创建 D1 数据库
+cd cloudflare/worker
+npx wrangler d1 create starway-db
+# 将返回的 database_id 写入 wrangler.toml
+
+# 2. 执行数据库迁移
+npx wrangler d1 execute starway-db --remote --file=../d1/migrations/0001_init.sql
+
+# 3. 配置 secrets
+npx wrangler secret put STARWAY_GITHUB_TOKEN      # GitHub 同步 token
+npx wrangler secret put STARWAY_AI_BASE_URL        # AI 端点
+npx wrangler secret put STARWAY_AI_API_KEY         # AI key
+npx wrangler secret put STARWAY_AI_MODEL           # 模型名
+
+# 4. 部署 Worker
+npx wrangler deploy
+
+# 5. 前端通过 Cloudflare Pages 连接 GitHub 仓库自动构建
+#    配置环境变量 VITE_API_BASE 指向 Worker URL
 ```
 
-#### 3. 初始化数据库（导入 Demo 数据）
+**CI/CD**：项目已内置 GitHub Actions workflow（`.github/workflows/deploy-cloudflare.yml`），push 到 master 自动部署 Worker 和 Pages。需在 GitHub 仓库 Settings → Secrets 配置：
 
-```bash
-cd backend
-corepack pnpm exec tsx src/db/seed.ts
-```
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `D1_DATABASE_ID`
 
-将 GitHub 星标仓库导入 SQLite（`backend/data/starway.db`）。
+### 方式三：Docker（规划中）
 
-#### 4. 启动后端 API
-
-```bash
-cd backend
-corepack pnpm exec tsx src/api/start.ts
-```
-
-API 服务运行在 `http://localhost:3210`。
-
-#### 5. 启动前端开发服务器
-
-```bash
-cd frontend
-corepack pnpm run dev
-```
-
-前端运行在 `http://localhost:5173`，自动连接本地 API。
-
-### 生产构建
-
-```bash
-cd frontend
-corepack pnpm run build
-```
-
-构建产物在 `frontend/dist/` 目录。
-
-## 平台差异说明
-
-### native 模块（better-sqlite3）
-
-`better-sqlite3` 是 native 模块，必须与启动时使用的 Node.js ABI 一致。
-
-- **Windows**：若启动报 `NODE_MODULE_VERSION` 不匹配，运行 `cd backend && corepack pnpm rebuild better-sqlite3`
-- **macOS / Linux**：首次安装或切换 Node 版本后，可能需要 `cd backend && corepack pnpm rebuild better-sqlite3`
-
-### 启动脚本差异
-
-| 平台 | 脚本 | 说明 |
-|---|---|---|
-| Windows | `start.ps1` | PowerShell 脚本，固定 Node 路径、检查 native、后台启动 |
-| macOS / Linux | `start.sh` | Bash 脚本，功能等价，使用 `ss`/`lsof`/`curl` 探测端口和就绪状态 |
-
-两个脚本共享相同的 PID 文件格式（`.runtime/pids.json`）和日志目录（`.runtime/`）。
+容器化部署方案正在规划中，详见 [Docs/roadmap.md](./Docs/roadmap.md)。
 
 ## 项目结构
 
 ```
 the-star-way/
-├── start.ps1                     # Windows 一键启动脚本
-├── start.sh                      # macOS/Linux 一键启动脚本
-├── .nvmrc                        # Node 版本固定
-├── .node-version                 # Node 版本固定
-├── sample.env                    # 环境变量示例
-├── shared/                       # 跨端共享层（运行时无关）
-│   ├── api-contracts/            # API 契约类型（user/repo/star/stats/tag/sync/cache/error）
-│   ├── classification/           # 标签字典 + 双语映射 + classifyRepo 纯函数
-│   ├── scoring/                  # 阈值口径（Sleep Stars / Hidden Gems 常量和纯函数）
-│   └── __tests__/                # 共享层纯函数测试
-├── backend/                      # 后端服务
-│   ├── src/
-│   │   ├── db/                   # 数据库连接、Schema、类型（re-export shared）
-│   │   ├── import/               # CSV 导入
-│   │   ├── repository/           # 仓库查询与统计（引用 shared 阈值）
-│   │   ├── sync/                 # GitHub 同步（client + syncer）
-│   │   ├── classification/       # 规则分类（re-export shared + 本地 db 版本）
-│   │   ├── api/                  # HTTP API 服务（端口 3210）
-│   │   ├── export/               # CSV/JSON/Markdown/HTML 导出
-│   │   └── ai/                   # AI Provider 配置和缓存框架
-│   ├── data/                     # SQLite 数据库文件
-│   └── ...
-├── frontend/                     # 前端应用
-│   ├── src/
-│   │   ├── pages/                # 页面组件
-│   │   │   ├── Dashboard.tsx     # 概览页
-│   │   │   ├── Developers.tsx    # 开发者管理
-│   │   │   ├── StarExplorer.tsx  # 星标仓库浏览
-│   │   │   ├── RepositoryAnalysis.tsx # 仓库分析
-│   │   │   └── Settings.tsx      # 设置页
-│   │   ├── components/           # UI 组件
-│   │   ├── lib/api.ts            # API 客户端
-│   │   ├── lib/settings.ts       # 统一设置管理
-│   │   └── i18n/                 # 多语言配置
-│   └── ...
-└── Docs/                         # 项目文档
-    ├── requirements.md
-    ├── design.md
-    ├── tasks.md
-    ├── api.md
-    ├── deployment.md
-    ├── troubleshooting.md
-    ├── changelog.md
-    ├── roadmap.md
-    └── dual-architecture-cloudflare-plan.md
+├── shared/                # 跨端共享层（类型 + 纯逻辑）
+├── backend/               # 本地后端（Node.js + SQLite）
+├── frontend/              # 前端应用（React + Vite）
+├── cloudflare/
+│   ├── worker/            # Cloudflare Worker API
+│   └── d1/migrations/     # D1 数据库迁移脚本
+├── Docs/                  # 项目文档
+├── start.ps1 / start.sh   # 一键启动脚本
+└── .github/workflows/     # CI/CD 配置
 ```
+
+## 快速开始
+
+### 本地体验（无需 Token）
+
+```bash
+git clone <repo-url> && cd the-star-way
+./start.sh              # 或 Windows: .\start.ps1
+```
+
+启动后自动加载 Demo 数据，可直接体验所有功能。
+
+### 配置环境变量
+
+复制 `sample.env` 为 `.env`，按需填写：
+
+```bash
+cp sample.env .env
+```
+
+| 变量 | 用途 | 必填 |
+|---|---|---|
+| `STARWAY_GITHUB_TOKEN` | GitHub 同步 token（read:user 权限） | 同步真实数据时必填 |
+| `STARWAY_AI_BASE_URL` | AI 服务端点 | 使用 AI 功能时必填 |
+| `STARWAY_AI_API_KEY` | AI 服务 key | 使用 AI 功能时必填 |
+| `STARWAY_AI_MODEL` | 模型名（如 glm-5.2 / deepseek-v4-flash） | 使用 AI 功能时必填 |
 
 ## API 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/users` | 用户列表 |
-| GET | `/api/users/:login/repos` | 仓库列表（支持筛选/排序/分页） |
-| GET | `/api/users/:login/repos/:fullName` | 单仓库详情 |
+| GET | `/api/users/:login/repos` | 仓库列表（筛选/排序/分页） |
 | GET | `/api/users/:login/stats` | 统计数据 |
-| GET | `/api/users/:login/summary` | 用户摘要（含 Sleep Stars / Hidden Gems） |
-| GET | `/api/users/:login/tags` | 标签列表 |
-| GET | `/api/users/:login/star-timeline` | 按月星标时间轴 |
+| GET | `/api/users/:login/summary` | 用户摘要（Sleep Stars / Hidden Gems） |
 | GET | `/api/users/:login/star-dna` | Star DNA 画像（AI 生成） |
 | GET | `/api/users/:login/learning-path` | 学习路径推荐（AI 生成） |
 | GET | `/api/repos/:fullName/readme-summary` | README 智能摘要（AI 生成） |
-| GET | `/api/repos/:fullName/similar` | 相似项目推荐 |
-| POST | `/api/users/:login/classify` | 触发规则分类 |
 | POST | `/api/sync` | 触发 GitHub 同步 |
-| DELETE | `/api/users/:login` | 删除用户 |
-| GET | `/api/overview` | 全局概览（支持业务阈值参数） |
-| GET | `/api/export?format=...` | 导出数据（CSV/JSON/Markdown/HTML） |
+| GET | `/api/export` | 导出数据（CSV/JSON/Markdown/HTML） |
+| GET | `/api/overview` | 全局概览 |
+
+完整接口列表详见 [Docs/api.md](./Docs/api.md)。
 
 ## 测试
 
 ```bash
-cd backend
-corepack pnpm test             # 运行全部测试
+# 后端测试
+cd backend && corepack pnpm test
+
+# Worker 测试
+cd cloudflare/worker && corepack pnpm test
 ```
-
-测试覆盖：
-- 数据库初始化（WAL 模式、事务、建表）
-- CSV 导入（解析、防重复、JSON 格式）
-- 仓库查询（筛选、排序、分页、业务阈值参数化）
-- GitHub 同步（mock 测试，不调用真实 API）
-- 规则分类（topic/name/description 三级规则）
-- API 路由（所有端点 + 阈值参数解析）
-- 导出功能（CSV/JSON/Markdown/HTML）
-- AI 缓存框架（Star DNA / Learning Path / README 摘要）
-- 启动脚本校验
-
-## 数据库 Schema
-
-| 表 | 说明 |
-|---|---|
-| `users` | GitHub 用户信息 |
-| `repos` | 仓库信息 |
-| `stars` | 用户-仓库星标关系（含 starred_at、removed_at） |
-| `repo_tags` | 仓库标签（含 tag_source、confidence） |
-| `translations` | 翻译缓存（README 摘要 / Star DNA / Learning Path） |
-| `analysis_reports` | 分析报告缓存 |
-| `sync_runs` | 同步运行记录 |
 
 ## 路线图
 
-- **V0.1** 本地数据层、GitHub 同步、规则分类、本地 API、前端对接、导出 ✓
-- **V0.2** AI 增强：Star DNA 画像、学习路径推荐、README 摘要、双语缓存 ✓
-- **V0.3** 设置页：超时/主题/阈值可配置、三态主题切换、统一存储 ✓
-- **V0.4** 星标趋势图：全量时间范围、Brush 缩放、年份智能显示 ✓
-- **V0.5** 分享卡片、GitHub Profile Badge、Compare Users、Awesome-list 自动生成
+- **V0.1** 本地数据层、GitHub 同步、规则分类、导出 ✓
+- **V0.2** AI 增强：Star DNA / Learning Path / README 摘要 ✓
+- **V0.3** 设置页、三态主题、统一存储 ✓
+- **V0.4** 星标趋势图、Brush 缩放、年份智能显示 ✓
+- **V0.5** Cloudflare 双架构部署 ✓
+- **V0.6** 分享卡片、GitHub Profile Badge、Compare Users
 
 ## 开源协议
 

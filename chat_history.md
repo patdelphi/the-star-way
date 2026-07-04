@@ -324,3 +324,27 @@
 - CC-BY-4.0 现在会正确识别为 cc 类型，风险等级为 caution（中等），显示"知识共享协议（Creative Commons）"
 - 所有 SPDX 协议（MIT/Apache-2.0/GPL-3.0/CC-BY-4.0/CC0-1.0 等）都链接到 spdx.org 详情页
 - NOASSERTION 和非标准协议仍链接到 GitHub LICENSE 文件
+
+## 2026-07-04 README 全面重写（中英文双语）
+
+### 用户需求
+- 开场从普通开发者角度切入，讲探索知名开发者星标仓库能获取的价值
+- 简化后端细节，重点讲：核心功能、技术栈、多平台部署（含 Cloudflare）
+- 翻译英文版 README，顶部加中英文互链
+
+### 改动文件
+1. README.md（重写）
+   - 开场：从开发者翻看别人收藏夹的本能切入，讲项目价值（兴趣版图/学习模式/成长轨迹）
+   - 核心功能：精简为 10 项（星标同步/智能分类/多维筛选/统计分析/仓库分析/AI增强/导出/多语言/主题/Demo）
+   - 技术栈：双后端架构（本地 Node.js + Cloudflare Workers），共享层，AI 支持多 provider
+   - 多平台部署：3 种方式（本地/VPS、Cloudflare、Docker 规划中）
+   - Cloudflare 部署：5 步骤 + CI/CD GitHub Actions
+   - 顶部加英文版链接
+2. README.en.md（新建）
+   - 同步翻译英文版本
+   - 顶部加中文版链接
+3. chat_history.md（追加本次记录）
+
+### 验证结果
+- 无代码改动，无需 tsc/build 验证
+- README 双语互链已就位
