@@ -4,5 +4,4 @@
 # 参考: https://pnpm.io/settings
 onlyBuiltDependencies:
   - esbuild
-  - workerd
   - sharp
