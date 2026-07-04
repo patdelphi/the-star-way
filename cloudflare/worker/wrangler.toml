@@ -7,18 +7,21 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 自定义域名配置
-# 前后端分域名架构：
+# 自定义域名配置（前后端分域名架构）
 #   - starway.patdelphi.xyz → Cloudflare Pages（前端页面）
 #   - api.patdelphi.xyz → Worker（API 服务）
 # 历史说明：
 #   之前 starway.patdelphi.xyz 同时绑定 Pages 和 Worker，导致 Pages 拦截所有请求（含 /api/*），
-#   Worker 完全不被触发。改为分域名后，Pages 只服务前端静态资源，Worker 独占 api.* 域名。
-# 本地 wrangler 已有 workers_routes (write) 权限，可本地部署应用 custom_domain；
-# CI token 缺少此权限，push 触发的 CI 部署会跳过 routes（已存在绑定不受影响）。
-routes = [
-  { pattern = "api.patdelphi.xyz", custom_domain = true }
-]
+#   Worker 完全不被触发，前端白屏。改为分域名后，Pages 只服务前端静态资源，Worker 独占 api.* 域名。
+# 部署方式：
+#   - custom_domain 绑定是一次性操作，已通过本地 `wrangler deploy` 完成（本地 token 有 workers_routes:write 权限）
+#   - CI token 缺少 Zone:Workers Routes:Edit 权限，因此不在此配置 routes，避免 CI 部署失败
+#   - 移除 routes 配置后，CI 的 `wrangler deploy` 只更新 Worker 代码，不影响已存在的 custom_domain 绑定
+#   - 如需 CI 自动管理 custom_domain，需在 Cloudflare Dashboard 重新生成 API Token 并添加权限：
+#       Zone > Workers Routes > Edit
+# routes = [
+#   { pattern = "api.patdelphi.xyz", custom_domain = true }
+# ]
 
 # D1 数据库绑定
 [[d1_databases]]
