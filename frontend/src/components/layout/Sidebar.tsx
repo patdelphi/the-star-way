@@ -12,6 +12,7 @@ import {
   Terminal,
   Menu,
   Star,
+  FileText,
   LayoutDashboard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
