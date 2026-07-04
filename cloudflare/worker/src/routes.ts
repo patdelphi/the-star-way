@@ -204,15 +204,27 @@ export async function handleRequest(
     })
   }
 
-  // 根路径和非 /api/* 路径重定向到前端 Pages
-  // Worker 仅处理 /api/* 路由，其他路径统一引导到前端
+  // 根路径返回 API 入口说明（不重定向）
+  // 前端页面由 Cloudflare Pages 托管，通过 Pages 自定义域名绑定处理
   if (!pathname.startsWith('/api/')) {
-    const frontendUrl = env.STARWAY_FRONTEND_URL || 'https://the-star-way.pages.dev/'
-    // 拼接原始路径到前端 URL（保持 query string）
-    const target = new URL(frontendUrl)
-    target.pathname = pathname
-    target.search = url.search
-    return Response.redirect(target.toString(), 302)
+    const apiBase = url.origin + '/api'
+    return new Response(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>the-star-way API</title></head>
+<body style="font-family: sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem;">
+<h1>the-star-way API</h1>
+<p>这是后端 API 服务，前端页面请访问 <a href="https://the-star-way.pages.dev/">the-star-way.pages.dev</a>。</p>
+<h2>主要端点</h2>
+<ul>
+  <li><a href="${apiBase}/status">GET /api/status</a> - 服务状态</li>
+  <li><a href="${apiBase}/users">GET /api/users</a> - 用户列表</li>
+  <li><a href="${apiBase}/overview">GET /api/overview</a> - 全局概览</li>
+</ul>
+</body>
+</html>`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
   }
 
   const repo = new D1StarRepository(env.DB)
