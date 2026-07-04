@@ -1,4 +1,4 @@
-## 2026-07-02 16:09:10 +08:00
+﻿## 2026-07-02 16:09:10 +08:00
 
 ### User
 
@@ -188,3 +188,36 @@
 ### Assistant
 
 按规则"每次对话的 chat history，都追加到当前目录的 chat_history.md 文件后面"补记本次对话。
+
+---
+
+## 2026-07-04 10:46:21 +08:00
+
+### User
+
+根据项目最新状态，更新dual-architecture-cloudflare-plan.md
+
+### Assistant
+
+按当前仓库状态检查并更新 `Docs/dual-architecture-cloudflare-plan.md`：
+
+- 核对 README、package.json、前端 API client、后端 routes、数据库连接和 schema。
+- 更新 Cloudflare 双架构方案，补充当前最新状态、API 优先级、D1 迁移注意事项、`VITE_API_BASE`、Node 24.15.0 与 package engine 不一致等内容。
+- 未执行 git commit、push、pull、merge；未联网、未安装依赖、未部署。
+
+---
+
+## 2026-07-04 10:52:00 +08:00
+
+### User
+
+另外本地已经安装Wrangler  cli并授权了，加进文档说明下
+
+### Assistant
+
+更新 `Docs/dual-architecture-cloudflare-plan.md`：
+
+- 在当前状态中补充本机已安装 Wrangler CLI 并已完成 Cloudflare 授权。
+- 在配置与密钥章节说明 Wrangler 是后续 Worker / D1 / Pages 操作入口。
+- 在迁移步骤中补充实施前只读确认 Wrangler 版本与登录状态。
+- 未执行 Wrangler 命令、未联网、未部署、未执行 git 操作。

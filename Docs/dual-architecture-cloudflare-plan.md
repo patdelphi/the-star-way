@@ -2,53 +2,73 @@
 
 ## 1. 目标
 
-在不破坏当前本地优先架构的前提下，新增一套可发布到 Cloudflare 的架构。
+在不破坏当前本地优先架构的前提下，新增一套可发布到 Cloudflare 的运行形态。
 
-最终保留两种运行形态：
+最终保留两种架构：
 
 | 形态 | 运行环境 | 数据库 | 适用场景 |
 |---|---|---|---|
-| 本地 / VPS 架构 | Node.js 24 + 本地进程 | better-sqlite3 + SQLite 文件 | 本地分析、批量同步、私有部署、开发调试 |
+| 本地 / VPS 架构 | Node.js 24.15.0 + 本地进程 | better-sqlite3 + SQLite 文件 | 本地分析、批量同步、私有部署、开发调试 |
 | Cloudflare 架构 | Pages + Workers | D1 | 在线访问、轻量同步、公开或半公开产品化部署 |
 
-## 2. 当前架构判断
+当前结论：Cloudflare 不是替代本地后端，而是新增一条独立发布路径。
 
-当前项目不能直接原样部署为 Cloudflare Worker，主要原因：
+## 2. 当前最新状态
 
-- 后端使用 `node:http` 创建长驻服务，并通过 `server.listen()` 监听端口。
-- 数据库使用 `better-sqlite3` native 模块，依赖本地 Node ABI。
-- 数据持久化依赖本地文件系统 `data/starway.db`。
-- 配置读取依赖本地 `.env` 和 `process.env`。
-- 部分同步、导入和导出逻辑默认面向本地运行环境。
+截至 2026-07-04，项目当前状态如下：
 
-这些能力适合本地 / VPS，但不适合 Worker 的请求驱动运行模型。
+- 前端是 `frontend` 下的 React 19 + Vite + TypeScript 应用，API 地址由 `VITE_API_BASE` 控制；未配置时默认同源请求。
+- 后端是 `backend` 下的 Node.js + TypeScript 服务，使用 `node:http`、`IncomingMessage`、`ServerResponse`。
+- 数据库使用 `better-sqlite3`，默认文件为 `backend/data/starway.db`，连接时启用 `PRAGMA journal_mode = WAL` 和 `PRAGMA synchronous = NORMAL`。
+- `.nvmrc` 与 `.node-version` 固定为 `24.15.0`；README 要求 Node.js `v24.15.0`。但 `backend/package.json` 与 `frontend/package.json` 的 `engines.node` 当前仍是 `>=24.14.0 <25`，后续应统一。
+- 包管理器声明为 `pnpm@11.7.0`，项目文档要求统一使用 `corepack pnpm`。
+- 本机已安装 Wrangler CLI，并已完成 Cloudflare 授权；后续可直接用于 `wrangler dev`、D1 管理和发布流程，但实际部署前仍需单独确认。
+- 后端当前 API 已覆盖用户、仓库、统计、标签、同步、AI 分析、相似项目、导出、报告、状态检测等能力。
+- GitHub Token fallback 顺序为：请求 body token、`STARWAY_GITHUB_TOKEN`、`GITHUB_TOKEN`、`GH_TOKEN`。
+- AI 功能使用 OpenAI-compatible 配置：`STARWAY_AI_BASE_URL`、`STARWAY_AI_API_KEY`、`STARWAY_AI_MODEL`，三项齐全才启用。
 
-## 3. 改造原则
+## 3. 为什么不能直接部署为 Worker
 
-1. 保留当前架构，不把现有 `backend` 强行改成 Worker。
-2. 新增 Cloudflare 适配层，避免影响本地稳定性。
-3. 前端 API 协议尽量保持一致，通过环境变量切换 API 地址。
-4. 抽出纯业务逻辑，复用分类、评分、导出、AI prompt 等不依赖运行时的模块。
-5. 数据访问层分离：本地 SQLite 一套，Cloudflare D1 一套。
-6. Cloudflare 版先做 MVP，不一次性迁移全部能力。
+当前 `backend` 不能原样部署到 Cloudflare Workers，原因是：
 
-## 4. 推荐目录结构
+- `node:http` 服务依赖长驻进程和 `server.listen()`，Worker 是请求驱动的 `fetch()` 模型。
+- `better-sqlite3` 是 native 模块，依赖本地 Node ABI，不能在 Worker 运行时加载。
+- SQLite 文件依赖本地文件系统，Worker 不能直接持久化 `backend/data/starway.db`。
+- 当前同步、导出、AI 缓存和部分批处理逻辑默认面向本地进程。
+- 后端路由大量直接接收 `IncomingMessage` / `ServerResponse`，需要先抽象请求响应边界。
+
+这些限制不影响本地 / VPS 架构，但决定了 Cloudflare 必须走适配层和 D1 数据访问实现。
+
+## 4. 改造原则
+
+1. 保留当前 `backend`，不把 Node 后端强行改成 Worker。
+2. Cloudflare 版新增独立入口和适配层，避免影响本地稳定性。
+3. 前端保持一套代码，通过 `VITE_API_BASE` 切换 API 地址。
+4. 优先共享纯业务逻辑：分类规则、标签字典、API 类型、评分口径、AI prompt。
+5. 数据访问层分离：本地 `better-sqlite3` 一套，Cloudflare D1 一套。
+6. Cloudflare MVP 先覆盖只读查询和轻量同步，不一次性迁移全部本地能力。
+7. 外部 API、AI 调用、同步任务都要有明确超时、异常响应和限流提示。
+
+## 5. 推荐目录结构
 
 ```text
 backend/
   src/
     api/                 # 当前 Node API，继续保留
-    db/                  # better-sqlite3 数据访问
-    classification/      # 可逐步抽成共享逻辑
+    db/                  # better-sqlite3 数据访问与 schema
+    repository/          # 当前查询与统计逻辑
+    classification/      # 可抽成共享逻辑
     sync/                # 当前 GitHub 同步逻辑
+    ai/                  # 当前 AI client 与缓存逻辑
+    export/              # 当前本地导出逻辑
 
 frontend/
   src/                   # 共享前端
 
 shared/
+  api-contracts/         # 前后端共享类型与响应结构
   classification/        # 纯分类规则和标签逻辑
-  scoring/               # 仓库评分逻辑
-  api-contracts/         # API 类型定义
+  scoring/               # Sleep Stars / Hidden Gems 等评分口径
   prompts/               # AI prompt 模板
 
 cloudflare/
@@ -58,50 +78,96 @@ cloudflare/
       routes.ts          # Worker API 路由
       d1-repository.ts   # D1 数据访问实现
       github-sync.ts     # Worker 版 GitHub 同步
+      env.ts             # Worker env 类型与配置读取
     wrangler.toml
   d1/
     migrations/
     seed/
 ```
 
-## 5. API 层改造
+## 6. API 边界
 
-当前 Node 后端：
+当前 Node 后端使用：
 
 ```text
 IncomingMessage + ServerResponse
 ```
 
-Cloudflare Worker 后端：
+Cloudflare Worker 使用：
 
 ```text
 Request -> Response
 ```
 
-建议新增一个运行时无关的 API 处理层：
+建议新增运行时无关的核心处理层：
 
-```text
-ApiRequest
-ApiResponse
-RepositoryPort
+```ts
+interface ApiRequest {
+  method: string
+  pathname: string
+  query: URLSearchParams
+  body?: unknown
+}
+
+interface ApiResponse<T = unknown> {
+  status: number
+  body: T
+  headers?: Record<string, string>
+}
+
+interface StarRepository {
+  listUsers(): Promise<UserSummary[]>
+  getOverview(options?: ThresholdOptions): Promise<Overview>
+  listRepos(login: string, params: RepoQueryParams): Promise<RepoQueryResult>
+  getRepo(login: string, fullName: string): Promise<RepoDetail | null>
+  listTags(login: string, lang: 'zh' | 'en'): Promise<TagSummary[]>
+}
 ```
 
-本地 Node API 和 Worker API 分别负责适配输入输出：
+本地 Node API 和 Worker API 分别负责把运行时对象适配为上述结构。
 
 | 层级 | 本地架构 | Cloudflare 架构 |
 |---|---|---|
 | HTTP 适配 | `node:http` | Worker `fetch()` |
 | 请求对象 | `IncomingMessage` | `Request` |
 | 响应对象 | `ServerResponse` | `Response` |
-| 路由逻辑 | 可复用一部分 | 可复用一部分 |
-| 数据访问 | better-sqlite3 repository | D1 repository |
+| 数据访问 | `better-sqlite3` repository | D1 repository |
+| 配置读取 | `.env` + `process.env` | Worker `env` + secrets |
 
-## 6. 数据库改造
+## 7. 当前 API 面与 Cloudflare 优先级
+
+| API | 当前状态 | Cloudflare MVP |
+|---|---|---|
+| `GET /api/users` | 已有 | 是 |
+| `GET /api/overview` | 已有，支持阈值参数 | 是 |
+| `GET /api/users/:login/repos` | 已有，支持筛选、排序、分页 | 是 |
+| `GET /api/users/:login/repos/:fullName` | 已有 | 是 |
+| `GET /api/users/:login/stats` | 已有 | 是 |
+| `GET /api/users/:login/summary` | 已有，支持阈值参数 | 是 |
+| `GET /api/users/:login/tags` | 已有，支持中英文 label | 是 |
+| `GET /api/users/:login/star-timeline` | 已有 | 是 |
+| `GET /api/repos/:fullName/similar` | 已有 | 第二阶段 |
+| `POST /api/sync` | 已有，真实 GitHub 同步 | 是，但限制单用户和批次 |
+| `GET /api/status` | 已有，会探测 GitHub 和 AI | 是，但避免长阻塞 |
+| `GET /api/token-source` | 已有 | 是 |
+| `GET /api/users/:login/sync-runs` | 已有 | 是 |
+| `GET /api/users/:login/removed-stars` | 已有 | 第二阶段 |
+| `POST /api/users/:login/classify` | 已有 | 是 |
+| `GET /api/repos/:fullName/readme-summary` | 已有，AI | 第二阶段 |
+| `GET /api/users/:login/star-dna` | 已有，AI | 第二阶段 |
+| `GET /api/users/:login/learning-path` | 已有，AI | 第二阶段 |
+| `GET /api/export` | 已有，CSV/JSON/Markdown/HTML | 第二阶段 |
+| `GET /api/users/:login/report` | 已有，Markdown 报告 | 第二阶段 |
+| `POST /api/repos/:fullName/tags` | 已有 | 第二阶段 |
+| `DELETE /api/repos/:fullName/tags/:tag` | 已有 | 第二阶段 |
+| `DELETE /api/users/:login` | 已有，逻辑删除 | 第二阶段 |
+
+## 8. 数据库改造
 
 本地版本继续使用：
 
 ```text
-better-sqlite3 + data/starway.db
+better-sqlite3 + backend/data/starway.db
 ```
 
 Cloudflare 版本使用：
@@ -110,48 +176,53 @@ Cloudflare 版本使用：
 Cloudflare D1
 ```
 
-需要把当前 SQL 操作按业务接口封装，例如：
+当前本地表：
 
-```ts
-interface StarRepository {
-  listUsers(): Promise<UserSummary[]>
-  getOverview(): Promise<Overview>
-  listRepos(params: RepoQuery): Promise<RepoQueryResult>
-  upsertSyncedRepos(input: SyncReposInput): Promise<SyncResult>
-}
-```
+| 表 | 用途 |
+|---|---|
+| `users` | GitHub 用户资料，含 `deleted_at` 逻辑删除 |
+| `repos` | 仓库基础信息 |
+| `stars` | 用户与仓库的星标关系，含 `removed_at` |
+| `repo_tags` | 仓库标签 |
+| `translations` | README 摘要、Star DNA、学习路径等缓存 |
+| `analysis_reports` | 分析报告缓存 |
+| `sync_runs` | 同步运行记录 |
 
-然后分别实现：
+D1 migration 应从当前 `backend/src/db/schema.ts` 生成，但需要单独审查：
 
-- `BetterSqliteStarRepository`
-- `D1StarRepository`
+- D1 是异步 API，当前 `better-sqlite3` 是同步 API，调用链要改为 `async`。
+- D1 支持事务和 batch，但写法与 `db.transaction()` 不同。
+- `PRAGMA journal_mode = WAL` 和 `synchronous = NORMAL` 只属于本地 SQLite，不迁移到 D1。
+- `translations` 当前复用 `repo_full_name = user:login` 存储用户级 AI 文本，迁移前应决定是否拆表。
+- Worker 同步大量 star 时可能超过执行时间，MVP 应限制同步页数，后续再引入 Queue。
 
-注意事项：
-
-- D1 是异步 API，当前 `better-sqlite3` 是同步 API，调用链需要改为 `async`。
-- D1 支持 SQL，但事务、批量写入和 prepared statement 写法需要单独适配。
-- 迁移脚本要独立存放在 `cloudflare/d1/migrations/`。
-
-## 7. 配置与密钥
+## 9. 配置与密钥
 
 本地架构继续使用：
 
 ```text
-.env
 STARWAY_GITHUB_TOKEN
+GITHUB_TOKEN
+GH_TOKEN
 STARWAY_AI_BASE_URL
 STARWAY_AI_API_KEY
 STARWAY_AI_MODEL
+VITE_API_BASE
 ```
 
-Cloudflare 架构使用：
+Cloudflare 架构使用 Worker secrets 和 Pages 环境变量：
 
 ```text
 wrangler secret put STARWAY_GITHUB_TOKEN
 wrangler secret put STARWAY_AI_API_KEY
 ```
 
-Worker 运行时通过 `env` 读取：
+本地前置条件：
+
+- Wrangler CLI 已安装并授权，可作为 Cloudflare Worker / D1 / Pages 操作入口。
+- 文档中的 Wrangler 命令只作为后续实施命令示例；执行 `wrangler dev`、创建 D1、写入 secret、发布部署前，需要按操作风险再次确认。
+
+Worker 运行时建议类型：
 
 ```ts
 export interface Env {
@@ -163,92 +234,106 @@ export interface Env {
 }
 ```
 
-## 8. 前端改造
-
-前端保持一套代码，通过构建环境区分 API 地址：
+前端 API 地址示例：
 
 ```text
-VITE_API_BASE_URL=http://localhost:3210
-VITE_API_BASE_URL=https://api.example.workers.dev
+VITE_API_BASE=http://localhost:3210
+VITE_API_BASE=https://api.example.workers.dev
 ```
 
-建议前端只依赖 API contract，不感知后端运行形态。
+## 10. Cloudflare MVP 范围
 
-部署方式：
-
-- 本地开发：`corepack pnpm run dev`
-- Cloudflare 发布：Cloudflare Pages 构建 `frontend/dist`
-
-## 9. Cloudflare MVP 范围
-
-第一阶段只迁移必要能力：
+第一阶段迁移必要能力：
 
 | 功能 | 是否进入 MVP | 说明 |
 |---|---|---|
-| 用户列表 | 是 | 从 D1 查询 |
-| 全局概览 | 是 | 从 D1 聚合 |
+| Pages 前端发布 | 是 | 构建 `frontend/dist` |
+| 用户列表 | 是 | D1 查询 |
+| 全局概览 | 是 | D1 聚合，保留阈值参数 |
 | 星标仓库列表 | 是 | 支持分页、搜索、排序 |
-| 标签统计 | 是 | 支持分析页基础图表 |
-| GitHub 同步 | 是 | 限制单用户、分页、错误处理 |
+| 单仓库详情 | 是 | 支持当前前端详情页 |
+| 用户统计 / 摘要 / 标签 / 趋势 | 是 | 支持当前仪表盘和分析页 |
+| GitHub 同步 | 是 | 单用户、分页、错误处理、限流提示 |
 | 分类 | 是 | 复用规则分类 |
-| AI 摘要 | 可选 | 依赖外部 API，建议放第二阶段 |
-| CSV / Markdown 导出 | 可选 | Worker 可做，但先不阻塞 MVP |
+| 同步历史 | 是 | 写入 `sync_runs` |
+| 状态检测 | 是 | 返回 GitHub / AI 配置状态，但限制超时 |
+| AI 摘要 / DNA / 学习路径 | 第二阶段 | 依赖外部 API 和缓存策略 |
+| 相似项目推荐 | 第二阶段 | 查询逻辑较重，先不阻塞 MVP |
+| CSV / Markdown / HTML 导出 | 第二阶段 | Worker 可做，但先不阻塞 MVP |
 | 本地 CSV 导入 | 否 | 保留在本地架构 |
 
-## 10. 迁移步骤
+## 11. 迁移步骤
+
+### 阶段 0：运行时与文档校准
+
+- 将 `backend/package.json` 与 `frontend/package.json` 的 `engines.node` 统一到 README、`.nvmrc`、`.node-version` 的 `24.15.0` 要求。
+- 确认所有安装、构建、测试命令都使用 `corepack pnpm`。
+- 保留本地 `better-sqlite3` native load 检查。
+- 记录本机 Wrangler CLI 已安装并授权，后续 Cloudflare 命令可从当前环境继续。
+
+验收标准：
+
+- README、package engine、启动脚本、故障排查文档的 Node 版本一致。
+- 本地后端和前端幂等校验通过。
+- Wrangler 版本与登录状态在执行 Cloudflare 实施前完成只读确认。
 
 ### 阶段 1：边界整理
 
-- 抽出共享类型：用户、仓库、标签、同步结果、统计结果。
-- 梳理现有 API 返回结构，形成 `api-contracts`。
-- 把分类规则从后端 Node 依赖中剥离为纯函数。
+- 抽出共享类型：用户、仓库、标签、同步结果、统计结果、错误响应。
+- 梳理当前 API 返回结构，形成 `shared/api-contracts`。
+- 把分类规则和标签 label 从后端 Node 依赖中剥离为纯函数。
+- 将 Sleep Stars、Hidden Gems 等阈值口径抽成共享模块。
 
 验收标准：
 
-- 本地后端测试通过。
-- 前端调用结构不变。
-- 分类逻辑在本地和 Worker 中可以共用。
+- 本地 API 返回结构不变。
+- 前端无需感知本地后端或 Worker 差异。
+- 分类和标签逻辑可在 Node 与 Worker 中共用。
 
 ### 阶段 2：D1 Schema 与数据访问
 
-- 将当前 SQLite schema 改写为 D1 migration。
+- 从 `backend/src/db/schema.ts` 生成 D1 migration 初稿。
 - 新增 `D1StarRepository`。
-- 为核心查询补测试或最小验证脚本。
+- 为核心查询补最小验证：用户列表、概览、仓库列表、标签、趋势、同步历史。
+- 明确 `translations` 是否保持兼容结构，或拆分为 repo 缓存与 user 缓存。
 
 验收标准：
 
-- D1 可创建表。
-- 能写入用户、仓库、星标、标签。
-- 能读取概览、仓库列表和标签统计。
+- D1 可创建所有 MVP 所需表和索引。
+- 能写入用户、仓库、星标、标签、同步记录。
+- 能读取 MVP 查询结果。
 
 ### 阶段 3：Worker API
 
 - 新建 `cloudflare/worker/src/index.ts`。
-- 实现 `/api/users`、`/api/overview`、`/api/users/:login/repos` 等核心路由。
-- 接入 D1 repository。
+- 实现 Worker 路由和统一 JSON 错误格式。
+- 接入 `D1StarRepository`。
+- 保持 CORS 与前端当前 API 客户端兼容。
 
 验收标准：
 
-- 本地 `wrangler dev` 可返回核心 API。
-- 前端切换 `VITE_API_BASE_URL` 后能读取 Worker API。
+- `wrangler dev` 可返回 MVP API。
+- 前端设置 `VITE_API_BASE` 后能读取 Worker API。
+- API 错误格式与当前前端兼容。
 
-### 阶段 4：GitHub 同步
+### 阶段 4：Worker 版 GitHub 同步
 
-- 实现 Worker 版 GitHub 同步。
-- 使用 Worker Secrets 管理 token。
-- 增加 GitHub API 限流错误提示。
+- 实现 Worker 版 GitHub client 与同步流程。
+- 使用 Worker secrets 管理 token。
+- 保留 username 规范化、rate limit 信息和 `sync_runs` 记录。
+- 对单次同步页数设置上限，避免 Worker 超时。
 
 验收标准：
 
 - 能同步真实 GitHub 用户公开 star 数据。
 - D1 中生成一致的用户、仓库、星标记录。
-- API 限流时返回明确错误。
+- 限流、用户不存在、网络失败时返回明确错误。
 
 ### 阶段 5：Cloudflare Pages 发布
 
 - 配置 Pages 构建 `frontend`。
-- 配置环境变量 `VITE_API_BASE_URL`。
-- Worker 与 Pages 分别发布。
+- 配置 `VITE_API_BASE` 指向 Worker API。
+- 使用已授权的 Wrangler CLI 发布 Worker，并通过 Cloudflare Pages 发布前端。
 
 验收标准：
 
@@ -256,23 +341,25 @@ VITE_API_BASE_URL=https://api.example.workers.dev
 - 线上页面可访问 Worker API。
 - 不依赖本地后端。
 
-## 11. 风险与取舍
+## 12. 风险与取舍
 
 | 风险 | 影响 | 处理方案 |
 |---|---|---|
-| D1 与 SQLite 行为差异 | 查询结果或事务行为不同 | 数据访问层分离，补核心查询验证 |
-| Worker 执行时间限制 | 大量 star 同步可能超时 | 分页同步、分批写入、后续引入 Queue |
-| GitHub API 限流 | 同步失败 | 强制支持 token，显示 rate limit |
-| AI API 成本与超时 | 页面响应慢 | AI 分析异步化或缓存 |
+| D1 与 SQLite 行为差异 | 查询结果、事务行为或索引性能不同 | 数据访问层分离，补核心查询验证 |
+| 同步超过 Worker 执行时间 | 大量 star 用户同步失败 | MVP 限制页数，后续引入 Queue |
+| AI API 成本与超时 | 页面响应慢或费用不可控 | AI 功能放第二阶段，使用缓存和超时 |
+| `translations` 表语义混杂 | D1 迁移后缓存难维护 | 迁移前决定是否拆表 |
 | 双架构维护成本 | 代码重复 | 只共享纯逻辑，不共享运行时适配 |
+| package engine 与 README 不一致 | 本地 native ABI 风险 | 先统一 Node 版本声明 |
 
-## 12. 不建议的方案
+## 13. 不建议的方案
 
-不建议把现有 `backend` 直接改造成兼容 Node 和 Worker 的单一后端，原因：
+不建议把现有 `backend` 直接改造成同时兼容 Node 和 Worker 的单一后端，原因：
 
 - `better-sqlite3` 与 D1 的调用模型差异很大。
 - `node:http` 与 Worker `fetch()` 模型差异明显。
-- 强行统一会引入大量条件分支，降低本地架构稳定性。
+- 强行统一会引入大量运行时条件分支，降低本地架构稳定性。
+- 本地批量同步、导入、导出和 AI 缓存不必全部搬到 Worker。
 
 更稳妥的路线是：
 
@@ -280,11 +367,11 @@ VITE_API_BASE_URL=https://api.example.workers.dev
 共享业务逻辑 + 两套运行时适配 + 两套数据访问实现
 ```
 
-## 13. 最终结论
+## 14. 最终结论
 
 项目可以保留双架构：
 
-- 当前架构作为本地优先版本继续演进。
-- Cloudflare 架构作为独立发布版本新增。
+- 当前 Node + SQLite 架构继续作为本地优先版本演进。
+- Cloudflare 架构作为独立发布版本新增，使用 Pages + Workers + D1。
 
-第一阶段不要追求完整迁移，先完成 Cloudflare MVP：Pages 前端、Worker API、D1 数据库、真实 GitHub 同步、基础查询与分类。
+下一步应先完成运行时与文档校准，再进入共享 API contract、D1 migration 和 Worker MVP。
