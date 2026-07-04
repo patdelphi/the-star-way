@@ -659,7 +659,8 @@ export default function Developers() {
   const activeDevName = activeDev?.name
   useEffect(() => {
     if (activeDevName) {
-      // 同步进行中不清空数据（由 runSync 用 force=true 重新加载）
+      // 同步进行中：跳过所有数据加载（由 runSync 统一刷新）
+      // 避免 syncStars 完成前请求不存在的用户导致 404 错误
       if (!isSyncingRef.current) {
         // 切换开发者时清空旧数据（上一个开发者的内容）
         setStarDna(null)
@@ -668,15 +669,17 @@ export default function Developers() {
         setPathError("")
         setDnaLoading(false)
         setPathLoading(false)
+        // 加载 DNA 和学习路径（force=false，使用缓存或首次生成）
+        loadStarDna(activeDevName)
+        loadLearningPath(activeDevName)
+        // 加载统计、标签、时间轴、同步历史
+        loadSyncRuns(activeDevName)
+        getStats(activeDevName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
+        getTags(activeDevName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
+        getUserStarTimeline(activeDevName)
+          .then((timeline) => setStarTimeline(Array.isArray(timeline) ? timeline : []))
+          .catch(() => setStarTimeline([]))
       }
-      loadSyncRuns(activeDevName)
-      loadStarDna(activeDevName)
-      loadLearningPath(activeDevName)
-      getStats(activeDevName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
-      getTags(activeDevName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
-      getUserStarTimeline(activeDevName)
-        .then((timeline) => setStarTimeline(Array.isArray(timeline) ? timeline : []))
-        .catch(() => setStarTimeline([]))
     } else {
       setSyncRuns([])
       setStarDna(null)
@@ -707,7 +710,9 @@ export default function Developers() {
     setSyncStatus("syncing")
     setSyncError("")
     setSyncMessage("")
-    // 标记同步进行中：防止 refreshDevelopers 触发 useEffect 清空 DNA/学习路径
+    // 标记同步进行中：防止 useEffect [activeDevName] 和 refreshDevelopers 清空 DNA/学习路径
+    // 整个 runSync 期间（含 loadStarDna/loadLearningPath 的 force=true 请求）保持 true
+    // 由 finally 块统一重置，确保异常路径也能复位
     isSyncingRef.current = true
     try {
       const token = getGitHubToken()
@@ -716,18 +721,20 @@ export default function Developers() {
         const syncedName = result.username || name
         setSyncStatus(token ? "successToken" : "successAnon")
         setSyncMessage(t("developers.starUpdated", { name: syncedName }))
-        // 先刷新开发者列表，更新星标数（触发 useEffect [activeDevName]，但因 isSyncingRef=true 不会清空数据）
+        // 先刷新开发者列表，更新星标数（isSyncingRef=true 时 useEffect 不会清空数据）
         await refreshDevelopers()
         // 同步历史
         await loadSyncRuns(syncedName)
-        // 强制重新生成 DNA 和学习路径（force=true，显示 loading）
-        // 不同步中标记已关闭，确保 loadStarDna 的 setDnaLoading 能正常显示
-        isSyncingRef.current = false
+        // 强制重新生成 DNA 和学习路径（force=true，显示 loading，清空旧数据）
+        // isSyncingRef 仍为 true，防止 useEffect 在 re-render 时发 force=false 请求竞态
         await loadStarDna(syncedName, true)
         await loadLearningPath(syncedName, true)
-        // 刷新统计和标签
+        // 刷新统计、标签和时间轴
         getStats(syncedName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
         getTags(syncedName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
+        getUserStarTimeline(syncedName)
+          .then((timeline) => setStarTimeline(Array.isArray(timeline) ? timeline : []))
+          .catch(() => setStarTimeline([]))
       } else {
         setSyncStatus("networkFail")
         setSyncError(t("developers.syncUnknownError"))
@@ -738,6 +745,7 @@ export default function Developers() {
       const message = err instanceof Error ? err.message : ""
       setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
     } finally {
+      // 统一重置：无论成功/失败/异常，都确保 isSyncingRef 复位
       isSyncingRef.current = false
     }
   }

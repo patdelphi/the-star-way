@@ -432,3 +432,23 @@ useEffect 依赖从 [t, currentLogin] 改为 [t]，避免 currentLogin 变化触
 ### 验证
 - tsc --noEmit: 通过
 - npm run build: 成功
+
+## 2026-07-04 Review 用户增加逻辑并修复残留竞态
+
+### Review 发现
+1. useEffect [activeDevName] 在 isSyncingRef=true 时仍调用 loadStarDna/loadLearningPath（force=false），与 runSync 的 force=true 请求竞态
+2. useEffect [activeDevName] 在 isSyncingRef=true 时仍调用 getStats/getTags/getUserStarTimeline，但 syncStars 完成前用户不存在，导致 404 错误
+3. runSync 里 isSyncingRef.current=false 在 loadStarDna 之前设置，re-render 触发 useEffect 会发 force=false 请求竞态
+4. runSync 里没有刷新 timeline，同步后时间轴不会更新
+
+### 修复
+1. useEffect [activeDevName] 在 isSyncingRef=true 时跳过所有数据加载（runSync 统一刷新）
+2. runSync 里移除 isSyncingRef.current=false（成功路径），统一由 finally 块重置
+3. runSync 里添加 getUserStarTimeline 刷新
+
+### 改动文件
+- frontend/src/pages/Developers.tsx
+
+### 验证
+- tsc --noEmit: 通过
+- npm run build: 成功
