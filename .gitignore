@@ -28,3 +28,5 @@ npm-debug.log*
 
 # aipython 数据同步产物（含导出的真实仓库数据，不入库）
 aipython/d1_sync/
+
+chat_history.md
