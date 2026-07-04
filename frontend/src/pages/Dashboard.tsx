@@ -210,7 +210,7 @@ function pickTopItems<T extends { count: number }>(items: T[], limit: number): T
   return [...items].sort((a, b) => b.count - a.count).slice(0, limit)
 }
 
-function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string } }) {
+function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string; zoomIn: string; zoomOut: string } }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
   // 可见窗口大小（月数），初始全量显示，支持 +/- 按钮缩放，范围 6 到 data.length，步长 6
@@ -267,7 +267,7 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
           onClick={zoomIn}
           disabled={windowSize <= 6}
           className="rounded border border-outline-variant px-2 text-sm text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
-          title="缩小时间范围"
+          title={labels.zoomIn}
         >−</button>
         <span className="px-2 text-xs text-muted-foreground leading-6">{windowSize}m</span>
         <button
@@ -275,7 +275,7 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
           onClick={zoomOut}
           disabled={windowSize >= data.length}
           className="rounded border border-outline-variant px-2 text-sm text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
-          title="放大时间范围"
+          title={labels.zoomOut}
         >+</button>
       </div>
       <ResponsiveContainer width="100%" height={180}>
@@ -679,6 +679,8 @@ const Dashboard: React.FC = () => {
                   total: t("dashboard.trendTotal"),
                   peakMonth: t("dashboard.trendPeakMonth"),
                   peakValue: t("dashboard.trendPeakValue"),
+                  zoomIn: t("dashboard.trendZoomIn"),
+                  zoomOut: t("dashboard.trendZoomOut"),
                 }}
               />
             </CardContent>

@@ -112,6 +112,8 @@
     "trendTotal": "总计",
     "trendPeakMonth": "峰值月份",
     "trendPeakValue": "峰值数量",
+    "trendZoomIn": "缩小时间范围",
+    "trendZoomOut": "放大时间范围",
     "pythonEcosystem": "Python 生态",
     "tsEcosystem": "TypeScript 生态",
     "systemTools": "系统工具",
@@ -649,7 +651,9 @@
     "starTrendDesc": "按真实用户的 starred_at 聚合最近 12 个月新增星标。",
     "trendTotal": "近 12 月新增",
     "trendPeakMonth": "峰值月份",
-    "trendPeakValue": "峰值数量"
+    "trendPeakValue": "峰值数量",
+    "trendZoomIn": "缩小时间范围",
+    "trendZoomOut": "放大时间范围"
   },
   "starCatalog": {
     "title": "星项目目录",

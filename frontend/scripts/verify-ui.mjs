@@ -254,6 +254,9 @@ const checks = [
   ["API 统计数据不会返回半结构", !files.api.includes("return data.data as UserStats") && files.api.includes("return normalizeUserStats(data.data)")],
   ["开发者搜索结果不复用同步成功提示", !files.developers.includes('setSearchResult(t("developers.starUpdated"')],
   ["开发者星标趋势空值兜底", files.developers.includes("setStarTimeline(Array.isArray(timeline) ? timeline : [])") && !files.developers.includes("then(setStarTimeline)")],
+  ["开发者 AI 长任务写 UI 前校验当前用户", files.developers.includes("currentLoginRef") && files.developers.includes("isCurrentDeveloperRequest(login, requestSeq)")],
+  ["开发者列表刷新保持指定用户选中", files.developers.includes("preferredLogin?: string") && files.developers.includes("preferredLogin || currentLoginRef.current")],
+  ["开发者首次 AI 生成也显示 loading", files.developers.includes("setDnaLoading(true)") && files.developers.includes("setPathLoading(true)") && files.developers.includes("isInitialLoad")],
   ["纯英文演示标签已清理", forbiddenTexts.every((text) => !allPageText.includes(text) && !zhText.includes(text))],
 ]
 

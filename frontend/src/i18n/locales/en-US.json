@@ -112,6 +112,8 @@
     "trendTotal": "Total",
     "trendPeakMonth": "Peak Month",
     "trendPeakValue": "Peak Count",
+    "trendZoomIn": "Narrow time range",
+    "trendZoomOut": "Expand time range",
     "pythonEcosystem": "Python Ecosystem",
     "tsEcosystem": "TypeScript Ecosystem",
     "systemTools": "System Tools",
@@ -649,7 +651,9 @@
     "starTrendDesc": "New stars in the last 12 months aggregated by starred_at.",
     "trendTotal": "New in 12 Months",
     "trendPeakMonth": "Peak Month",
-    "trendPeakValue": "Peak Count"
+    "trendPeakValue": "Peak Count",
+    "trendZoomIn": "Narrow time range",
+    "trendZoomOut": "Expand time range"
   },
   "starCatalog": {
     "title": "Star Catalog",
