@@ -221,3 +221,64 @@
 - 在配置与密钥章节说明 Wrangler 是后续 Worker / D1 / Pages 操作入口。
 - 在迁移步骤中补充实施前只读确认 Wrangler 版本与登录状态。
 - 未执行 Wrangler 命令、未联网、未部署、未执行 git 操作。
+
+## 2026-07-04 Worker AI 配置与 SQLite→D1 数据同步
+
+### 用户请求
+1. 根据 .env 中的 AI key 配置 Cloudflare Worker AI
+2. 询问"为什么本地用就可以？"
+3. 删除 Worker AI key，把本地 SQLite db 数据同步到 D1，commit and push
+
+### 执行过程
+
+#### 阶段1：配置 Worker AI secrets（按 .env 原样）
+- 读取 .env：STARWAY_AI_BASE_URL=https://coding.dashscope.aliyuncs.com/v1，STARWAY_AI_API_KEY=sk-sp-...（coding plan key），STARWAY_AI_MODEL=qwen3.7-plus
+- 用户选择"仍按 .env 原样配置"
+- 上传 3 个 secrets 到 Worker（wrangler secret put）
+- 验证 /api/status：ai.configured=true, valid=true
+- 端到端测试 readme-summary：失败，AI_ERROR 405 "Coding Plan is currently only available for Coding Agents"
+
+#### 阶段2：根因分析（为什么本地能用、Worker 不能用）
+- 对比 backend/src/ai/client.ts 与 cloudflare/worker/src/ai/client.ts：请求构造完全一致（headers/body/URL）
+- 本地 Node.js fetch 测试 coding 端点：200 成功
+- 本地 Node.js fetch + 显式 User-Agent:Cloudflare-Workers：200 成功
+- 结论：阿里云通过出口 IP 段识别，coding plan 仅允许本地 IP，屏蔽 Cloudflare 数据中心 IP
+- 这是阿里云产品限制，非代码问题
+
+#### 阶段3：删除 Worker AI secrets
+- 删除 3 个 secrets：STARWAY_AI_BASE_URL、STARWAY_AI_API_KEY、STARWAY_AI_MODEL（wrangler secret delete）
+
+#### 阶段4：SQLite → D1 数据同步
+- 创建 aipython 目录（项目无此目录）
+- 调查 SQLite：users=17, repos=9458, stars=9880, repo_tags=1828, translations=76, sync_runs=28, analysis_reports=0
+- D1 现状：users=1, stars=712（旧测试数据）
+- 用户确认：清空 D1 + 全量导入 + 同步 translations 表
+- 创建 inspect_sqlite.py（只读调查脚本）
+- 创建 export_sqlite_to_d1.py（导出脚本，按表分批 500 行，生成 46 个 SQL 文件）
+- 创建 clear_d1.sql（清空 7 个表）
+- 执行清空 D1：删除 1426 行
+- 批量导入 46 个 SQL 文件（PowerShell 循环 wrangler d1 execute --file）：ok=46 fail=0
+
+#### 阶段5：验证 D1 数据完整性
+- 查询 D1 各表数量，与 SQLite 完全一致：
+  - users: 17=17 ✓
+  - repos: 9458=9458 ✓
+  - stars: 9880=9880 ✓
+  - repo_tags: 1828=1828 ✓
+  - translations: 76=76 ✓
+  - sync_runs: 28=28 ✓
+
+#### 阶段6：准备 commit
+- 更新 .gitignore：忽略 aipython/d1_sync/（含导出的真实仓库数据，不入库）
+- 待提交文件：aipython/inspect_sqlite.py、export_sqlite_to_d1.py、import_to_d1.ps1、clear_d1.sql、.gitignore
+
+### 改动文件
+- 新建：aipython/inspect_sqlite.py（SQLite 调查脚本）
+- 新建：aipython/export_sqlite_to_d1.py（SQLite→D1 导出脚本）
+- 新建：aipython/import_to_d1.ps1（D1 批量导入 PowerShell 脚本）
+- 新建：aipython/clear_d1.sql（D1 清空 SQL）
+- 修改：.gitignore（添加 aipython/d1_sync/ 忽略规则）
+
+### 未执行事项
+- Worker AI 功能不可用（coding plan key 不兼容 Worker 环境，需标准 dashscope key）
+- 未提交 d1_sync/ 目录的 46 个 SQL 数据文件（已加入 .gitignore）
