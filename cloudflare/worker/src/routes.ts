@@ -25,6 +25,14 @@ import { resolveGitHubToken, getGitHubTokenSource, isAiConfigured } from './env.
 import { D1StarRepository, SYSTEM_DEMO_LOGIN } from './d1-repository.js'
 import { WorkerApiError, errorResponse, dataResponse, jsonResponse } from './errors.js'
 import { syncStars as syncStarsWorker } from './github-sync.js'
+import {
+  generateRepoAnalysis,
+  generateStarDna,
+  generateLearningPath,
+  translateToEnglish,
+  translateRepoAnalysisToEnglish,
+  type RepoAnalysisResult,
+} from './ai/client.js'
 import { classifyRepo } from '@shared/classification/classifier.js'
 import { getTagLabel } from '@shared/classification/tag-labels-bilingual.js'
 import type { ThresholdOptions } from '@shared/scoring/thresholds.js'
@@ -238,8 +246,8 @@ export async function handleRequest(
         },
         ai: {
           configured: aiEnabled,
-          valid: false,
-          message: 'Worker MVP 未启用 AI 功能',
+          valid: aiEnabled, // 配置齐全即视为可用（实际调用时再验证）
+          message: aiEnabled ? null : 'AI 未配置（需要 STARWAY_AI_BASE_URL、STARWAY_AI_API_KEY、STARWAY_AI_MODEL 三项齐全）',
         },
       })
     }
@@ -417,20 +425,303 @@ export async function handleRequest(
       }
     }
 
-    // ===== 第二阶段 API：返回 501 NOT_IMPLEMENTED =====
-    // AI 接口
+    // ===== AI 接口（第二阶段，已启用）=====
+
+    // GET /api/repos/*fullName/readme-summary
+    // 生成仓库深度分析（摘要 + 星标原因 + 复用建议），支持中英文双语缓存
     const readmeMatch = matchRoute('/api/repos/*/readme-summary', pathname)
     if (method === 'GET' && readmeMatch) {
-      throw new WorkerApiError('AI 摘要功能在 Worker MVP 阶段未启用', 'NOT_IMPLEMENTED', 501)
+      const fullName = decodePathParam(readmeMatch['*'] || '')
+      const query = parseQuery(url)
+      const force = query.force === '1'
+      const lang = query.lang === 'en' ? 'en' : 'zh'
+      const cacheKey = lang // 'zh' 或 'en'
+
+      // 1. 查缓存（非强制刷新时）
+      if (!force) {
+        const cached = await repo.getCachedTranslation(fullName, cacheKey)
+        if (cached) {
+          // 兼容新格式（JSON: {summary, starReason, reuseAdvice}）和旧格式（纯文本）
+          try {
+            const parsed = JSON.parse(cached) as RepoAnalysisResult
+            if (parsed.summary) {
+              return dataResponse({ ...parsed, cached: true })
+            }
+          } catch {
+            // 旧格式纯文本，作为 summary 返回
+          }
+          return dataResponse({ summary: cached, starReason: '', reuseAdvice: '', cached: true })
+        }
+      }
+
+      // 2. 检查 AI 是否启用
+      if (!aiEnabled) {
+        throw new WorkerApiError(
+          'AI 摘要功能未启用，请配置 STARWAY_AI_BASE_URL、STARWAY_AI_API_KEY、STARWAY_AI_MODEL',
+          'AI_NOT_CONFIGURED',
+          503,
+        )
+      }
+
+      // 3. 查仓库基础信息
+      const repoRow = await repo.getRepoGlobal(fullName)
+      if (!repoRow) {
+        throw new WorkerApiError(`仓库 ${fullName} 不存在`, 'REPO_NOT_FOUND', 404)
+      }
+
+      // 4. 解析 topics
+      let topics: string[] = []
+      try {
+        if (repoRow.topics_json) topics = JSON.parse(repoRow.topics_json) as string[]
+      } catch {
+        topics = []
+      }
+
+      // 5. 生成中文分析（AI 失败时降级返回缓存）
+      let analysis: RepoAnalysisResult
+      try {
+        analysis = await generateRepoAnalysis(
+          fullName,
+          repoRow.description || '',
+          repoRow.language || '',
+          topics,
+          env,
+        )
+      } catch (err) {
+        // AI 失败时降级返回缓存（如果有）
+        const cached = await repo.getCachedTranslation(fullName, cacheKey === 'en' ? 'zh' : 'en')
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as RepoAnalysisResult
+            if (parsed.summary) {
+              return dataResponse({ ...parsed, cached: true })
+            }
+          } catch {
+            // 旧格式纯文本
+            return dataResponse({ summary: cached, starReason: '', reuseAdvice: '', cached: true })
+          }
+        }
+        throw new WorkerApiError(
+          err instanceof Error ? err.message : 'AI 生成摘要失败',
+          'AI_ERROR',
+          500,
+        )
+      }
+
+      const now = new Date().toISOString()
+
+      // 6. 缓存中文版本（JSON 字符串）
+      await repo.upsertTranslation(fullName, 'zh', JSON.stringify(analysis), now)
+
+      // 7. 翻译英文（失败不阻塞主流程）
+      try {
+        const enAnalysis = await translateRepoAnalysisToEnglish(analysis, env)
+        await repo.upsertTranslation(fullName, 'en', JSON.stringify(enAnalysis), now)
+      } catch {
+        // 翻译失败不阻塞，中文版本已缓存可用
+      }
+
+      // 8. 返回请求语言版本
+      let result = analysis
+      if (lang === 'en') {
+        const enCached = await repo.getCachedTranslation(fullName, 'en')
+        if (enCached) {
+          try {
+            const parsed = JSON.parse(enCached) as RepoAnalysisResult
+            if (parsed.summary) result = parsed
+          } catch {
+            // 英文缓存解析失败，用中文版
+          }
+        }
+      }
+      return dataResponse({ ...result, cached: false })
     }
+
+    // GET /api/users/:login/star-dna
+    // 生成开发者技术画像，支持中英文双语缓存
     const starDnaMatch = matchRoute('/api/users/:login/star-dna', pathname)
     if (method === 'GET' && starDnaMatch) {
-      throw new WorkerApiError('Star DNA 功能在 Worker MVP 阶段未启用', 'NOT_IMPLEMENTED', 501)
+      const login = normalizeRouteLogin(starDnaMatch.login)
+      const query = parseQuery(url)
+      const force = query.force === '1'
+      const lang = query.lang === 'en' ? 'en' : 'zh'
+      const cacheKey = `dna-${lang}`
+
+      // 1. 校验用户存在
+      const userExists = await repo.ensureUserExists(login)
+      if (!userExists) {
+        throw new WorkerApiError(`用户 ${login} 不存在`, 'USER_NOT_FOUND', 404)
+      }
+
+      // 2. 查缓存（非强制刷新时）
+      if (!force) {
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ dna: cached, cached: true })
+        }
+      }
+
+      // 3. 检查 AI 是否启用
+      if (!aiEnabled) {
+        throw new WorkerApiError(
+          'Star DNA 功能未启用，请配置 AI 相关环境变量',
+          'AI_NOT_CONFIGURED',
+          503,
+        )
+      }
+
+      // 4. 校验星标数 > 0
+      const starCount = await repo.getUserStarCount(login)
+      if (starCount === 0) {
+        throw new WorkerApiError(
+          `用户 ${login} 暂无星标数据，请先同步星标`,
+          'EMPTY_STAR_DATA',
+          400,
+        )
+      }
+
+      // 5. 收集统计
+      const languages = await repo.getUserTopLanguages(login, 5)
+      const tags = await repo.getUserTopTags(login, 8)
+      const activeRepoCount = await repo.queryActiveRepoCount(login)
+      const topRepos = await repo.getUserTopRepos(login, 5)
+
+      // 6. 生成中文画像
+      let dnaZh: string
+      try {
+        dnaZh = await generateStarDna(
+          login,
+          {
+            repoCount: starCount,
+            activeRepoCount,
+            languages,
+            tags,
+            topRepos,
+          },
+          env,
+        )
+      } catch (err) {
+        // AI 失败时降级返回缓存（如果有）
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ dna: cached, cached: true })
+        }
+        throw new WorkerApiError(
+          err instanceof Error ? err.message : 'AI 生成画像失败',
+          'AI_ERROR',
+          500,
+        )
+      }
+
+      // 7. 翻译英文（失败不阻塞）
+      const now = new Date().toISOString()
+      let dnaEn = ''
+      try {
+        dnaEn = await translateToEnglish(dnaZh, env)
+      } catch {
+        // 翻译失败不阻塞
+      }
+
+      // 8. 缓存中英文（事务写入）
+      await repo.cacheUserAiTextPair(login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
+
+      // 9. 返回请求语言版本
+      const result = lang === 'en' ? (dnaEn || dnaZh) : dnaZh
+      return dataResponse({ dna: result, cached: false })
     }
+
+    // GET /api/users/:login/learning-path
+    // 生成个性化学习路径，支持中英文双语缓存
     const learningMatch = matchRoute('/api/users/:login/learning-path', pathname)
     if (method === 'GET' && learningMatch) {
-      throw new WorkerApiError('学习路径功能在 Worker MVP 阶段未启用', 'NOT_IMPLEMENTED', 501)
+      const login = normalizeRouteLogin(learningMatch.login)
+      const query = parseQuery(url)
+      const force = query.force === '1'
+      const lang = query.lang === 'en' ? 'en' : 'zh'
+      const cacheKey = `learning-${lang}`
+
+      // 1. 校验用户存在
+      const userExists = await repo.ensureUserExists(login)
+      if (!userExists) {
+        throw new WorkerApiError(`用户 ${login} 不存在`, 'USER_NOT_FOUND', 404)
+      }
+
+      // 2. 查缓存（非强制刷新时）
+      if (!force) {
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ path: cached, cached: true })
+        }
+      }
+
+      // 3. 检查 AI 是否启用
+      if (!aiEnabled) {
+        throw new WorkerApiError(
+          '学习路径功能未启用，请配置 AI 相关环境变量',
+          'AI_NOT_CONFIGURED',
+          503,
+        )
+      }
+
+      // 4. 校验星标数 > 0
+      const starCount = await repo.getUserStarCount(login)
+      if (starCount === 0) {
+        throw new WorkerApiError(
+          `用户 ${login} 暂无星标数据，请先同步星标`,
+          'EMPTY_STAR_DATA',
+          400,
+        )
+      }
+
+      // 5. 收集统计（学习路径用更多标签和仓库）
+      const languages = await repo.getUserTopLanguages(login, 5)
+      const tags = await repo.getUserTopTags(login, 10)
+      const topRepos = await repo.getUserTopRepos(login, 8)
+
+      // 6. 生成中文学习路径
+      let pathZh: string
+      try {
+        pathZh = await generateLearningPath(
+          login,
+          {
+            repoCount: starCount,
+            languages,
+            tags,
+            topRepos,
+          },
+          env,
+        )
+      } catch (err) {
+        // AI 失败时降级返回缓存
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ path: cached, cached: true })
+        }
+        throw new WorkerApiError(
+          err instanceof Error ? err.message : 'AI 生成学习路径失败',
+          'AI_ERROR',
+          500,
+        )
+      }
+
+      // 7. 翻译英文（失败不阻塞）
+      const now = new Date().toISOString()
+      let pathEn = ''
+      try {
+        pathEn = await translateToEnglish(pathZh, env)
+      } catch {
+        // 翻译失败不阻塞
+      }
+
+      // 8. 缓存中英文（事务写入）
+      await repo.cacheUserAiTextPair(login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
+
+      // 9. 返回请求语言版本
+      const result = lang === 'en' ? (pathEn || pathZh) : pathZh
+      return dataResponse({ path: result, cached: false })
     }
+
+    // ===== 以下接口仍返回 501 NOT_IMPLEMENTED =====
 
     // 相似项目推荐
     const similarMatch = matchRoute('/api/repos/*/similar', pathname)

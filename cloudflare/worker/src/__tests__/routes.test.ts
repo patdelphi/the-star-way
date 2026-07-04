@@ -456,37 +456,144 @@ describe('全局仓库接口', () => {
   })
 })
 
-// ===== 第二阶段 API 返回 501 =====
-describe('第二阶段 API 返回 501', () => {
-  it('GET /api/repos/*/readme-summary 返回 501', async () => {
+// ===== AI 接口测试 =====
+// AI 未配置时返回 503，有缓存时返回缓存，强制刷新且未配置时返回 503
+describe('AI 接口', () => {
+  it('GET /api/repos/*/readme-summary 未配置 AI 时返回 503', async () => {
     const res = await handleRequest(
       makeRequest('GET', '/api/repos/testuser/repo1/readme-summary'),
       env,
       mockCtx(),
     )
-    expect(res.status).toBe(501)
+    expect(res.status).toBe(503)
     const body = await res.json()
-    expect(body.error.code).toBe('NOT_IMPLEMENTED')
+    expect(body.error.code).toBe('AI_NOT_CONFIGURED')
   })
 
-  it('GET /api/users/:login/star-dna 返回 501', async () => {
+  it('GET /api/repos/*/readme-summary 有缓存时返回缓存', async () => {
+    // 预写缓存
+    const cached = JSON.stringify({
+      summary: '缓存的摘要',
+      starReason: '缓存的原因',
+      reuseAdvice: '缓存的建议',
+    })
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('testuser/repo1', 'zh', cached, new Date().toISOString()).run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/repos/testuser/repo1/readme-summary'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.summary).toBe('缓存的摘要')
+    expect(body.data.cached).toBe(true)
+  })
+
+  it('GET /api/repos/*/readme-summary force=1 且未配置 AI 时返回 503', async () => {
+    const res = await handleRequest(
+      makeRequest('GET', '/api/repos/testuser/repo1/readme-summary?force=1'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error.code).toBe('AI_NOT_CONFIGURED')
+  })
+
+  it('GET /api/users/:login/star-dna 未配置 AI 时返回 503', async () => {
     const res = await handleRequest(
       makeRequest('GET', '/api/users/testuser/star-dna'),
       env,
       mockCtx(),
     )
-    expect(res.status).toBe(501)
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error.code).toBe('AI_NOT_CONFIGURED')
   })
 
-  it('GET /api/users/:login/learning-path 返回 501', async () => {
+  it('GET /api/users/:login/star-dna 有缓存时返回缓存', async () => {
+    const cached = '缓存的 DNA 画像'
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('user:testuser', 'dna-zh', cached, new Date().toISOString()).run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.dna).toBe('缓存的 DNA 画像')
+    expect(body.data.cached).toBe(true)
+  })
+
+  it('GET /api/users/:login/star-dna 用户不存在时返回 404', async () => {
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/nonexistent-user/star-dna'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error.code).toBe('USER_NOT_FOUND')
+  })
+
+  it('GET /api/users/:login/learning-path 未配置 AI 时返回 503', async () => {
     const res = await handleRequest(
       makeRequest('GET', '/api/users/testuser/learning-path'),
       env,
       mockCtx(),
     )
-    expect(res.status).toBe(501)
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error.code).toBe('AI_NOT_CONFIGURED')
   })
 
+  it('GET /api/users/:login/learning-path 有缓存时返回缓存', async () => {
+    const cached = '缓存的学习路径'
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('user:testuser', 'learning-zh', cached, new Date().toISOString()).run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/learning-path'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.path).toBe('缓存的学习路径')
+    expect(body.data.cached).toBe(true)
+  })
+
+  it('GET /api/users/:login/learning-path lang=en 时返回英文缓存', async () => {
+    const cachedEn = 'cached learning path in english'
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('user:testuser', 'learning-en', cachedEn, new Date().toISOString()).run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/learning-path?lang=en'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.path).toBe('cached learning path in english')
+    expect(body.data.cached).toBe(true)
+  })
+})
+
+// ===== 仍返回 501 的接口 =====
+describe('未实现的接口返回 501', () => {
   it('GET /api/repos/*/similar 返回 501', async () => {
     const res = await handleRequest(
       makeRequest('GET', '/api/repos/testuser/repo1/similar'),

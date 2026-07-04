@@ -7,7 +7,7 @@
  * Worker 环境变量
  * - DB: D1 数据库绑定（在 wrangler.toml 中声明）
  * - STARWAY_GITHUB_TOKEN: GitHub Token（通过 wrangler secret put 写入）
- * - STARWAY_AI_BASE_URL / API_KEY / MODEL: AI 配置（第二阶段启用）
+ * - STARWAY_AI_BASE_URL / API_KEY / MODEL: AI 配置（三项齐全才启用）
  */
 export interface Env {
   // D1 数据库绑定
@@ -20,7 +20,7 @@ export interface Env {
   // 用于根路径 / 重定向到前端 Pages
   STARWAY_FRONTEND_URL?: string
 
-  // AI 配置（第二阶段启用，MVP 不使用）
+  // AI 配置（通过 wrangler secret put 写入，三项齐全才启用）
   STARWAY_AI_BASE_URL?: string
   STARWAY_AI_API_KEY?: string
   STARWAY_AI_MODEL?: string
@@ -44,9 +44,9 @@ export function getGitHubTokenSource(env: Env): string | null {
 
 /**
  * 判断 AI 功能是否已配置
- * MVP 阶段即使配置了也不启用，返回 false
+ * 三项配置（BASE_URL/API_KEY/MODEL）齐全才返回 true
+ * 实际配置加载逻辑见 ai/config.ts
  */
-export function isAiConfigured(_env: Env): boolean {
-  // MVP 阶段不启用 AI 功能
-  return false
+export function isAiConfigured(env: Env): boolean {
+  return !!(env.STARWAY_AI_BASE_URL && env.STARWAY_AI_API_KEY && env.STARWAY_AI_MODEL)
 }

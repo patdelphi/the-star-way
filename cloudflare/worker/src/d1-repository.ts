@@ -1013,6 +1013,178 @@ export class D1StarRepository {
     return toRemove.length
   }
 
+  // ===== AI 缓存读写（translations 表）=====
+
+  /**
+   * 读取单条翻译缓存
+   * @param repoFullName 仓库全名，或 'user:login' 形式的用户级缓存键
+   * @param targetLang 目标语言 key（如 'zh'、'en'、'dna-zh'、'learning-en'）
+   * @returns 缓存内容（translated_readme_summary 字段），未命中返回 null
+   */
+  async getCachedTranslation(
+    repoFullName: string,
+    targetLang: string,
+  ): Promise<string | null> {
+    const result = await this.db
+      .prepare(
+        'SELECT translated_readme_summary FROM translations WHERE repo_full_name = ? AND target_lang = ?',
+      )
+      .bind(repoFullName, targetLang)
+      .first<{ translated_readme_summary: string | null }>()
+    return result?.translated_readme_summary || null
+  }
+
+  /**
+   * 写入单条翻译缓存（upsert）
+   * 用于仓库级 readme-summary 的中英文版本独立写入
+   * @param repoFullName 仓库全名
+   * @param targetLang 语言 key（'zh' 或 'en'）
+   * @param content 缓存内容（JSON 字符串或纯文本）
+   * @param now 时间戳
+   */
+  async upsertTranslation(
+    repoFullName: string,
+    targetLang: string,
+    content: string,
+    now: string,
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+         VALUES (?, ?, ?, 'ai', ?)
+         ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+           translated_readme_summary = excluded.translated_readme_summary,
+           provider = excluded.provider,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(repoFullName, targetLang, content, now)
+      .run()
+  }
+
+  /**
+   * 批量写入用户级 AI 缓存（中英文对，原子写入）
+   * 用 D1 batch 模拟事务，保证中英文同时写入或同时失败
+   * @param login 用户登录名
+   * @param zhKey 中文缓存 key（如 'dna-zh'、'learning-zh'）
+   * @param zhText 中文内容
+   * @param enKey 英文缓存 key（如 'dna-en'、'learning-en'）
+   * @param enText 英文内容（可为空，翻译失败时不写入）
+   * @param now 时间戳
+   */
+  async cacheUserAiTextPair(
+    login: string,
+    zhKey: string,
+    zhText: string,
+    enKey: string,
+    enText: string,
+    now: string,
+  ): Promise<void> {
+    const userKey = `user:${login}`
+    const stmts: D1PreparedStatement[] = [
+      this.db
+        .prepare(
+          `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+           VALUES (?, ?, ?, 'ai', ?)
+           ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+             translated_readme_summary = excluded.translated_readme_summary,
+             provider = excluded.provider,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(userKey, zhKey, zhText, now),
+    ]
+
+    // 英文内容存在才写入（翻译失败时 enText 为空字符串）
+    if (enText) {
+      stmts.push(
+        this.db
+          .prepare(
+            `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+             VALUES (?, ?, ?, 'ai', ?)
+             ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
+               translated_readme_summary = excluded.translated_readme_summary,
+               provider = excluded.provider,
+               updated_at = excluded.updated_at`,
+          )
+          .bind(userKey, enKey, enText, now),
+      )
+    }
+
+    // D1 batch 保证原子性
+    await this.db.batch(stmts)
+  }
+
+  /**
+   * 获取用户代表性星标仓库（按 stars 降序，用于 AI 生成画像和学习路径）
+   * @param login 用户登录名
+   * @param limit 返回数量
+   * @returns 仓库列表（full_name, description, stars）
+   */
+  async getUserTopRepos(
+    login: string,
+    limit = 5,
+  ): Promise<Array<{ full_name: string; description: string; stars: number }>> {
+    const result = await this.db
+      .prepare(
+        `SELECT r.full_name, r.description, r.stars
+         FROM repos r JOIN stars s ON r.full_name = s.repo_full_name
+         WHERE s.user_login = ? AND s.removed_at IS NULL AND r.description IS NOT NULL
+         ORDER BY r.stars DESC LIMIT ?`,
+      )
+      .bind(login, limit)
+      .all<{ full_name: string; description: string | null; stars: number }>()
+    // 将 description: string | null 转为 string（null 转空字符串）
+    // 与 AI client prompt 模板期望一致（r.description || ''）
+    return (result.results || []).map((r) => ({
+      full_name: r.full_name,
+      description: r.description || '',
+      stars: r.stars,
+    }))
+  }
+
+  /**
+   * 获取用户星标语言分布（top N，用于 AI 生成）
+   * @param login 用户登录名
+   * @param limit 返回数量
+   */
+  async getUserTopLanguages(
+    login: string,
+    limit = 5,
+  ): Promise<Array<{ language: string; count: number }>> {
+    const result = await this.db
+      .prepare(
+        `SELECT language, COUNT(*) as count FROM repos
+         WHERE full_name IN (
+           SELECT repo_full_name FROM stars WHERE user_login = ? AND removed_at IS NULL
+         )
+         GROUP BY language ORDER BY count DESC LIMIT ?`,
+      )
+      .bind(login, limit)
+      .all<{ language: string; count: number }>()
+    return result.results || []
+  }
+
+  /**
+   * 获取用户星标标签分布（top N，用于 AI 生成）
+   * @param login 用户登录名
+   * @param limit 返回数量
+   */
+  async getUserTopTags(
+    login: string,
+    limit = 8,
+  ): Promise<Array<{ tag: string; count: number }>> {
+    const result = await this.db
+      .prepare(
+        `SELECT tag, COUNT(*) as count FROM repo_tags
+         WHERE repo_full_name IN (
+           SELECT repo_full_name FROM stars WHERE user_login = ? AND removed_at IS NULL
+         )
+         GROUP BY tag ORDER BY count DESC LIMIT ?`,
+      )
+      .bind(login, limit)
+      .all<{ tag: string; count: number }>()
+    return result.results || []
+  }
+
   // ===== 分类 =====
 
   /**
