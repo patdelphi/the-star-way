@@ -88,21 +88,53 @@ function formatStars(n: number): string {
 }
 
 /** 协议类型识别 */
-type LicenseType = "mit" | "apache" | "bsd" | "gpl" | "lgpl" | "mpl" | "agpl" | "unlicense" | "noassertion" | "unknown"
+type LicenseType =
+  | "mit" | "apache" | "bsd" | "gpl" | "lgpl" | "mpl" | "agpl"
+  | "unlicense" | "cc0" | "isc" | "wtfpl" | "cc" | "noassertion" | "unknown"
 
-/** 从 license 字符串识别协议类型 */
+/** 从 license 字符串识别协议类型
+ *  支持主流 SPDX 协议 + Creative Commons + ISC + CC0 + WTFPL
+ *  匹配顺序：强传染 → 弱传染 → 宽松 → 公共领域 → 其他 */
 function detectLicenseType(license: string): LicenseType {
   const lower = license.toLowerCase()
+  if (!lower) return "noassertion"
+  if (lower === "noassertion" || lower === "other") return "noassertion"
+  // 强 copyleft（先匹配，避免被 gpl 误判）
   if (lower.includes("agpl")) return "agpl"
   if (lower.includes("lgpl")) return "lgpl"
   if (lower.includes("gpl")) return "gpl"
+  // 弱 copyleft
+  if (lower.includes("mpl")) return "mpl"
+  // 宽松开源
   if (lower.includes("apache")) return "apache"
   if (lower.includes("mit")) return "mit"
   if (lower.includes("bsd")) return "bsd"
-  if (lower.includes("mpl")) return "mpl"
+  if (lower.includes("isc")) return "isc"
+  if (lower.includes("wtfpl")) return "wtfpl"
+  // 公有领域
   if (lower.includes("unlicense")) return "unlicense"
-  if (lower === "noassertion" || lower === "other" || lower === "") return "noassertion"
+  if (lower.includes("cc0")) return "cc0"
+  // Creative Commons（CC-BY-4.0 / CC-BY-SA-4.0 等，含 cc0 已在上面匹配）
+  if (lower.startsWith("cc-") || lower.startsWith("cc ")) return "cc"
   return "unknown"
+}
+
+/** 判断 license 字符串是否为 SPDX 标准 ID
+ *  SPDX ID 特征：全字母数字+连字符，无空格，常见如 MIT/Apache-2.0/GPL-3.0/CC-BY-4.0/CC0-1.0 */
+function isSpdxLicense(license: string): boolean {
+  if (!license) return false
+  // SPDX ID 仅含大写字母、数字、连字符、点
+  return /^[A-Za-z0-9.-]+$/.test(license) && license !== "NOASSERTION" && license !== "other"
+}
+
+/** 生成协议详情链接
+ *  - SPDX 标准 ID → spdx.org/licenses/{ID}.html
+ *  - 其他（含 NOASSERTION）→ GitHub 仓库 LICENSE 文件 */
+function buildLicenseUrl(license: string, repoFullName: string): string {
+  if (isSpdxLicense(license)) {
+    return `https://spdx.org/licenses/${license}.html`
+  }
+  return `https://github.com/${repoFullName}/blob/HEAD/LICENSE`
 }
 
 /** 协议风险等级 */
@@ -379,7 +411,11 @@ export default function RepositoryAnalysis() {
       mit: "safe",
       apache: "safe",
       bsd: "safe",
+      isc: "safe",        // ISC 宽松协议，类似 MIT
+      wtfpl: "safe",      // WTFPL 极宽松
+      cc0: "safe",        // CC0 公有领域
       unlicense: "safe",
+      cc: "caution",      // CC-BY-4.0 需署名，CC-BY-SA 有传染性
       mpl: "caution",
       lgpl: "caution",
       gpl: "danger",
@@ -819,14 +855,16 @@ export default function RepositoryAnalysis() {
                     {licenseInfo.riskLabel}
                   </Badge>
                   <span className="text-sm text-muted-foreground">{licenseInfo.typeName}</span>
-                  {licenseInfo.type === "noassertion" && activeRepo && (
+                  {activeRepo && activeRepo.license && (
                     <a
-                      href={`https://github.com/${activeRepo.fullName}/blob/HEAD/LICENSE`}
+                      href={buildLicenseUrl(activeRepo.license, activeRepo.fullName)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-auto text-xs font-medium text-primary hover:underline"
                     >
-                      {t("repoAnalysis.viewLicenseFile")}
+                      {isSpdxLicense(activeRepo.license)
+                        ? t("repoAnalysis.viewLicenseSpdx", { license: activeRepo.license })
+                        : t("repoAnalysis.viewLicenseFile")}
                     </a>
                   )}
                 </div>

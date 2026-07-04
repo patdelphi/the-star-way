@@ -282,3 +282,45 @@
 ### 未执行事项
 - Worker AI 功能不可用（coding plan key 不兼容 Worker 环境，需标准 dashscope key）
 - 未提交 d1_sync/ 目录的 46 个 SQL 数据文件（已加入 .gitignore）
+
+## 2026-07-04 协议分析全面修复（CC/ISC/CC0/WTFPL + SPDX 链接）
+
+### 用户问题
+- EbookFoundation/free-programming-books 项目协议显示为"协议未识别"
+- 期望：非 GitHub 默认协议应显示协议名 + 协议链接
+
+### 根因
+- 前端 detectLicenseType 函数硬编码只识别 8 种主流协议（MIT/Apache/BSD/GPL/LGPL/MPL/AGPL/Unlicense）
+- CC-BY-4.0 落入 unknown 分支，显示"协议未识别"
+- 协议链接逻辑只在 noassertion 时显示 GitHub LICENSE 链接
+- unknown 分支风险等级标为 danger（极高风险），对 CC-BY-4.0 这类宽松协议不公平
+
+### 修复方案（全面修复）
+
+#### 改动文件
+1. frontend/src/pages/RepositoryAnalysis.tsx
+   - detectLicenseType 增加 cc/cc0/isc/wtfpl 4 类协议识别
+   - 新增 isSpdxLicense() 判断函数（SPDX ID 仅含字母数字+连字符+点）
+   - 新增 buildLicenseUrl() 生成协议详情链接（SPDX→spdx.org，其他→GitHub LICENSE）
+   - riskMap 更新：ISC/CC0/WTFPL→safe，CC→caution
+   - 协议链接 UI 放宽：所有有 license 的仓库都显示链接
+   - SPDX 标准 ID 链接到 https://spdx.org/licenses/{ID}.html
+   - 非 SPDX（含 NOASSERTION）链接到 GitHub 仓库 LICENSE 文件
+   - 链接文案区分：SPDX 显示"查看 SPDX {license} 协议详情"，其他显示"查看 LICENSE 文件"
+
+2. frontend/src/i18n/locales/zh-CN.json
+   - 新增 viewLicenseSpdx 文案
+   - 新增 4 类协议的 licenseType/licenseAdvice/licenseCaution/licenseRisk 文案
+
+3. frontend/src/i18n/locales/en-US.json
+   - 同步新增上述文案的英文版本
+
+#### 验证结果
+- tsc --noEmit: 通过
+- npm run build: 成功（588 modules transformed，937KB JS）
+
+### 改动说明
+- 匹配顺序：强 copyleft（agpl/lgpl/gpl）→ 弱 copyleft（mpl）→ 宽松（apache/mit/bsd/isc/wtfpl）→ 公共领域（unlicense/cc0）→ CC → unknown
+- CC-BY-4.0 现在会正确识别为 cc 类型，风险等级为 caution（中等），显示"知识共享协议（Creative Commons）"
+- 所有 SPDX 协议（MIT/Apache-2.0/GPL-3.0/CC-BY-4.0/CC0-1.0 等）都链接到 spdx.org 详情页
+- NOASSERTION 和非标准协议仍链接到 GitHub LICENSE 文件
