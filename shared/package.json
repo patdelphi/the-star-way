@@ -1,0 +1,16 @@
+{
+  "name": "the-star-way-shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared types, classification rules, and scoring logic for the-star-way (runtime-agnostic).",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./api-contracts": "./api-contracts/index.ts",
+    "./classification": "./classification/index.ts",
+    "./scoring": "./scoring/index.ts"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

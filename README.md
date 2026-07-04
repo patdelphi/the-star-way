@@ -170,13 +170,18 @@ the-star-way/
 ├── .nvmrc                        # Node 版本固定
 ├── .node-version                 # Node 版本固定
 ├── sample.env                    # 环境变量示例
+├── shared/                       # 跨端共享层（运行时无关）
+│   ├── api-contracts/            # API 契约类型（user/repo/star/stats/tag/sync/cache/error）
+│   ├── classification/           # 标签字典 + 双语映射 + classifyRepo 纯函数
+│   ├── scoring/                  # 阈值口径（Sleep Stars / Hidden Gems 常量和纯函数）
+│   └── __tests__/                # 共享层纯函数测试
 ├── backend/                      # 后端服务
 │   ├── src/
-│   │   ├── db/                   # 数据库连接、Schema、类型
+│   │   ├── db/                   # 数据库连接、Schema、类型（re-export shared）
 │   │   ├── import/               # CSV 导入
-│   │   ├── repository/           # 仓库查询与统计
+│   │   ├── repository/           # 仓库查询与统计（引用 shared 阈值）
 │   │   ├── sync/                 # GitHub 同步（client + syncer）
-│   │   ├── classification/       # 规则分类（60+ 标签规则）
+│   │   ├── classification/       # 规则分类（re-export shared + 本地 db 版本）
 │   │   ├── api/                  # HTTP API 服务（端口 3210）
 │   │   ├── export/               # CSV/JSON/Markdown/HTML 导出
 │   │   └── ai/                   # AI Provider 配置和缓存框架
@@ -203,7 +208,8 @@ the-star-way/
     ├── deployment.md
     ├── troubleshooting.md
     ├── changelog.md
-    └── roadmap.md
+    ├── roadmap.md
+    └── dual-architecture-cloudflare-plan.md
 ```
 
 ## API 接口

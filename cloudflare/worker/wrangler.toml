@@ -1,0 +1,36 @@
+# Cloudflare Worker 配置
+# the-star-way Worker API
+# 部署前需执行：wrangler d1 create starway-db 并替换下面的 database_id
+
+name = "the-star-way-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "starway-db"
+database_id = "d338ce4b-12cd-46b0-b669-2e33b28212f0"
+
+# Worker secrets（通过 wrangler secret put 写入，不在此明文配置）
+# - STARWAY_GITHUB_TOKEN: GitHub Token
+# - STARWAY_AI_BASE_URL: AI API base URL（第二阶段）
+# - STARWAY_AI_API_KEY: AI API key（第二阶段）
+# - STARWAY_AI_MODEL: AI 模型名（第二阶段）
+
+# 环境变量（非敏感）
+[vars]
+# 可在此配置非敏感变量
+
+# 开发环境配置
+[env.development]
+name = "the-star-way-api-dev"
+
+# 生产环境配置
+[env.production]
+name = "the-star-way-api"
+# 生产环境路由（部署时配置）
+# routes = [
+#   { pattern = "api.your-domain.com/*", zone_name = "your-domain.com" }
+# ]

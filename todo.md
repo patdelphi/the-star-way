@@ -1,92 +1,184 @@
-# 修复任务清单
+# 双架构 Cloudflare 改造 - 阶段 2-5 执行计划
 
-## 2026-07-02
+> 创建时间: 2026-07-04
+> 状态: 待用户确认
+> 参考文档: Docs/dual-architecture-cloudflare-plan.md
 
-1. [完成] 检查前端硬编码展示内容，改为来自 API 或当前状态的真实动态内容。
-2. [完成] 检查不准确说明文字，尤其是开发者页、星标仓库页、分析页，并补齐语言切换。
-3. [完成] 在开发者标签页的同步星标旁增加“查看星标仓库”按钮。
-4. [完成] 统一图表 tooltip / popup 的暗色主题样式，避免亮色数字标签。
-5. [完成] 解释并修正星标仓库“分数”的业务含义和展示文案。
-6. [完成] 复查各业务页面的内容逻辑，删除或替换误导性说明。
-7. [完成] 补充测试并执行验证。
+## 关键决策
 
----
+1. **`translations` 表保持兼容结构**：当前 `repo_full_name = user:login` 复用模式已稳定，D1 中保持相同结构，不拆表，避免引入迁移复杂度。
+2. **D1 异步 API**：所有查询改为 `async/await`，与 better-sqlite3 同步 API 并存。
+3. **Worker 同步页数上限**：单次同步最多 10 页（1000 条 star），超过返回 `SYNC_PAGE_LIMIT` 错误，避免 Worker 超时。
+4. **AI 功能放第二阶段**：Worker MVP 不实现 AI 接口，前端调用时返回 `NOT_IMPLEMENTED` 错误。
+5. **部署阶段（阶段5）需用户确认**：涉及 `wrangler deploy`、创建 D1 数据库、写入 secrets，属危险操作，必须停下来确认。
 
-## 2026-07-03 设置页功能开发
+## 阶段 2: D1 Schema 与数据访问
 
-### 范围
-A/B/C/D 四组全部实现,存储用统一 namespace localStorage `starway-settings`(JSON 对象,不碰 `.env`)。老的 `starway-github-token`、`starway-lang` 已迁移到统一 namespace 并删除老 key(用户确认"老的去掉")。提供"重置为默认值"按钮。
+### 2.1 生成 D1 migration
+- [ ] 新建 `cloudflare/d1/migrations/0001_init.sql`
+- 从 `backend/src/db/schema.ts` 转换为 D1 兼容 SQL
+- 移除 `PRAGMA journal_mode = WAL` 和 `synchronous = NORMAL`（D1 不支持）
+- 移除 `AUTOINCREMENT`（D1 用 AUTOINCREMENT 语法但行为略异，保留以兼容）
+- 保留所有表结构和索引
 
-### 完成状态(2026-07-03)
-- Phase 1 前端基础设施:完成(settings.ts 新建、api.ts 改造、Settings.tsx 重写、i18n 追加)
-- Phase 2 应用设置到调用方:完成(StarExplorer/RepositoryAnalysis/Developers/TopBar/i18n)
-- Phase 3 后端业务阈值可配置:完成(repo-queries.ts 参数化、routes.ts query 解析、threshold.test.ts 16 测试全过)
-- Phase 4 验证:前端 verify-ui 47 项通过、前端 build 通过、后端 tsc 通过、后端 threshold 测试通过;后端全部测试 126 passed / 4 failed(4 个失败为 HEAD 版本预先存在的 translations 表测试隔离问题,与 Phase 3 无关,待用户确认是否修复)
+### 2.2 新建 D1 数据访问层
+- [ ] 新建 `cloudflare/worker/src/d1-repository.ts`
+- 定义 `D1StarRepository` 类，封装核心查询方法（异步）
+- 方法清单：
+  - `listUsers()` - 用户列表
+  - `getOverview(options)` - 全局概览
+  - `listRepos(login, params)` - 仓库列表（分页、筛选、排序）
+  - `getRepo(login, fullName)` - 单仓库详情
+  - `getUserStats(login)` - 用户统计
+  - `getUserSummary(login, options)` - 用户摘要
+  - `listTags(login, lang)` - 标签列表
+  - `getUserStarTimeline(login)` - 星标时间轴
+  - `listSyncRuns(login)` - 同步历史
+  - `getRepoTags(fullName)` - 仓库标签
+  - `upsertUser/profile/repos/stars` - 同步写入
+  - `insertSyncRun/updateSyncRun` - 同步记录
 
-### 详细任务
+### 2.3 核心查询验证
+- [ ] 新建 `cloudflare/worker/src/__tests__/d1-repository.test.ts`
+- 使用 Miniflare 或 D1 模拟器测试
+- 覆盖：用户列表、概览、仓库列表、标签、趋势、同步历史
 
-#### Phase 1: 前端基础设施(A/B/C 组前端部分)
+### 验收标准
+- D1 可创建所有 MVP 所需表和索引
+- 能写入用户、仓库、星标、标签、同步记录
+- 能读取 MVP 查询结果
 
-- [ ] 1.1 新建 `frontend/src/lib/settings.ts`
-  - 类型定义:`AppSettings { aiTimeout, syncTimeout, apiTimeout, pageSize, defaultSort, language, theme, autoGenSummary, confirmForceRegen, sleepDays, gemStarsMin, gemStarsMax }`
-  - 默认值常量 `DEFAULT_SETTINGS`(aiTimeout=60000, syncTimeout=180000, apiTimeout=8000, pageSize=20, defaultSort='starred_at:desc', language='auto', theme='auto', autoGenSummary=true, confirmForceRegen=true, sleepDays=90, gemStarsMin=50, gemStarsMax=1000)
-  - `getSettings()` / `saveSettings(partial)` / `resetSettings()` / `getSetting(key)`
-  - 合并存储值与默认值,保证向后兼容(新增字段时自动取默认)
-- [ ] 1.2 修改 `frontend/src/lib/api.ts`
-  - 把 `API_TIMEOUT` / `AI_TIMEOUT` / `SYNC_TIMEOUT` 常量改为运行时从 settings 读取,默认值不变
-  - `fetchWithTimeout(url, options, timeoutMs?)` 不传 timeoutMs 时按 URL 前缀判定:含 `/sync` 用 syncTimeout,含 `readme-summary|star-dna|learning-path` 用 aiTimeout,其他用 apiTimeout
-  - 调用 `getStats/getUserSummary/getGlobalOverview` 时传入 sleepDays / gemStarsMin / gemStarsMax 作为 query 参数
-- [ ] 1.3 重构 `frontend/src/pages/Settings.tsx`,新增卡片:
-  - **超时类**:`AI 超时(s)` 数字输入(范围 30-180,步进 10) / `同步超时(s)` 数字输入(60-600,步进 30) / `普通 API 超时(s)` 数字输入(3-30,步进 1)
-  - **浏览体验**:`默认每页数量` 下拉(20/50/100) / `默认排序` 下拉(starred_at desc / stars desc / pushed_at desc / full_name asc) / `界面语言` 下拉(中文/英文/跟随系统) / `主题` 下拉(浅色/深色/跟随系统)
-  - **AI 行为**:`仓库详情自动生成摘要` Switch / `强制重生成二次确认` Switch
-  - **业务阈值**:`Sleep Stars 天数` 数字(30-365) / `Hidden Gems stars 区间` 两个数字(min/max,带校验 min<max)
-  - 底部"重置为默认值"按钮(二次确认弹窗)
-  - 所有字段 onChange 即保存(无独立提交按钮),保存后 toast 提示
-- [ ] 1.4 i18n 新增 settings.* 子树(zh-CN.json / en-US.json 同步追加)
-  - `settings.timeouts.*`、`settings.browsing.*`、`settings.ai.*`、`settings.thresholds.*`、`settings.reset.*`
-  - 保证 `verify-ui.mjs` 静态校验通过(无中文 string literal)
+## 阶段 3: Worker API
 
-#### Phase 2: 应用设置到调用方
+### 3.1 Worker 入口与路由
+- [ ] 新建 `cloudflare/worker/src/index.ts` - fetch 入口
+- [ ] 新建 `cloudflare/worker/src/routes.ts` - 路由匹配
+- [ ] 新建 `cloudflare/worker/src/env.ts` - Worker env 类型
+- [ ] 新建 `cloudflare/worker/wrangler.toml` - Wrangler 配置
 
-- [ ] 2.1 修改 `frontend/src/pages/StarExplorer.tsx`:初始 pageSize / sort 从 settings 读取
-- [ ] 2.2 修改 `frontend/src/pages/RepositoryAnalysis.tsx`(仓库详情页):
-  - 自动生成摘要开关生效:关闭时不自动调 `getReadmeSummary`,改为显示"点击生成"按钮
-  - 强制重生成二次确认:点击"重新生成"按钮时弹 confirm
-- [ ] 2.3 修改 Star DNA / Learning Path 重新生成按钮,同样接入"强制重生成二次确认"开关
-- [ ] 2.4 主题切换扩展:
-  - `frontend/src/components/layout/TopBar.tsx` 把 `light|dark` 扩展为 `light|dark|auto`
-  - `auto` 模式监听 `prefers-color-scheme`,系统切换时自动跟随
-  - 主题选择从 settings 读取,与 TopBar 共享状态(可用 useState + window 事件)
-- [ ] 2.5 界面语言切换:settings 中 `language` 改变时调用 `i18n.changeLanguage(lng)`,auto 模式跟随 navigator
+### 3.2 MVP API 实现
+- 路由清单（与 Node 后端对齐）：
+  - `GET /api/users` ✓
+  - `GET /api/overview` ✓
+  - `GET /api/users/:login/repos` ✓
+  - `GET /api/users/:login/repos/*fullName` ✓
+  - `GET /api/users/:login/stats` ✓
+  - `GET /api/users/:login/summary` ✓
+  - `GET /api/users/:login/tags` ✓
+  - `GET /api/users/:login/star-timeline` ✓
+  - `GET /api/users/:login/sync-runs` ✓
+  - `POST /api/sync` ✓（调用阶段4的同步逻辑）
+  - `POST /api/users/:login/classify` ✓
+  - `GET /api/status` ✓（限制超时）
+  - `GET /api/token-source` ✓
+  - `GET /api/repos/*fullName` ✓
+  - 第二阶段 API（AI、相似、导出、删除）：返回 501 NOT_IMPLEMENTED
 
-#### Phase 3: 后端业务阈值可配置(D 组)
+### 3.3 统一 JSON 错误格式
+- [ ] 错误响应格式：`{ error: { code, message } }`，与 Node 后端一致
+- [ ] CORS 头：`Access-Control-Allow-Origin: *` 等
 
-- [ ] 3.1 `backend/src/repository/repo-queries.ts`:`getUserSummary` / `getGlobalOverview` / `getHiddenGems` 等接受可选参数 `options?: { sleepDays?, gemStarsMin?, gemStarsMax? }`,无参数时用现有常量(向后兼容)
-- [ ] 3.2 `backend/src/api/routes.ts`:`/api/users/:login/summary`、`/api/overview` 解析 query 参数 `sleepDays / gemStarsMin / gemStarsMax`,转 number 后传入,带范围校验(非法值回退到默认)
-- [ ] 3.3 后端测试更新:`backend/src/__tests__` 或对应 `__tests__/` 加测试用例,验证自定义阈值生效
-- [ ] 3.4 前端 api.ts 调用 summary / overview 时带上 settings 中的阈值参数
+### 验收标准
+- `wrangler dev` 可返回 MVP API
+- 前端设置 `VITE_API_BASE` 后能读取 Worker API
+- API 错误格式与当前前端兼容
 
-#### Phase 4: 验证
+## 阶段 4: Worker 版 GitHub 同步
 
-- [ ] 4.1 前端 `pnpm run verify-ui` 通过
-- [ ] 4.2 前端 `pnpm run build` 通过
-- [ ] 4.3 后端 `pnpm test` 全部通过(原 111 + 新增)
-- [ ] 4.4 后端 `pnpm run build` 通过
-- [ ] 4.5 手动验证:改设置→刷新→设置保留;改超时→触发对应接口生效;改阈值→Hidden Gems/Sleep Stars 数量变化;主题/语言跟随系统切换
+### 4.1 Worker 版 GitHub client
+- [ ] 新建 `cloudflare/worker/src/github-client.ts`
+- 复用 shared 层逻辑
+- 使用 Worker `fetch()`（与 Node 版一致）
+- 解析 rate limit headers
 
-### 关键假设(需要你确认)
+### 4.2 Worker 版同步流程
+- [ ] 新建 `cloudflare/worker/src/github-sync.ts`
+- 单次同步页数上限：10 页（1000 条）
+- 使用 D1 batch 替代 `db.transaction()`
+- 写入 `sync_runs` 记录
+- token 从 `env.STARWAY_GITHUB_TOKEN` 读取
 
-1. **存储方式**:统一 `starway-settings` JSON key(若你坚持分散多 key,告知后改)
-2. **保存策略**:onChange 即保存,无提交按钮;如果想要"保存"按钮集中提交,告知后改
-3. **业务阈值生效范围**:仅影响前端展示的统计数(Sleep Stars/Hidden Gems 计数),不影响数据存储;后端 query 参数向后兼容,无参数时行为不变
-4. **主题 auto 模式**:监听 `prefers-color-scheme`,系统主题变化时自动切换
-5. **语言 auto 模式**:跟随 `navigator.language`,但用户手动选过的语言优先(已存在的 `starway-lang` 不动)
-6. **强制重生成二次确认**:仅对"重新生成"类按钮(Star DNA / Learning Path / README 摘要),不影响首次自动生成
+### 4.3 Worker secrets 配置
+- [ ] 在 `wrangler.toml` 声明 secrets
+- 不写入实际值，部署时由用户通过 `wrangler secret put` 写入
 
-### 风险与注意
+### 验收标准
+- 能同步真实 GitHub 用户公开 star 数据
+- D1 中生成一致的用户、仓库、星标记录
+- 限流、用户不存在、网络失败时返回明确错误
 
-- D 组需要前后端联动 + 后端测试更新,改动较大,放最后做
-- `verify-ui.mjs` 严格扫中文 string literal,所有新文案必须走 i18n
-- 老的 `starway-lang` / `starway-github-token` 不迁移,避免破坏现有 TopBar 语言切换和 GitHub Token 卡片
-- 主题 `auto` 模式需要监听 `matchMedia`,组件卸载时清理监听器避免内存泄漏
+## 阶段 5: Cloudflare Pages 发布（需用户确认）
+
+> ⚠️ 本阶段涉及部署操作，必须先获得用户确认后才能执行
+
+### 5.1 文档准备（可先完成）
+- [ ] 新建 `cloudflare/worker/README.md` - Worker 部署说明
+- [ ] 更新 `Docs/deployment.md` - Cloudflare 部署章节
+- [ ] 更新 `README.md` - 项目结构说明
+
+### 5.2 部署配置（可先完成）
+- [ ] 完善 `wrangler.toml` 配置
+- [ ] 新建 `cloudflare/pages/` 配置目录
+- [ ] 前端构建脚本适配 Pages
+
+### 5.3 实际部署（⚠️ 需用户确认）
+- [ ] 创建 D1 数据库
+- [ ] 执行 migration
+- [ ] 写入 Worker secrets
+- [ ] 发布 Worker
+- [ ] 发布 Pages
+
+### 验收标准
+- 线上页面可打开
+- 线上页面可访问 Worker API
+- 不依赖本地后端
+
+## 执行顺序
+
+1. **阶段 2**：纯代码开发，可立即执行
+2. **阶段 3**：纯代码开发，可立即执行
+3. **阶段 4**：纯代码开发，可立即执行
+4. **阶段 5.1-5.2**：文档和配置，可立即执行
+5. **阶段 5.3**：⚠️ 暂停，等待用户确认是否部署
+
+## 测试策略
+
+- 阶段 2：D1 查询用 Miniflare 模拟器测试
+- 阶段 3：Worker 路由用 Miniflare 测试
+- 阶段 4：GitHub 同步用 mock fetch 测试
+- 阶段 5：本地 `wrangler dev` 验证后再部署
+
+## 风险
+
+1. **D1 与 SQLite 行为差异**：数据访问层分离，补核心查询验证
+2. **Worker 执行时间限制**：同步页数上限 10 页
+3. **Miniflare 测试复杂度**：先用最小测试集覆盖核心查询
+4. **shared 代码引用**：Worker 通过相对路径引用 shared，不依赖 @shared alias（Wrangler 不支持）
+
+## 预计产出文件
+
+```
+cloudflare/
+  worker/
+    src/
+      index.ts
+      routes.ts
+      env.ts
+      d1-repository.ts
+      github-client.ts
+      github-sync.ts
+      errors.ts
+      __tests__/
+        d1-repository.test.ts
+        routes.test.ts
+        github-sync.test.ts
+    wrangler.toml
+    package.json
+    tsconfig.json
+    README.md
+  d1/
+    migrations/
+      0001_init.sql
+  pages/
+    README.md
+```

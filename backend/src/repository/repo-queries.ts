@@ -11,43 +11,26 @@ import type {
   TopicStat,
   LicenseStat,
 } from '../db/types.js'
+// 阈值口径从 shared/scoring 引用，与 Cloudflare Worker 共用同一份逻辑
+import {
+  ACTIVE_DAYS_MS,
+  GEM_STARS_MAX,
+  GEM_STARS_MIN,
+  GEM_STARS_UPPER,
+  resolveThresholds,
+} from '@shared/scoring/thresholds.js'
+import type { ThresholdOptions } from '@shared/scoring/thresholds.js'
 
 export const SYSTEM_DEMO_LOGIN = 'demo-user'
 
-// 活跃阈值：90 天（毫秒）
-export const ACTIVE_DAYS_MS = 90 * 24 * 60 * 60 * 1000
-
-// Hidden Gems 阈值
-export const GEM_STARS_MAX = 1000
-
-// Gem 筛选范围
-export const GEM_STARS_MIN = 50
-export const GEM_STARS_UPPER = 10000
-
-/**
- * 业务阈值可选项
- * 由前端 settings 透传，无值时回退到默认常量，保证向后兼容
- */
-export interface ThresholdOptions {
-  sleepDays?: number    // 沉睡星标判定天数，默认 90
-  gemStarsMin?: number  // gemRepos stars 下限，默认 GEM_STARS_MIN
-  gemStarsMax?: number  // hiddenGemsCount stars 上限，默认 GEM_STARS_MAX
+// 阈值常量从 shared 引用后 re-export，保持现有调用方 import 路径不变
+export {
+  ACTIVE_DAYS_MS,
+  GEM_STARS_MAX,
+  GEM_STARS_MIN,
+  GEM_STARS_UPPER,
 }
-
-// 解析阈值 options，非法或缺失时回退到默认常量
-function resolveThresholds(options?: ThresholdOptions) {
-  const sleepDays = options?.sleepDays
-  const sleepMs = typeof sleepDays === 'number' && Number.isFinite(sleepDays) && sleepDays > 0
-    ? sleepDays * 24 * 60 * 60 * 1000
-    : ACTIVE_DAYS_MS
-  const gemStarsMax = typeof options?.gemStarsMax === 'number' && Number.isFinite(options.gemStarsMax) && options.gemStarsMax > 0
-    ? options.gemStarsMax
-    : GEM_STARS_MAX
-  const gemStarsMin = typeof options?.gemStarsMin === 'number' && Number.isFinite(options.gemStarsMin) && options.gemStarsMin >= 0
-    ? options.gemStarsMin
-    : GEM_STARS_MIN
-  return { sleepMs, gemStarsMin, gemStarsMax }
-}
+export type { ThresholdOptions }
 
 // ===== 列表查询 =====
 

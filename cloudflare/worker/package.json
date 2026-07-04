@@ -1,0 +1,28 @@
+{
+  "name": "the-star-way-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker for the-star-way: D1 data access, GitHub sync, MVP API.",
+  "type": "module",
+  "engines": {
+    "node": "24.15.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/node": "^22.15.0",
+    "miniflare": "^3.20250101.0",
+    "typescript": "^5.8.0",
+    "vite": "^5.4.0",
+    "vitest": "^3.1.0",
+    "wrangler": "^3.90.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

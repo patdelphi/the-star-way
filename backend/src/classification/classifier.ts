@@ -1,22 +1,22 @@
 /**
- * 规则分类模块
- * 基于 topic / name / description 对仓库进行标签分类
- * 保存 tag_source 和 confidence 到 repo_tags 表
+ * 规则分类模块（backend 本地版）
+ * - 纯函数 classifyRepo 从 shared/classification 引入
+ * - 数据库批量分类 classifyAllRepos / classifyReposForUser 保留在 backend 本地
  */
 import type Database from 'better-sqlite3'
 import { withTransaction } from '../db/connection.js'
-import {
-  TOPIC_TAG_RULES,
-  NAME_TAG_RULES,
-  DESC_TAG_RULES,
-  type TagRule,
-} from './tag-dictionary.js'
+// 纯函数从 shared 引用，与 Cloudflare Worker 共用同一份逻辑
+import { classifyRepo as classifyRepoImpl } from '@shared/classification/classifier.js'
 
 // 分类结果
 export interface ClassificationResult {
   repoCount: number
   tagsCreated: number
 }
+
+// re-export 纯函数和类型，保持向后兼容
+export const classifyRepo = classifyRepoImpl
+export type { ClassifyTagResult } from '@shared/classification/classifier.js'
 
 /**
  * 对所有仓库执行规则分类
@@ -91,72 +91,4 @@ export function classifyReposForUser(db: Database.Database, userLogin?: string):
   })
 
   return { repoCount: repos.length, tagsCreated }
-}
-
-/**
- * 对单个仓库进行分类
- */
-export function classifyRepo(
-  name: string,
-  description: string | null,
-  topicsJson: string | null,
-): { tag: string; source: string; confidence: number }[] {
-  const results: { tag: string; source: string; confidence: number }[] = []
-  const seenTags = new Set<string>()
-
-  // 解析 topics
-  const topics: string[] = topicsJson ? safeJsonParse(topicsJson) : []
-  const descLower = (description ?? '').toLowerCase()
-  const nameLower = name.toLowerCase()
-
-  // 1. Topic 精确匹配（置信度 0.95）
-  for (const rule of TOPIC_TAG_RULES) {
-    const matchMode = rule.matchMode ?? 'exact'
-    if (matchMode === 'exact') {
-      const matched = topics.some(t => rule.keywords.includes(t.toLowerCase()))
-      if (matched && !seenTags.has(rule.label)) {
-        results.push({ tag: rule.label, source: 'topic', confidence: 0.95 })
-        seenTags.add(rule.label)
-      }
-    } else {
-      const matched = topics.some(t =>
-        rule.keywords.some(kw => t.toLowerCase().includes(kw))
-      )
-      if (matched && !seenTags.has(rule.label)) {
-        results.push({ tag: rule.label, source: 'topic', confidence: 0.95 })
-        seenTags.add(rule.label)
-      }
-    }
-  }
-
-  // 2. 仓库名称匹配（置信度 0.85）
-  for (const rule of NAME_TAG_RULES) {
-    const matched = rule.keywords.some(kw => nameLower.includes(kw.toLowerCase()))
-    if (matched && !seenTags.has(rule.label)) {
-      results.push({ tag: rule.label, source: 'name', confidence: 0.85 })
-      seenTags.add(rule.label)
-    }
-  }
-
-  // 3. 描述匹配（置信度 0.80）
-  for (const rule of DESC_TAG_RULES) {
-    const matched = rule.keywords.some(kw => descLower.includes(kw.toLowerCase()))
-    if (matched && !seenTags.has(rule.label)) {
-      results.push({ tag: rule.label, source: 'description', confidence: 0.80 })
-      seenTags.add(rule.label)
-    }
-  }
-
-  return results
-}
-
-/**
- * 安全解析 JSON，失败返回 null
- */
-function safeJsonParse(text: string): any {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
 }

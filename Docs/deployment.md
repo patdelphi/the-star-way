@@ -1,5 +1,9 @@
 # the-star-way 部署与运行规划
 
+> 双架构说明：本项目支持两种部署形态
+> - **本地 / VPS 架构**：Node.js + better-sqlite3，本文档覆盖
+> - **Cloudflare 架构**：Workers + D1 + Pages，详见 [cloudflare-deployment.md](./cloudflare-deployment.md)
+
 ## 1. 首版运行方式
 
 项目开发环境固定使用 Node.js `24.15.0`，并统一通过 `corepack pnpm` 执行依赖安装、测试、构建和 native rebuild。

@@ -1,0 +1,159 @@
+# Cloudflare 自动部署工作流
+# the-star-way 项目双架构自动发布
+#
+# 触发条件：
+# - 推送到 main 分支且修改了 cloudflare/、shared/、frontend/ 任一目录
+# - 手动在 Actions 页面触发
+#
+# 必需的 GitHub Secrets：
+# - CLOUDFLARE_API_TOKEN: Cloudflare API Token（Workers + Pages + D1 权限）
+# - CLOUDFLARE_ACCOUNT_ID: Cloudflare Account ID
+# - D1_DATABASE_ID: D1 数据库 ID
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/**'
+      - 'shared/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+
+jobs:
+  # ===== 阶段 1：测试 =====
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Cache pnpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            cloudflare/worker/node_modules
+            frontend/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      # Worker 测试
+      - name: Install Worker Dependencies
+        working-directory: cloudflare/worker
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Worker Type Check
+        working-directory: cloudflare/worker
+        run: npx tsc --noEmit
+
+      - name: Worker Tests
+        working-directory: cloudflare/worker
+        run: npx vitest run
+
+      # 前端构建验证
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Frontend Type Check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Frontend Build
+        working-directory: frontend
+        run: pnpm build
+        env:
+          VITE_API_BASE: ${{ vars.WORKER_API_URL || '' }}
+
+  # ===== 阶段 2：部署 Worker =====
+  deploy-worker:
+    name: Deploy Worker API
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+
+      - name: Install Worker Dependencies
+        working-directory: cloudflare/worker
+        run: |
+          corepack enable
+          pnpm install --no-frozen-lockfile
+
+      - name: Update D1 Database ID
+        working-directory: cloudflare/worker
+        run: |
+          sed -i "s/REPLACE_WITH_REAL_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
+          echo "已替换 database_id"
+
+      - name: Deploy Worker
+        working-directory: cloudflare/worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Output Worker URL
+        working-directory: cloudflare/worker
+        run: |
+          echo "::notice::Worker 已部署"
+          echo "Worker URL 可在 Cloudflare Dashboard 查看"
+
+  # ===== 阶段 3：部署 Pages =====
+  deploy-pages:
+    name: Deploy Frontend Pages
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: |
+          corepack enable
+          pnpm install --no-frozen-lockfile
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: pnpm build
+        env:
+          # Worker URL 可通过 GitHub Variable 或硬编码配置
+          VITE_API_BASE: ${{ vars.WORKER_API_URL || '' }}
+
+      - name: Deploy to Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: pages deploy dist --project-name=the-star-way-frontend
+
+      - name: Output Pages URL
+        run: |
+          echo "::notice::前端已部署到 Cloudflare Pages"
+          echo "Pages URL: https://the-star-way-frontend.pages.dev"

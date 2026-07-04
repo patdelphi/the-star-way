@@ -1,4 +1,4 @@
-﻿# the-star-way 双架构 Cloudflare 改造方案
+# the-star-way 双架构 Cloudflare 改造方案
 
 ## 1. 目标
 
@@ -277,18 +277,32 @@ VITE_API_BASE=https://api.example.workers.dev
 - 本地后端和前端幂等校验通过。
 - Wrangler 版本与登录状态在执行 Cloudflare 实施前完成只读确认。
 
-### 阶段 1：边界整理
+### 阶段 1：边界整理 ✓ (2026-07-04 完成)
 
 - 抽出共享类型：用户、仓库、标签、同步结果、统计结果、错误响应。
 - 梳理当前 API 返回结构，形成 `shared/api-contracts`。
 - 把分类规则和标签 label 从后端 Node 依赖中剥离为纯函数。
 - 将 Sleep Stars、Hidden Gems 等阈值口径抽成共享模块。
 
+实施结果：
+
+- 新建 `shared/` 目录，包含 `api-contracts/`、`classification/`、`scoring/` 三个子模块。
+- `shared/api-contracts/` 导出所有跨端共用的类型（user/repo/star/stats/tag/sync/cache/error）。
+- `shared/scoring/thresholds.ts` 导出阈值常量、`ThresholdOptions` 接口、`resolveThresholds` 纯函数和校验函数。
+- `shared/classification/` 导出标签字典、双语映射表和 `classifyRepo` 纯函数。
+- backend 的 `db/types.ts`、`repository/repo-queries.ts`、`classification/` 改为从 shared re-export，行为零变更。
+- backend tsconfig.json 和 vitest.config.ts 配置 `@shared` alias 解析 shared 目录。
+- frontend vite.config.ts 和 tsconfig.app.json 配置 `@shared` alias（前端类型保留本地定义，因与 shared 结构有差异，后续 Worker 接入时统一）。
+- 新增 `shared/__tests__/threshold.test.ts`（16 测试）和 `shared/__tests__/classifier.test.ts`（10 测试）。
+- 修复 `classifyRepo` 在无效 topicsJson 时的空指针问题（safeJsonParse 返回 null 时改为空数组）。
+
 验收标准：
 
-- 本地 API 返回结构不变。
-- 前端无需感知本地后端或 Worker 差异。
-- 分类和标签逻辑可在 Node 与 Worker 中共用。
+- ✓ 本地 API 返回结构不变（backend 132/132 测试通过）。
+- ✓ 前端无需感知本地后端或 Worker 差异（tsc + build 通过）。
+- ✓ 分类和标签逻辑可在 Node 与 Worker 中共用（shared/ 无 Node 依赖）。
+- ✓ shared/ 不依赖 better-sqlite3、node:http（纯类型和纯函数）。
+- ✓ 总测试 158/158 通过（132 backend + 26 shared）。
 
 ### 阶段 2：D1 Schema 与数据访问
 

@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const srcPath = new URL("./src", import.meta.url).pathname.replace(/^\/([A-Za-z]:\/)/, "$1")
+// shared 层路径（跨端共用的类型和纯逻辑）
+const sharedPath = new URL("../shared", import.meta.url).pathname.replace(/^\/([A-Za-z]:\/)/, "$1")
 
 // 从 .runtime/port.json 读取后端实际端口（后端端口占用时自动递增）
 function getBackendPort(): number {
@@ -23,6 +25,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": srcPath,
+      "@shared": sharedPath,
     },
   },
   server: {
