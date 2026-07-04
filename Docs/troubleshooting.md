@@ -32,7 +32,7 @@ NODE_MODULE_VERSION 127. This version of Node.js requires NODE_MODULE_VERSION 13
 
 ### 当前修复
 
-`start-project.ps1` 已做以下处理：
+`start.ps1` 已做以下处理：
 
 - 固定要求 Node.js `v24.15.0`，版本不一致时直接终止启动。
 - 固定解析系统 `node.exe` 路径。
@@ -93,7 +93,7 @@ node -e "const Database = require('better-sqlite3'); new Database(':memory:').cl
 
 ```powershell
 cd "C:\Users\patde\Documents\GitHub\the-star-way"
-.\start-project.ps1
+.\start.ps1
 ```
 
 如果启动成功，应看到后端和前端 URL。

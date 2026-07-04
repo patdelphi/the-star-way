@@ -39,7 +39,7 @@ import {
   RefreshCw,
   GraduationCap,
 } from "lucide-react"
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend, Brush } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
 import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline, deleteUser } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
@@ -246,6 +246,28 @@ function normalizeGitHubLogin(input: string): string {
 function TrendBars({ data, labels }: { data: { label: string; value: number }[]; labels: { total: string; peakMonth: string; peakValue: string } }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const peak = data.reduce((best, item) => item.value > best.value ? item : best, data[0])
+  // 可见窗口大小（月数），初始全量显示，支持 +/- 按钮缩放，范围 6 到 data.length，步长 6
+  const [windowSize, setWindowSize] = useState(data.length)
+  const [startIdx, setStartIdx] = useState(0)
+  const endIdx = Math.min(data.length - 1, startIdx + windowSize - 1)
+
+  // 数据切换时重置为全量显示
+  useEffect(() => {
+    setWindowSize(data.length)
+    setStartIdx(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
+  const zoomOut = () => {
+    const ws = Math.min(data.length, windowSize + 6)
+    setWindowSize(ws)
+    setStartIdx(Math.max(0, data.length - ws))
+  }
+  const zoomIn = () => {
+    const ws = Math.max(6, windowSize - 6)
+    setWindowSize(ws)
+    setStartIdx(Math.max(0, data.length - ws))
+  }
 
   // X 轴智能显示：第一个月或跨年时显示完整 YYYY-MM，同年其他月份只显示 MM，避免横向拥挤
   const formatTick = (value: unknown) => {
@@ -272,6 +294,23 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
           <div className="text-sm font-medium text-on-surface">{labels.peakValue}</div>
         </div>
       </div>
+      <div className="flex justify-end gap-1">
+        <button
+          type="button"
+          onClick={zoomIn}
+          disabled={windowSize <= 6}
+          className="rounded border border-outline-variant px-2 text-sm text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
+          title="缩小时间范围"
+        >−</button>
+        <span className="px-2 text-xs text-muted-foreground leading-6">{windowSize}m</span>
+        <button
+          type="button"
+          onClick={zoomOut}
+          disabled={windowSize >= data.length}
+          className="rounded border border-outline-variant px-2 text-sm text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
+          title="放大时间范围"
+        >+</button>
+      </div>
       <ResponsiveContainer width="100%" height={180}>
         <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -279,6 +318,24 @@ function TrendBars({ data, labels }: { data: { label: string; value: number }[];
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip content={<ThemedChartTooltip />} />
           <Area type="monotone" dataKey="value" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} strokeWidth={2} />
+          {data.length > 6 && (
+            <Brush
+              dataKey="label"
+              height={20}
+              stroke="var(--color-primary)"
+              fill="var(--color-surface-container)"
+              travellerWidth={8}
+              startIndex={startIdx}
+              endIndex={endIdx}
+              tickFormatter={formatTick}
+              onChange={(e: { startIndex?: number; endIndex?: number }) => {
+                if (typeof e?.startIndex === 'number' && typeof e?.endIndex === 'number') {
+                  setStartIdx(e.startIndex)
+                  setWindowSize(Math.max(1, e.endIndex - e.startIndex + 1))
+                }
+              }}
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>

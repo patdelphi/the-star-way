@@ -1,4 +1,4 @@
-﻿# the-star-way 部署与运行规划
+# the-star-way 部署与运行规划
 
 ## 1. 首版运行方式
 
@@ -8,7 +8,13 @@
 
 ```powershell
 cd "C:\Users\patde\Documents\GitHub\the-star-way"
-.\start-project.ps1
+.\start.ps1
+```
+
+Linux/macOS：
+
+```bash
+./start.sh
 ```
 
 手动启动：
