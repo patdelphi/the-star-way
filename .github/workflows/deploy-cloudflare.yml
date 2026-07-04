@@ -98,12 +98,6 @@ jobs:
           corepack enable
           pnpm install --no-frozen-lockfile
 
-      - name: Update D1 Database ID
-        working-directory: cloudflare/worker
-        run: |
-          sed -i "s/REPLACE_WITH_REAL_DATABASE_ID/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
-          echo "已替换 database_id"
-
       - name: Deploy Worker
         working-directory: cloudflare/worker
         env:
@@ -151,9 +145,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: frontend
-          command: pages deploy dist --project-name=the-star-way-frontend
+          command: pages deploy dist --project-name=the-star-way --branch=main
 
       - name: Output Pages URL
         run: |
           echo "::notice::前端已部署到 Cloudflare Pages"
-          echo "Pages URL: https://the-star-way-frontend.pages.dev"
+          echo "Pages URL: https://the-star-way.pages.dev"
