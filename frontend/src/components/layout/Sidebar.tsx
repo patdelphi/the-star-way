@@ -9,7 +9,6 @@ import {
   Compass,
   LineChart,
   Settings,
-  FileText,
   Terminal,
   Menu,
   Star,
@@ -53,9 +52,9 @@ const navGroups = [
   },
 ]
 
+// 底部外链：仅保留 GitHub 项目链接（新窗口打开）
 const footerLinks = [
-  { path: "#", icon: FileText, labelKey: "nav.helpDocs" },
-  { path: "#", icon: Terminal, labelKey: "nav.github" },
+  { url: "https://github.com/patdelphi/the-star-way", icon: Terminal, labelKey: "nav.github" },
 ]
 
 function SidebarContent() {
@@ -117,16 +116,18 @@ function SidebarContent() {
           {footerLinks.map((item) => {
             const Icon = item.icon
             return (
-              <Link
+              <a
                 key={item.labelKey}
-                to={item.path}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant font-medium hover:bg-surface-container hover:text-primary transition-colors duration-200"
               >
                 <Icon className="w-4 h-4" />
                 <span className="font-sans text-sm tracking-wider">
                   {t(item.labelKey)}
                 </span>
-              </Link>
+              </a>
             )
           })}
         </div>
