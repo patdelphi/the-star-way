@@ -408,6 +408,9 @@ export default function Developers() {
   // 请求序号用于防止切换开发者/语言时旧响应覆盖当前页面
   const dnaRequestSeq = useRef(0)
   const pathRequestSeq = useRef(0)
+  // 同步进行中标记：防止 useEffect [activeDevName] 在同步后清空 DNA/学习路径
+  // 同步完成后由 runSync 显式用 force=true 重新加载
+  const isSyncingRef = useRef(false)
 
   // 获取同步状态显示文本
   const getSyncStatusText = (status: string) => {
@@ -656,13 +659,16 @@ export default function Developers() {
   const activeDevName = activeDev?.name
   useEffect(() => {
     if (activeDevName) {
-      // 切换开发者时清空旧数据（上一个开发者的内容）
-      setStarDna(null)
-      setLearningPath(null)
-      setDnaError("")
-      setPathError("")
-      setDnaLoading(false)
-      setPathLoading(false)
+      // 同步进行中不清空数据（由 runSync 用 force=true 重新加载）
+      if (!isSyncingRef.current) {
+        // 切换开发者时清空旧数据（上一个开发者的内容）
+        setStarDna(null)
+        setLearningPath(null)
+        setDnaError("")
+        setPathError("")
+        setDnaLoading(false)
+        setPathLoading(false)
+      }
       loadSyncRuns(activeDevName)
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
@@ -701,6 +707,8 @@ export default function Developers() {
     setSyncStatus("syncing")
     setSyncError("")
     setSyncMessage("")
+    // 标记同步进行中：防止 refreshDevelopers 触发 useEffect 清空 DNA/学习路径
+    isSyncingRef.current = true
     try {
       const token = getGitHubToken()
       const result = await syncStars(name, token || undefined)
@@ -708,11 +716,15 @@ export default function Developers() {
         const syncedName = result.username || name
         setSyncStatus(token ? "successToken" : "successAnon")
         setSyncMessage(t("developers.starUpdated", { name: syncedName }))
-        await loadSyncRuns(syncedName)
-        await loadStarDna(syncedName)
-        await loadLearningPath(syncedName)
-        // 同步成功后刷新开发者列表，更新星标数
+        // 先刷新开发者列表，更新星标数（触发 useEffect [activeDevName]，但因 isSyncingRef=true 不会清空数据）
         await refreshDevelopers()
+        // 同步历史
+        await loadSyncRuns(syncedName)
+        // 强制重新生成 DNA 和学习路径（force=true，显示 loading）
+        // 不同步中标记已关闭，确保 loadStarDna 的 setDnaLoading 能正常显示
+        isSyncingRef.current = false
+        await loadStarDna(syncedName, true)
+        await loadLearningPath(syncedName, true)
         // 刷新统计和标签
         getStats(syncedName).then(setDeveloperStats).catch(() => setDeveloperStats(null))
         getTags(syncedName).then((tags) => setDeveloperTags(Array.isArray(tags) ? tags : [])).catch(() => setDeveloperTags([]))
@@ -725,6 +737,8 @@ export default function Developers() {
       setSyncMessage("")
       const message = err instanceof Error ? err.message : ""
       setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
+    } finally {
+      isSyncingRef.current = false
     }
   }
 

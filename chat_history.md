@@ -396,3 +396,39 @@ useEffect 依赖从 [t, currentLogin] 改为 [t]，避免 currentLogin 变化触
 ### 验证
 - tsc --noEmit: 通过
 - npm run build: 成功
+
+## 2026-07-04 修复同步后星标数未更新和 DNA/学习路径未自动执行
+
+### 问题
+1. 添加新开发者成功后，列表中星标数仍为 0，需刷新页面才更新
+2. Star DNA 画像和学习路径推荐未在星标同步后自动生成
+
+### 根因
+**问题1（星标数未更新）**：
+- runSync 里 loadStarDna/loadLearningPath 在 refreshDevelopers 之前调用
+- useEffect [activeDevName] 在 refreshDevelopers 后重新触发，但会先 setStarDna(null) 清空数据
+- 形成竞态：runSync 的加载结果被 useEffect 的清空覆盖
+
+**问题2（DNA/学习路径未自动执行）**：
+- runSync 里 loadStarDna(syncedName, false) 用 force=false
+- 对于新用户首次同步，useEffect [activeDevName] 先触发 loadStarDna(name)（用户不存在，失败）
+- runSync 的 loadStarDna 被竞态覆盖（requestSeq 机制）
+
+### 修复
+1. 新增 isSyncingRef 标记同步进行中
+2. useEffect [activeDevName] 在 isSyncingRef=true 时不清空数据
+3. runSync 调整顺序：
+   - 先 refreshDevelopers（更新星标数）
+   - 再 loadSyncRuns
+   - 然后用 force=true 调用 loadStarDna 和 loadLearningPath（强制重新生成）
+4. finally 块重置 isSyncingRef
+
+### 改动文件
+- frontend/src/pages/Developers.tsx:
+  - 新增 isSyncingRef
+  - useEffect [activeDevName] 加 isSyncingRef 判断
+  - runSync 重排序 + force=true
+
+### 验证
+- tsc --noEmit: 通过
+- npm run build: 成功
