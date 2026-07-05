@@ -25,6 +25,7 @@ import {
   type ThresholdOptions,
 } from '@shared/scoring/thresholds.js'
 import { classifyRepo } from '@shared/classification/classifier.js'
+import { USER_AI_CACHE_KEYS, getUserAiCacheKey } from '@shared/ai/index.js'
 
 /**
  * 系统演示用户 login，与 backend 一致
@@ -867,6 +868,38 @@ export class D1StarRepository {
   }
 
   /**
+   * 更新 sync_runs 为部分完成状态。
+   * 用于 Worker 达到分页上限时，明确告诉前端和 AI 层数据不完整。
+   */
+  async updateSyncRunPartial(
+    id: number,
+    endedAt: string,
+    reposUpserted: number,
+    starsUpserted: number,
+    pagesFetched: number,
+    rateLimitRemaining: number | null,
+    rateLimitReset: string | null,
+    warning: string,
+  ): Promise<void> {
+    await this.db
+      .prepare(`
+        UPDATE sync_runs SET
+          status = 'partial',
+          ended_at = ?,
+          repos_upserted = ?,
+          stars_upserted = ?,
+          repos_removed = 0,
+          pages_fetched = ?,
+          rate_limit_remaining = ?,
+          rate_limit_reset = ?,
+          error_message = ?
+        WHERE id = ?
+      `)
+      .bind(endedAt, reposUpserted, starsUpserted, pagesFetched, rateLimitRemaining, rateLimitReset, warning, id)
+      .run()
+  }
+
+  /**
    * 更新 sync_runs 为失败状态
    */
   async updateSyncRunFailure(id: number, endedAt: string, errorMessage: string): Promise<void> {
@@ -970,8 +1003,11 @@ export class D1StarRepository {
       )
     }
 
-    // D1 batch 原子执行
-    await this.db.batch(stmts)
+    // D1 batch 原子执行；分块降低 Worker/D1 单次批量语句压力。
+    const chunkSize = 100
+    for (let i = 0; i < stmts.length; i += chunkSize) {
+      await this.db.batch(stmts.slice(i, i + chunkSize))
+    }
 
     return { reposUpserted: repos.length, starsUpserted: repos.length }
   }
@@ -1011,6 +1047,38 @@ export class D1StarRepository {
 
     await this.db.batch(stmts)
     return toRemove.length
+  }
+
+  /**
+   * 读取用户最新一次同步状态，用于阻止基于不完整数据生成 AI 缓存。
+   */
+  async getLatestSyncRun(userLogin: string): Promise<{ status: string; error_message: string | null } | null> {
+    const result = await this.db
+      .prepare(`
+        SELECT status, error_message
+        FROM sync_runs
+        WHERE user_login = ?
+        ORDER BY started_at DESC, id DESC
+        LIMIT 1
+      `)
+      .bind(userLogin)
+      .first<{ status: string; error_message: string | null }>()
+    return result ?? null
+  }
+
+  /**
+   * 清理用户级 AI 缓存。
+   * 同步数据变化后旧画像/学习路径可能不再准确，必须重新生成。
+   */
+  async clearUserAiCache(login: string): Promise<void> {
+    await this.db
+      .prepare(`
+        DELETE FROM translations
+        WHERE repo_full_name = ?
+          AND target_lang IN (${USER_AI_CACHE_KEYS.map(() => '?').join(', ')})
+      `)
+      .bind(getUserAiCacheKey(login), ...USER_AI_CACHE_KEYS)
+      .run()
   }
 
   // ===== AI 缓存读写（translations 表）=====
@@ -1079,7 +1147,7 @@ export class D1StarRepository {
     enText: string,
     now: string,
   ): Promise<void> {
-    const userKey = `user:${login}`
+    const userKey = getUserAiCacheKey(login)
     const stmts: D1PreparedStatement[] = [
       this.db
         .prepare(

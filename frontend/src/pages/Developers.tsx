@@ -791,38 +791,52 @@ export default function Developers() {
       const result = await syncStars(name, token || undefined)
       if (result !== null) {
         const syncedName = result.username || name
+        const syncComplete = result.complete !== false
         if (isCurrentDeveloperRequest(syncedName, 0)) {
-          setSyncStatus(token ? "successToken" : "successAnon")
-          setSyncMessage(t("developers.starUpdated", { name: syncedName }))
+          if (syncComplete) {
+            setSyncStatus(token ? "successToken" : "successAnon")
+            setSyncMessage(t("developers.starUpdated", { name: syncedName }))
+          } else {
+            setSyncStatus("partial")
+            setSyncMessage(result.warning || t("developers.syncPartialMessage"))
+            setDnaError(t("developers.syncPartialAiBlocked"))
+            setPathError(t("developers.syncPartialAiBlocked"))
+          }
         }
         // 先刷新开发者列表，更新星标数（isSyncingRef=true 时 useEffect 不会清空数据）
         if (isMountedRef.current) {
           await refreshDevelopers(currentLoginRef.current === syncedName ? syncedName : currentLoginRef.current)
         }
-        // 强制重新生成 DNA 和学习路径。若用户已切走，仅触发后端缓存写入，不写当前页面 UI。
-        try {
-          if (isCurrentDeveloperRequest(syncedName, 0)) {
-            await loadSyncRuns(syncedName)
-            await loadStarDna(syncedName, true)
-          } else {
-            await getStarDna(syncedName, true)
-          }
-        } catch (err) {
-          if (isCurrentDeveloperRequest(syncedName, 0)) {
-            setDnaError(err instanceof Error ? err.message : t("developers.dnaEmpty"))
-          }
+        if (isCurrentDeveloperRequest(syncedName, 0)) {
+          await loadSyncRuns(syncedName)
         }
-        try {
-          if (isCurrentDeveloperRequest(syncedName, 0)) {
-            await loadLearningPath(syncedName, true)
-            loadDeveloperDetails(syncedName)
-          } else {
-            await getLearningPath(syncedName, true)
+        if (syncComplete) {
+          // 强制重新生成 DNA 和学习路径。若用户已切走，仅触发后端缓存写入，不写当前页面 UI。
+          try {
+            if (isCurrentDeveloperRequest(syncedName, 0)) {
+              await loadStarDna(syncedName, true)
+            } else {
+              await getStarDna(syncedName, true)
+            }
+          } catch (err) {
+            if (isCurrentDeveloperRequest(syncedName, 0)) {
+              setDnaError(err instanceof Error ? err.message : t("developers.dnaEmpty"))
+            }
           }
-        } catch (err) {
-          if (isCurrentDeveloperRequest(syncedName, 0)) {
-            setPathError(err instanceof Error ? err.message : t("developers.pathEmpty"))
+          try {
+            if (isCurrentDeveloperRequest(syncedName, 0)) {
+              await loadLearningPath(syncedName, true)
+              loadDeveloperDetails(syncedName)
+            } else {
+              await getLearningPath(syncedName, true)
+            }
+          } catch (err) {
+            if (isCurrentDeveloperRequest(syncedName, 0)) {
+              setPathError(err instanceof Error ? err.message : t("developers.pathEmpty"))
+            }
           }
+        } else if (isCurrentDeveloperRequest(syncedName, 0)) {
+          loadDeveloperDetails(syncedName)
         }
       } else {
         if (isCurrentDeveloperRequest(name, 0)) {

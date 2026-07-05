@@ -4,7 +4,7 @@
  *
  * 与 backend/src/sync/github-client.ts 的差异：
  * - 使用 Worker 原生 fetch，不引入 node:http
- * - 分页上限 10 页（1000 条），与 todo.md 决策一致，避免 Worker CPU 超时
+ * - 分页上限 20 页（2000 条），避免 Worker CPU 超时；超过上限返回 partial 语义
  * - 错误类型沿用 backend 的 GitHubSyncError，保持业务语义一致
  *
  * 安全考虑：
@@ -64,7 +64,7 @@ export interface GitHubClientConfig {
   token?: string
   baseUrl?: string // 用于测试 mock
   userAgent?: string
-  // 可选：最大页数（默认 10 页 = 1000 条），防止 Worker CPU 超时
+  // 可选：最大页数（默认 20 页 = 2000 条），防止 Worker CPU 超时
   maxPages?: number
 }
 
@@ -81,8 +81,8 @@ export class GitHubClient {
     this.token = config.token
     this.baseUrl = config.baseUrl ?? 'https://api.github.com'
     this.userAgent = config.userAgent ?? 'the-star-way-worker/1.0.0'
-    // MVP 决策：最多 10 页 = 1000 条，避免 Worker 单次请求 CPU 超时
-    this.maxPages = config.maxPages ?? 10
+    // Worker 单次请求需要有上限；超过上限时由同步流程标记为 partial。
+    this.maxPages = config.maxPages ?? 20
   }
 
   /**
@@ -94,7 +94,7 @@ export class GitHubClient {
   async listStarredRepos(
     username: string,
     onPage?: (page: number, repos: GitHubStarredRepo[]) => void,
-  ): Promise<{ repos: GitHubStarredRepo[]; rateLimit: RateLimitInfo | null; totalPages: number }> {
+  ): Promise<{ repos: GitHubStarredRepo[]; rateLimit: RateLimitInfo | null; totalPages: number; complete: boolean; warning?: string }> {
     const allRepos: GitHubStarredRepo[] = []
     let page = 1
     let rateLimit: RateLimitInfo | null = null
@@ -118,17 +118,21 @@ export class GitHubClient {
       onPage?.(page, data)
 
       // 如果返回数量小于 perPage，说明已经是最后一页
-      if (data.length < perPage) break
+      if (data.length < perPage) {
+        return { repos: allRepos, rateLimit, totalPages: page, complete: true }
+      }
 
       page++
     }
 
-    // 达到页数上限时记录警告（不抛错，与 Node 版本语义保持一致）
-    if (page > this.maxPages && allRepos.length >= this.maxPages * perPage) {
-      console.warn(`用户 ${username} 星标仓库达到 Worker 同步上限 ${this.maxPages * perPage} 条，需在 Node 后端继续同步`)
+    // 达到页数上限时不再声明成功，避免 AI 使用不完整数据生成画像。
+    if (allRepos.length >= this.maxPages * perPage) {
+      const warning = `用户 ${username} 星标仓库达到 Worker 同步上限 ${this.maxPages * perPage} 条，本次只同步前 ${this.maxPages} 页`
+      console.warn(warning)
+      return { repos: allRepos, rateLimit, totalPages: this.maxPages, complete: false, warning }
     }
 
-    return { repos: allRepos, rateLimit, totalPages: Math.min(page, this.maxPages) }
+    return { repos: allRepos, rateLimit, totalPages: Math.min(page, this.maxPages), complete: true }
   }
 
   /**

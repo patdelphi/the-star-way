@@ -533,6 +533,23 @@ describe('AI 接口', () => {
     expect(body.data.cached).toBe(true)
   })
 
+  it('GET /api/users/:login/star-dna 最新同步为 partial 时拒绝生成新画像', async () => {
+    const now = new Date(Date.now() + 1000).toISOString()
+    await env.DB.prepare(`
+      INSERT INTO sync_runs (user_login, started_at, status, ended_at, repos_upserted, stars_upserted, repos_removed, pages_fetched, error_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind('testuser', now, 'partial', now, 2000, 2000, 0, 20, '达到 Worker 同步上限').run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna?force=1'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error.code).toBe('SYNC_INCOMPLETE')
+  })
+
   it('GET /api/users/:login/star-dna 用户不存在时返回 404', async () => {
     const res = await handleRequest(
       makeRequest('GET', '/api/users/nonexistent-user/star-dna'),
@@ -571,6 +588,23 @@ describe('AI 接口', () => {
     const body = await res.json()
     expect(body.data.path).toBe('缓存的学习路径')
     expect(body.data.cached).toBe(true)
+  })
+
+  it('GET /api/users/:login/learning-path 最新同步为 partial 时拒绝生成新路径', async () => {
+    const now = new Date(Date.now() + 1000).toISOString()
+    await env.DB.prepare(`
+      INSERT INTO sync_runs (user_login, started_at, status, ended_at, repos_upserted, stars_upserted, repos_removed, pages_fetched, error_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind('testuser', now, 'partial', now, 2000, 2000, 0, 20, '达到 Worker 同步上限').run()
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/learning-path?force=1'),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error.code).toBe('SYNC_INCOMPLETE')
   })
 
   it('GET /api/users/:login/learning-path lang=en 时返回英文缓存', async () => {

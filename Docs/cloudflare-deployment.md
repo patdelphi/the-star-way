@@ -1,4 +1,4 @@
-# Cloudflare 部署指南
+﻿# Cloudflare 部署指南
 
 本文档描述 the-star-way 项目的 Cloudflare 双架构部署流程，包括 Worker API、D1 数据库和前端 Pages 的发布。
 
@@ -15,7 +15,7 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Worker API（Cloudflare Workers）                          │
 │  - 路由、CORS、错误处理                                    │
-│  - GitHub 同步（最多 10 页 = 1000 条）                     │
+│  - GitHub 同步（默认最多 20 页 = 2000 条）                  │
 │  - MVP 只读查询 + 轻量同步                                 │
 └────────────────────────┬─────────────────────────────────┘
                          │ 绑定
@@ -30,7 +30,7 @@
 ## 2. 前置条件
 
 - Cloudflare 账号（免费版即可，D1 免费额度：5GB 存储 + 500 万次/天读 + 10 万次/天写）
-- 已安装 Wrangler CLI（项目内已集成，可直接 `npx wrangler`）
+- 本机已安装 Wrangler CLI 并完成 Cloudflare 授权；项目内也可通过 `npx wrangler` 使用本地依赖版本
 - GitHub 仓库写权限（用于 CI/CD 自动部署）
 
 ## 3. 一次性初始化
@@ -91,6 +91,15 @@ GitHub Token 必须通过 secret 注入，不要写入代码或 wrangler.toml：
 ```bash
 npx wrangler secret put STARWAY_GITHUB_TOKEN
 ```
+
+可选：调整 Worker 单次同步页数上限（默认 20 页，每页 100 条 starred repos）：
+
+```toml
+[vars]
+STARWAY_GITHUB_MAX_PAGES = "20"
+```
+
+达到上限时 `/api/sync` 返回 `complete: false`，`sync_runs.status` 写入 `partial`，并暂停 Star DNA / 学习路径的新生成，避免基于不完整数据缓存错误画像。
 
 按提示粘贴 GitHub Personal Access Token（建议 fine-grained token，仅需 `read:user` 和 `public_repo` 权限）。
 

@@ -36,6 +36,11 @@ import {
 import { classifyRepo } from '@shared/classification/classifier.js'
 import { getTagLabel } from '@shared/classification/tag-labels-bilingual.js'
 import type { ThresholdOptions } from '@shared/scoring/thresholds.js'
+import {
+  canGenerateUserAiFromSyncStatus,
+  getIncompleteSyncMessage,
+  type SyncStatus,
+} from '@shared/sync/index.js'
 
 // ===== 工具函数 =====
 
@@ -161,6 +166,24 @@ function parseThresholdOptions(query: Record<string, string>): ThresholdOptions 
   }
 
   return hasAny ? opts : undefined
+}
+
+/**
+ * AI 画像/学习路径依赖完整星标数据。
+ * 最新同步仍在运行、失败或 partial 时，禁止生成新的用户级 AI 缓存。
+ */
+async function assertUserAiDataReady(repo: D1StarRepository, login: string): Promise<void> {
+  const latestRun = await repo.getLatestSyncRun(login)
+  if (!latestRun) return
+
+  const status = latestRun.status as SyncStatus
+  if (!canGenerateUserAiFromSyncStatus(status)) {
+    throw new WorkerApiError(
+      getIncompleteSyncMessage(login, status, latestRun.error_message),
+      'SYNC_INCOMPLETE',
+      409,
+    )
+  }
 }
 
 /**
@@ -574,6 +597,9 @@ export async function handleRequest(
       }
 
       // 3. 检查 AI 是否启用
+      await assertUserAiDataReady(repo, login)
+
+      // 4. 检查 AI 是否启用
       if (!aiEnabled) {
         throw new WorkerApiError(
           'Star DNA 功能未启用，请配置 AI 相关环境变量',
@@ -582,7 +608,7 @@ export async function handleRequest(
         )
       }
 
-      // 4. 校验星标数 > 0
+      // 5. 校验星标数 > 0
       const starCount = await repo.getUserStarCount(login)
       if (starCount === 0) {
         throw new WorkerApiError(
@@ -592,13 +618,13 @@ export async function handleRequest(
         )
       }
 
-      // 5. 收集统计
+      // 6. 收集统计
       const languages = await repo.getUserTopLanguages(login, 5)
       const tags = await repo.getUserTopTags(login, 8)
       const activeRepoCount = await repo.queryActiveRepoCount(login)
       const topRepos = await repo.getUserTopRepos(login, 5)
 
-      // 6. 生成中文画像
+      // 7. 生成中文画像
       let dnaZh: string
       try {
         dnaZh = await generateStarDna(
@@ -625,7 +651,7 @@ export async function handleRequest(
         )
       }
 
-      // 7. 翻译英文（失败不阻塞）
+      // 8. 翻译英文（失败不阻塞）
       const now = new Date().toISOString()
       let dnaEn = ''
       try {
@@ -634,10 +660,10 @@ export async function handleRequest(
         // 翻译失败不阻塞
       }
 
-      // 8. 缓存中英文（事务写入）
+      // 9. 缓存中英文（事务写入）
       await repo.cacheUserAiTextPair(login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
 
-      // 9. 返回请求语言版本
+      // 10. 返回请求语言版本
       const result = lang === 'en' ? (dnaEn || dnaZh) : dnaZh
       return dataResponse({ dna: result, cached: false })
     }
@@ -666,7 +692,10 @@ export async function handleRequest(
         }
       }
 
-      // 3. 检查 AI 是否启用
+      // 3. 校验最新同步是否完整
+      await assertUserAiDataReady(repo, login)
+
+      // 4. 检查 AI 是否启用
       if (!aiEnabled) {
         throw new WorkerApiError(
           '学习路径功能未启用，请配置 AI 相关环境变量',
@@ -675,7 +704,7 @@ export async function handleRequest(
         )
       }
 
-      // 4. 校验星标数 > 0
+      // 5. 校验星标数 > 0
       const starCount = await repo.getUserStarCount(login)
       if (starCount === 0) {
         throw new WorkerApiError(
@@ -685,12 +714,12 @@ export async function handleRequest(
         )
       }
 
-      // 5. 收集统计（学习路径用更多标签和仓库）
+      // 6. 收集统计（学习路径用更多标签和仓库）
       const languages = await repo.getUserTopLanguages(login, 5)
       const tags = await repo.getUserTopTags(login, 10)
       const topRepos = await repo.getUserTopRepos(login, 8)
 
-      // 6. 生成中文学习路径
+      // 7. 生成中文学习路径
       let pathZh: string
       try {
         pathZh = await generateLearningPath(
@@ -716,7 +745,7 @@ export async function handleRequest(
         )
       }
 
-      // 7. 翻译英文（失败不阻塞）
+      // 8. 翻译英文（失败不阻塞）
       const now = new Date().toISOString()
       let pathEn = ''
       try {
@@ -725,10 +754,10 @@ export async function handleRequest(
         // 翻译失败不阻塞
       }
 
-      // 8. 缓存中英文（事务写入）
+      // 9. 缓存中英文（事务写入）
       await repo.cacheUserAiTextPair(login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
 
-      // 9. 返回请求语言版本
+      // 10. 返回请求语言版本
       const result = lang === 'en' ? (pathEn || pathZh) : pathZh
       return dataResponse({ path: result, cached: false })
     }

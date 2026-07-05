@@ -51,6 +51,7 @@
       "pending": "Pending",
       "syncing": "Syncing",
       "success": "Sync Success",
+      "partial": "Partial Sync",
       "rateLimit": "GitHub API Rate Limited",
       "notFound": "User Not Found",
       "networkFail": "Network Failed"
@@ -70,6 +71,8 @@
     "syncSuccessToken": "Sync success (with Token)",
     "syncSuccessAnon": "Sync success (anonymous)",
     "syncUnknownError": "Sync failed. Please check GitHub rate limit, username, or network status.",
+    "syncPartialMessage": "Only partial data was synced. AI content is paused.",
+    "syncPartialAiBlocked": "Starred repo data is not fully synced yet. AI content is paused.",
     "starUpdated": "{{name}} stars updated",
     "simulateNotice": "Simulating 401/404/rate-limit/network-fail states, not calling GitHub API.",
     "radarCenter": "Tech Stack",

@@ -1,4 +1,4 @@
-# the-star-way 双架构 Cloudflare 改造方案
+﻿# the-star-way 双架构 Cloudflare 改造方案
 
 ## 1. 目标
 
@@ -15,7 +15,7 @@
 
 ## 2. 当前最新状态
 
-截至 2026-07-04，项目当前状态如下：
+截至 2026-07-05，项目当前状态如下：
 
 - 前端是 `frontend` 下的 React 19 + Vite + TypeScript 应用，API 地址由 `VITE_API_BASE` 控制；未配置时默认同源请求。
 - 后端是 `backend` 下的 Node.js + TypeScript 服务，使用 `node:http`、`IncomingMessage`、`ServerResponse`。
@@ -23,9 +23,11 @@
 - `.nvmrc` 与 `.node-version` 固定为 `24.15.0`；README 要求 Node.js `v24.15.0`。但 `backend/package.json` 与 `frontend/package.json` 的 `engines.node` 当前仍是 `>=24.14.0 <25`，后续应统一。
 - 包管理器声明为 `pnpm@11.7.0`，项目文档要求统一使用 `corepack pnpm`。
 - 本机已安装 Wrangler CLI，并已完成 Cloudflare 授权；后续可直接用于 `wrangler dev`、D1 管理和发布流程，但实际部署前仍需单独确认。
+- Cloudflare 版已具备 `cloudflare/worker` Worker API、`cloudflare/d1/migrations/0001_init.sql` D1 schema 和 `shared` 共享分类/评分逻辑；线上入口已部署到 `https://starway.patdelphi.xyz/developers`。
 - 后端当前 API 已覆盖用户、仓库、统计、标签、同步、AI 分析、相似项目、导出、报告、状态检测等能力。
 - GitHub Token fallback 顺序为：请求 body token、`STARWAY_GITHUB_TOKEN`、`GITHUB_TOKEN`、`GH_TOKEN`。
 - AI 功能使用 OpenAI-compatible 配置：`STARWAY_AI_BASE_URL`、`STARWAY_AI_API_KEY`、`STARWAY_AI_MODEL`，三项齐全才启用。
+- Worker 同步默认最多拉取 20 页 starred repos（2000 条），可通过 `STARWAY_GITHUB_MAX_PAGES` 调整；达到上限时同步状态为 `partial`，不会标记 removed，也不会生成新的 Star DNA / 学习路径缓存。
 
 ## 3. 为什么不能直接部署为 Worker
 
@@ -67,9 +69,10 @@ frontend/
 
 shared/
   api-contracts/         # 前后端共享类型与响应结构
+  ai/                    # Star DNA / 学习路径 prompt、用户级 AI 缓存 key
   classification/        # 纯分类规则和标签逻辑
   scoring/               # Sleep Stars / Hidden Gems 等评分口径
-  prompts/               # AI prompt 模板
+  sync/                  # success / partial / failed 等同步状态语义
 
 cloudflare/
   worker/
@@ -147,15 +150,15 @@ interface StarRepository {
 | `GET /api/users/:login/tags` | 已有，支持中英文 label | 是 |
 | `GET /api/users/:login/star-timeline` | 已有 | 是 |
 | `GET /api/repos/:fullName/similar` | 已有 | 第二阶段 |
-| `POST /api/sync` | 已有，真实 GitHub 同步 | 是，但限制单用户和批次 |
+| `POST /api/sync` | 已有，真实 GitHub 同步 | 是，单用户同步，Worker 默认 20 页上限，超过后返回 `partial` |
 | `GET /api/status` | 已有，会探测 GitHub 和 AI | 是，但避免长阻塞 |
 | `GET /api/token-source` | 已有 | 是 |
 | `GET /api/users/:login/sync-runs` | 已有 | 是 |
 | `GET /api/users/:login/removed-stars` | 已有 | 第二阶段 |
 | `POST /api/users/:login/classify` | 已有 | 是 |
-| `GET /api/repos/:fullName/readme-summary` | 已有，AI | 第二阶段 |
-| `GET /api/users/:login/star-dna` | 已有，AI | 第二阶段 |
-| `GET /api/users/:login/learning-path` | 已有，AI | 第二阶段 |
+| `GET /api/repos/:fullName/readme-summary` | 已有，AI | 已启用，含中英文缓存 |
+| `GET /api/users/:login/star-dna` | 已有，AI | 已启用；最新同步非 `success` 时拒绝生成新缓存 |
+| `GET /api/users/:login/learning-path` | 已有，AI | 已启用；最新同步非 `success` 时拒绝生成新缓存 |
 | `GET /api/export` | 已有，CSV/JSON/Markdown/HTML | 第二阶段 |
 | `GET /api/users/:login/report` | 已有，Markdown 报告 | 第二阶段 |
 | `POST /api/repos/:fullName/tags` | 已有 | 第二阶段 |
@@ -195,6 +198,9 @@ D1 migration 应从当前 `backend/src/db/schema.ts` 生成，但需要单独审
 - `PRAGMA journal_mode = WAL` 和 `synchronous = NORMAL` 只属于本地 SQLite，不迁移到 D1。
 - `translations` 当前复用 `repo_full_name = user:login` 存储用户级 AI 文本，迁移前应决定是否拆表。
 - Worker 同步大量 star 时可能超过执行时间，MVP 应限制同步页数，后续再引入 Queue。
+- 当前 Worker 同步达到页数上限时写入 `sync_runs.status = 'partial'`，保留已获取 star，但跳过 removed 标记，避免把未拉到的 star 误判为取消收藏。
+- 同步成功或 partial 后会清理用户级 AI 缓存（Star DNA、学习路径），避免旧缓存继续展示过期画像。
+- AI prompt、用户级 AI 缓存 key、同步状态语义已抽到 `shared/ai` 和 `shared/sync`，本地后端、前端和 Worker 共用同一份定义。
 
 ## 9. 配置与密钥
 
@@ -202,6 +208,7 @@ D1 migration 应从当前 `backend/src/db/schema.ts` 生成，但需要单独审
 
 ```text
 STARWAY_GITHUB_TOKEN
+STARWAY_GITHUB_MAX_PAGES
 GITHUB_TOKEN
 GH_TOKEN
 STARWAY_AI_BASE_URL
@@ -228,6 +235,7 @@ Worker 运行时建议类型：
 export interface Env {
   DB: D1Database
   STARWAY_GITHUB_TOKEN?: string
+  STARWAY_GITHUB_MAX_PAGES?: string
   STARWAY_AI_BASE_URL?: string
   STARWAY_AI_API_KEY?: string
   STARWAY_AI_MODEL?: string
@@ -257,7 +265,7 @@ VITE_API_BASE=https://api.example.workers.dev
 | 分类 | 是 | 复用规则分类 |
 | 同步历史 | 是 | 写入 `sync_runs` |
 | 状态检测 | 是 | 返回 GitHub / AI 配置状态，但限制超时 |
-| AI 摘要 / DNA / 学习路径 | 第二阶段 | 依赖外部 API 和缓存策略 |
+| AI 摘要 / DNA / 学习路径 | 是 | 已接入 OpenAI-compatible API；用户级 AI 生成要求最新同步为 `success` |
 | 相似项目推荐 | 第二阶段 | 查询逻辑较重，先不阻塞 MVP |
 | CSV / Markdown / HTML 导出 | 第二阶段 | Worker 可做，但先不阻塞 MVP |
 | 本地 CSV 导入 | 否 | 保留在本地架构 |
@@ -286,8 +294,10 @@ VITE_API_BASE=https://api.example.workers.dev
 
 实施结果：
 
-- 新建 `shared/` 目录，包含 `api-contracts/`、`classification/`、`scoring/` 三个子模块。
+- 新建 `shared/` 目录，包含 `api-contracts/`、`ai/`、`classification/`、`scoring/`、`sync/` 子模块。
 - `shared/api-contracts/` 导出所有跨端共用的类型（user/repo/star/stats/tag/sync/cache/error）。
+- `shared/ai/` 导出 Star DNA / 学习路径 prompt 构造函数和用户级 AI 缓存 key。
+- `shared/sync/` 导出 `running` / `success` / `partial` / `failed` 状态集合、AI 生成前置判断和统一错误文案。
 - `shared/scoring/thresholds.ts` 导出阈值常量、`ThresholdOptions` 接口、`resolveThresholds` 纯函数和校验函数。
 - `shared/classification/` 导出标签字典、双语映射表和 `classifyRepo` 纯函数。
 - backend 的 `db/types.ts`、`repository/repo-queries.ts`、`classification/` 改为从 shared re-export，行为零变更。

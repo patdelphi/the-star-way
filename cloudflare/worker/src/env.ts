@@ -7,6 +7,7 @@
  * Worker 环境变量
  * - DB: D1 数据库绑定（在 wrangler.toml 中声明）
  * - STARWAY_GITHUB_TOKEN: GitHub Token（通过 wrangler secret put 写入）
+ * - STARWAY_GITHUB_MAX_PAGES: 单次同步最大页数，默认 20
  * - STARWAY_AI_BASE_URL / API_KEY / MODEL: AI 配置（三项齐全才启用）
  */
 export interface Env {
@@ -15,6 +16,9 @@ export interface Env {
 
   // GitHub Token（secret）
   STARWAY_GITHUB_TOKEN?: string
+
+  // 单次 Worker 同步最大页数（非敏感配置），默认 20 页。
+  STARWAY_GITHUB_MAX_PAGES?: string
 
   // 前端 URL（非敏感，配置在 wrangler.toml [vars]）
   // 用于根路径 / 重定向到前端 Pages

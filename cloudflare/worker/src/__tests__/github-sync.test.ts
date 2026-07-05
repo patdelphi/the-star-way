@@ -286,6 +286,60 @@ describe('正常同步流程', () => {
     expect(starCount?.cnt).toBe(250)
   })
 
+  it('超过 Worker 同步上限时标记为 partial，且不标记未拉取的旧星标为 removed', async () => {
+    const now = new Date().toISOString()
+    const repos: any[] = []
+    env.STARWAY_GITHUB_MAX_PAGES = '3'
+    for (let i = 1; i <= 350; i++) {
+      repos.push(makeStarredRepo(i, `testuser/repo${i}`, '2024-03-01T00:00:00Z'))
+    }
+    globalThis.fetch = makeMockFetch('testuser', repos) as any
+
+    await env.DB.prepare(`
+      INSERT INTO users (login, synced_at, deleted_at)
+      VALUES (?, ?, NULL)
+    `).bind('testuser', now).run()
+    await env.DB.prepare(`
+      INSERT INTO repos (github_id, full_name, owner, name, html_url, created_at, updated_at, archived, fork)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      999999,
+      'testuser/old-outside-window',
+      'testuser',
+      'old-outside-window',
+      'https://github.com/testuser/old-outside-window',
+      now,
+      now,
+      0,
+      0,
+    ).run()
+    await env.DB.prepare(`
+      INSERT INTO stars (user_login, repo_full_name, starred_at, first_seen_at, last_seen_at, removed_at)
+      VALUES (?, ?, ?, ?, ?, NULL)
+    `).bind('testuser', 'testuser/old-outside-window', now, now, now).run()
+
+    const result = await syncStars(env, 'testuser', 'test-token')
+
+    expect(result.complete).toBe(false)
+    expect(result.warning).toContain('同步上限')
+    expect(result.reposUpserted).toBe(300)
+    expect(result.reposMarkedRemoved).toBe(0)
+
+    const run = await env.DB
+      .prepare('SELECT status, error_message, pages_fetched FROM sync_runs WHERE user_login = ? ORDER BY id DESC LIMIT 1')
+      .bind('testuser')
+      .first<{ status: string; error_message: string | null; pages_fetched: number }>()
+    expect(run?.status).toBe('partial')
+    expect(run?.error_message).toContain('同步上限')
+    expect(run?.pages_fetched).toBe(3)
+
+    const oldStar = await env.DB
+      .prepare('SELECT removed_at FROM stars WHERE user_login = ? AND repo_full_name = ?')
+      .bind('testuser', 'testuser/old-outside-window')
+      .first<{ removed_at: string | null }>()
+    expect(oldStar?.removed_at).toBeNull()
+  })
+
   it('用户名规范化：@login 形式输入', async () => {
     const repos = [makeStarredRepo(1, 'testuser/repo1', '2024-03-01T00:00:00Z')]
     globalThis.fetch = makeMockFetch('testuser', repos) as any

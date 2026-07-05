@@ -27,6 +27,12 @@ import { loadAiConfig } from '../ai/config.js'
 import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
 import { getTagLabel } from '../classification/tag-labels-bilingual.js'
 import { loadEnv } from '../config/env.js'
+import { getUserAiCacheKey } from '@shared/ai/index.js'
+import {
+  canGenerateUserAiFromSyncStatus,
+  getIncompleteSyncMessage,
+  type SyncStatus,
+} from '@shared/sync/index.js'
 
 // ===== 工具函数 =====
 
@@ -129,8 +135,28 @@ function getUserAiTextCache(db: Database.Database, login: string, key: string): 
     SELECT translated_readme_summary
     FROM translations
     WHERE repo_full_name = ? AND target_lang = ?
-  `).get(`user:${login}`, key) as { translated_readme_summary: string } | undefined
+  `).get(getUserAiCacheKey(login), key) as { translated_readme_summary: string } | undefined
   return cached?.translated_readme_summary || null
+}
+
+/** 读取最新同步状态，用于阻止基于不完整数据生成 AI 缓存 */
+function getLatestSyncStatus(db: Database.Database, login: string): { status: SyncStatus; error_message: string | null } | null {
+  const row = db.prepare(`
+    SELECT status, error_message
+    FROM sync_runs
+    WHERE user_login = ?
+    ORDER BY started_at DESC, id DESC
+    LIMIT 1
+  `).get(login) as { status: SyncStatus; error_message: string | null } | undefined
+  return row ?? null
+}
+
+/** AI 画像/学习路径依赖完整星标数据，本地和 Worker 使用同一状态语义 */
+function assertUserAiDataReady(db: Database.Database, login: string): string | null {
+  const latestRun = getLatestSyncStatus(db, login)
+  if (!latestRun) return null
+  if (canGenerateUserAiFromSyncStatus(latestRun.status)) return null
+  return getIncompleteSyncMessage(login, latestRun.status, latestRun.error_message)
 }
 
 /** 获取用户星标数量，用于 AI 内容生成前的空数据保护 */
@@ -157,7 +183,7 @@ function cacheUserAiTextPair(
         translated_readme_summary = excluded.translated_readme_summary,
         provider = excluded.provider,
         updated_at = excluded.updated_at
-    `).run(`user:${login}`, zhKey, zhText, updatedAt)
+    `).run(getUserAiCacheKey(login), zhKey, zhText, updatedAt)
 
     if (enText) {
       db.prepare(`
@@ -167,7 +193,7 @@ function cacheUserAiTextPair(
           translated_readme_summary = excluded.translated_readme_summary,
           provider = excluded.provider,
           updated_at = excluded.updated_at
-      `).run(`user:${login}`, enKey, enText, updatedAt)
+      `).run(getUserAiCacheKey(login), enKey, enText, updatedAt)
     }
   })
 
@@ -719,6 +745,12 @@ export function createRouter(db: Database.Database) {
           return
         }
 
+        const incompleteSyncMessage = assertUserAiDataReady(db, login)
+        if (incompleteSyncMessage) {
+          error(res, 'SYNC_INCOMPLETE', incompleteSyncMessage, 409)
+          return
+        }
+
         const starCount = getUserStarCount(db, login)
         if (starCount === 0) {
           error(res, 'EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
@@ -826,6 +858,12 @@ export function createRouter(db: Database.Database) {
         // 查缓存（非强制刷新时）
         if (!force && cachedText) {
           json(res, { data: { path: cachedText, cached: true } })
+          return
+        }
+
+        const incompleteSyncMessage = assertUserAiDataReady(db, login)
+        if (incompleteSyncMessage) {
+          error(res, 'SYNC_INCOMPLETE', incompleteSyncMessage, 409)
           return
         }
 

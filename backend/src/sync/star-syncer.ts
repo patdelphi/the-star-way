@@ -10,19 +10,13 @@ import type { GitHubClientConfig } from './github-client.js'
 import { GitHubSyncError } from './errors.js'
 import { mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { SyncResult } from '@shared/api-contracts/index.js'
+import { USER_AI_CACHE_KEYS, getUserAiCacheKey } from '@shared/ai/index.js'
 
 /**
  * 同步结果（不含 API 交互的版本）
  */
-export interface StarSyncResult {
-  username: string
-  syncedAt: string
-  reposUpserted: number
-  starsUpserted: number
-  reposMarkedRemoved: number
-  totalPages: number
-  rateLimit: RateLimitInfo | null
-}
+export type StarSyncResult = SyncResult
 
 /**
  * 规范化 GitHub 用户名输入：支持 @login、GitHub 用户主页 URL 和首尾空白。
@@ -205,6 +199,13 @@ export async function syncStars(
       reposMarkedRemoved = removedResult.changes
     }
 
+    // 同步数据变化后清理用户级 AI 缓存，避免继续展示旧画像/学习路径。
+    db.prepare(`
+      DELETE FROM translations
+      WHERE repo_full_name = ?
+        AND target_lang IN (${USER_AI_CACHE_KEYS.map(() => '?').join(', ')})
+    `).run(getUserAiCacheKey(username), ...USER_AI_CACHE_KEYS)
+
     return { reposUpserted, starsUpserted, reposMarkedRemoved }
   })
 
@@ -238,6 +239,7 @@ export async function syncStars(
     ...result,
     totalPages,
     rateLimit,
+    complete: true,
   }
 }
 

@@ -4,7 +4,7 @@
  *
  * 与 backend/src/sync/star-syncer.ts 的差异：
  * - 数据库操作使用 D1StarRepository（异步、batch 替代 transaction）
- * - 分页上限 10 页（1000 条），与 todo.md 决策一致
+ * - 分页上限 20 页（2000 条），超过上限标记为 partial
  * - 不支持请求 body 传 token，token 仅从 env.STARWAY_GITHUB_TOKEN 读取
  * - 同步流程整体保留：profile 验证 → upsert user → sync_runs → 分页拉取 → batch upsert → markRemoved → 更新 sync_runs
  *
@@ -17,19 +17,12 @@ import type { Env } from './env.js'
 import { GitHubClient, type RateLimitInfo } from './github-client.js'
 import { GitHubSyncError } from './sync-errors.js'
 import { D1StarRepository } from './d1-repository.js'
+import type { SyncResult } from '@shared/api-contracts/index.js'
 
 /**
  * 同步结果
  */
-export interface StarSyncResult {
-  username: string
-  syncedAt: string
-  reposUpserted: number
-  starsUpserted: number
-  reposMarkedRemoved: number
-  totalPages: number
-  rateLimit: RateLimitInfo | null
-}
+export type StarSyncResult = SyncResult
 
 /**
  * 规范化 GitHub 用户名输入：支持 @login、GitHub 用户主页 URL 和首尾空白。
@@ -40,6 +33,16 @@ export function normalizeGitHubUsername(input: string): string {
   value = value.replace(/^https?:\/\/github\.com\//i, '')
   value = value.split(/[/?#]/)[0] || value
   return value.replace(/^@+/, '').trim()
+}
+
+/**
+ * 解析 Worker 单次同步最大页数，非法配置回退到 GitHubClient 默认值。
+ */
+function parseMaxPages(value: string | undefined): number | undefined {
+  if (!value) return undefined
+  const parsed = parseInt(value, 10)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) return undefined
+  return parsed
 }
 
 /**
@@ -67,7 +70,7 @@ export async function syncStars(
     )
   }
 
-  const client = new GitHubClient({ token })
+  const client = new GitHubClient({ token, maxPages: parseMaxPages(env.STARWAY_GITHUB_MAX_PAGES) })
   const repo = new D1StarRepository(env.DB)
   const now = new Date().toISOString()
 
@@ -84,6 +87,8 @@ export async function syncStars(
   // 4. 分页拉取 starred repos
   let totalPages = 0
   let rateLimit: RateLimitInfo | null = null
+  let complete = true
+  let warning: string | undefined
   let repos: Awaited<ReturnType<typeof client.listStarredRepos>>['repos'] = []
 
   try {
@@ -93,6 +98,8 @@ export async function syncStars(
     repos = syncResult.repos
     rateLimit = syncResult.rateLimit
     totalPages = syncResult.totalPages
+    complete = syncResult.complete
+    warning = syncResult.warning
   } catch (err) {
     // 分页拉取失败：更新 sync_runs 后重抛
     const errorMessage = err instanceof Error ? err.message : String(err)
@@ -112,7 +119,7 @@ export async function syncStars(
 
   // 6. 标记 removed_at：本地有但本次 API 未返回的仓库
   let reposMarkedRemoved = 0
-  if (upsertResult.reposUpserted > 0) {
+  if (complete && upsertResult.reposUpserted > 0) {
     const seenFullNames = repos.map(r => r.repo.full_name)
     try {
       reposMarkedRemoved = await repo.markRemovedStars(profile.login, seenFullNames, now)
@@ -143,17 +150,37 @@ export async function syncStars(
     console.warn('upsertUserProfile 失败，不影响同步结果:', err)
   }
 
-  // 8. 更新 sync_runs 为成功状态
-  await repo.updateSyncRunSuccess(
-    syncRunId,
-    new Date().toISOString(),
-    upsertResult.reposUpserted,
-    upsertResult.starsUpserted,
-    reposMarkedRemoved,
-    totalPages,
-    rateLimit?.remaining ?? null,
-    rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
-  )
+  // 8. 同步后清理用户级 AI 缓存，避免旧画像/学习路径继续展示。
+  try {
+    await repo.clearUserAiCache(profile.login)
+  } catch (err) {
+    console.warn('clearUserAiCache 失败，不影响同步结果:', err)
+  }
+
+  // 9. 更新 sync_runs 状态：完整同步才是 success，达到 Worker 上限则为 partial。
+  if (complete) {
+    await repo.updateSyncRunSuccess(
+      syncRunId,
+      new Date().toISOString(),
+      upsertResult.reposUpserted,
+      upsertResult.starsUpserted,
+      reposMarkedRemoved,
+      totalPages,
+      rateLimit?.remaining ?? null,
+      rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
+    )
+  } else {
+    await repo.updateSyncRunPartial(
+      syncRunId,
+      new Date().toISOString(),
+      upsertResult.reposUpserted,
+      upsertResult.starsUpserted,
+      totalPages,
+      rateLimit?.remaining ?? null,
+      rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
+      warning ?? 'Worker 同步未完整完成',
+    )
+  }
 
   return {
     username: profile.login,
@@ -163,5 +190,7 @@ export async function syncStars(
     reposMarkedRemoved,
     totalPages,
     rateLimit,
+    complete,
+    warning,
   }
 }

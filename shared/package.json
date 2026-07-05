@@ -9,8 +9,10 @@
   "exports": {
     ".": "./index.ts",
     "./api-contracts": "./api-contracts/index.ts",
+    "./ai": "./ai/index.ts",
     "./classification": "./classification/index.ts",
-    "./scoring": "./scoring/index.ts"
+    "./scoring": "./scoring/index.ts",
+    "./sync": "./sync/index.ts"
   },
   "packageManager": "pnpm@11.7.0"
 }

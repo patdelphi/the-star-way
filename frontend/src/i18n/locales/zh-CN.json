@@ -51,6 +51,7 @@
       "pending": "待同步",
       "syncing": "同步中",
       "success": "同步成功",
+      "partial": "部分同步",
       "rateLimit": "GitHub API 限流",
       "notFound": "用户不存在",
       "networkFail": "网络失败"
@@ -70,6 +71,8 @@
     "syncSuccessToken": "同步成功（已使用 Token）",
     "syncSuccessAnon": "同步成功（匿名模式）",
     "syncUnknownError": "同步失败，请检查 GitHub 限流、用户名或网络状态",
+    "syncPartialMessage": "同步只完成部分数据，暂不生成 AI 内容",
+    "syncPartialAiBlocked": "星标数据尚未完整同步，暂不生成 AI 内容。",
     "starUpdated": "{{name}} 星标已更新",
     "simulateNotice": "模拟 401/404/限流/网络失败状态，不调用 GitHub API。",
     "radarCenter": "技术栈",

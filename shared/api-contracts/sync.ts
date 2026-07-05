@@ -21,6 +21,8 @@ export interface SyncResult {
   reposMarkedRemoved: number
   totalPages: number
   rateLimit: RateLimitInfo | null
+  complete: boolean
+  warning?: string
 }
 
 // 同步运行记录（数据库 sync_runs 表）
@@ -28,7 +30,7 @@ export interface SyncRunRow {
   user_login: string
   started_at: string
   finished_at: string | null
-  status: 'running' | 'success' | 'failed'
+  status: 'running' | 'success' | 'partial' | 'failed'
   repos_synced: number | null
   stars_synced: number | null
   error_message: string | null

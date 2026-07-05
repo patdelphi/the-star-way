@@ -4,6 +4,7 @@
  * 超时、Token、语言偏好、业务阈值均从统一设置（settings.ts）读取。
  */
 import { getSettings, saveSettings, resolveLanguage } from '@/lib/settings'
+import type { SyncResult } from '@shared/api-contracts/index.js'
 
 // ===== 类型定义 =====
 
@@ -495,7 +496,9 @@ export async function classifyRepos(login: string): Promise<{ classified: number
 /**
  * 触发同步
  */
-export async function syncStars(username: string, token?: string): Promise<any | null> {
+export type SyncStarsResult = SyncResult
+
+export async function syncStars(username: string, token?: string): Promise<SyncStarsResult | null> {
   try {
     if (await checkApiAvailable()) {
       const body: Record<string, string> = { username }
@@ -509,7 +512,7 @@ export async function syncStars(username: string, token?: string): Promise<any |
       if (!res.ok) {
         throw new Error(data?.error?.message || 'SYNC_FAILED')
       }
-      return data.data
+      return data.data as SyncStarsResult
     }
   } catch (err) {
     if (err instanceof Error) throw err

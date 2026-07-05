@@ -54,3 +54,14 @@
 - Star DNA 和学习路径首次生成也进入 loading 状态；同步后若用户已切走，仅触发后端缓存写入，不污染当前页面状态。
 - 补充前端静态校验，覆盖开发者 AI 长任务归属、刷新选中用户保持和首次 AI loading。
 - 修复 Dashboard / Developers 趋势缩放按钮的中文 title 硬编码，改为中英文 i18n 文案。
+
+## 2026-07-05
+
+- 修复 Cloudflare Worker 同步不完整时仍被当作成功数据的问题：达到页数上限时写入 `partial`，返回 `complete: false` 和 warning。
+- Worker GitHub starred repos 默认同步上限从 10 页调整为 20 页，并支持 `STARWAY_GITHUB_MAX_PAGES` 配置。
+- partial 同步不再执行 removed 标记，避免把未拉取到的星标误判为已取消收藏。
+- 同步后清理用户级 Star DNA / 学习路径缓存；最新同步非 `success` 时拒绝生成新的用户级 AI 内容。
+- 前端识别 partial 同步状态，显示提示并跳过自动刷新 Star DNA / 学习路径。
+- 更新 Cloudflare 双架构文档和部署指南，记录本地 Wrangler CLI 已安装并授权，以及 Worker partial 同步语义。
+- 抽出 `shared/ai` 和 `shared/sync`：本地后端、前端和 Cloudflare Worker 共用 Star DNA / 学习路径 prompt、用户级 AI 缓存 key、同步状态语义和 AI 生成前置判断。
+- 本地同步完成后也清理用户级 AI 缓存；本地 AI 路由也按最新同步状态阻止基于不完整数据生成新缓存。
