@@ -67,6 +67,9 @@ function createMocks(url: string, method: string = 'GET', body?: string) {
 describe('API 路由', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(aiClient.generateStarDna).mockReset().mockImplementation(async () => '测试 DNA 画像')
+    vi.mocked(aiClient.generateLearningPath).mockReset().mockImplementation(async () => '## 阶段一：巩固基础\n- 测试学习路径')
+    vi.mocked(aiClient.translateToEnglish).mockReset().mockImplementation(async (text: string) => `EN: ${text}`)
     // :memory: 数据库：每个测试全新实例，无需文件清理
     db = createConnection(':memory:')
     initDatabase(db)
@@ -375,7 +378,36 @@ describe('API 路由', () => {
     expect(data.data).toEqual({ dna: '缓存 DNA 画像', cached: true })
   })
 
-  it('GET /api/users/:login/learning-path 应生成并缓存中英文结果', async () => {
+  it('GET /api/users/:login/star-dna 中文生成不等待英文翻译', async () => {
+    vi.mocked(aiClient.translateToEnglish).mockRejectedValueOnce(new Error('translation timeout'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/star-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '测试 DNA 画像', cached: false })
+    expect(vi.mocked(aiClient.generateStarDna)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(aiClient.translateToEnglish)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/star-dna 英文缺缓存时翻译中文缓存，不重新生成', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'dna-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存 DNA 画像', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/star-dna?lang=en`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: 'EN: 缓存 DNA 画像', cached: false })
+    expect(vi.mocked(aiClient.generateStarDna)).not.toHaveBeenCalled()
+    expect(vi.mocked(aiClient.translateToEnglish)).toHaveBeenCalledWith('缓存 DNA 画像')
+  })
+
+  it('GET /api/users/:login/learning-path 中文请求应生成并缓存中文结果', async () => {
     const router = createRouter(db)
     const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?force=1`)
     await router(req, res)
@@ -390,8 +422,38 @@ describe('API 路由', () => {
       WHERE repo_full_name = ?
       ORDER BY target_lang
     `).all(`user:${DEMO_USER_LOGIN}`) as Array<{ target_lang: string; translated_readme_summary: string }>
-    expect(rows.map(r => r.target_lang)).toEqual(['learning-en', 'learning-zh'])
-    expect(rows.find(r => r.target_lang === 'learning-en')?.translated_readme_summary).toContain('EN:')
+    expect(rows.map(r => r.target_lang)).toEqual(['learning-zh'])
+    expect(rows.find(r => r.target_lang === 'learning-zh')?.translated_readme_summary).toContain('阶段一')
+  })
+
+  it('GET /api/users/:login/learning-path 中文生成不等待英文翻译', async () => {
+    vi.mocked(aiClient.translateToEnglish).mockRejectedValueOnce(new Error('translation timeout'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data.path).toContain('阶段一')
+    expect(data.data.cached).toBe(false)
+    expect(vi.mocked(aiClient.generateLearningPath)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(aiClient.translateToEnglish)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/learning-path 英文缺缓存时翻译中文缓存，不重新生成', async () => {
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'learning-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存学习路径', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?lang=en`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ path: 'EN: 缓存学习路径', cached: false })
+    expect(vi.mocked(aiClient.generateLearningPath)).not.toHaveBeenCalled()
+    expect(vi.mocked(aiClient.translateToEnglish)).toHaveBeenCalledWith('缓存学习路径')
   })
 
   it('GET /api/users/:login/learning-path 强制生成失败时应回退已有缓存', async () => {

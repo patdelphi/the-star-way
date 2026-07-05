@@ -744,6 +744,19 @@ export function createRouter(db: Database.Database) {
           json(res, { data: { dna: cachedText, cached: true } })
           return
         }
+        if (!force && lang === 'en') {
+          const cachedZh = getUserAiTextCache(db, login, 'dna-zh')
+          if (cachedZh) {
+            try {
+              const translated = await translateToEnglish(cachedZh)
+              cacheUserAiTextPair(db, login, 'dna-zh', cachedZh, 'dna-en', translated, new Date().toISOString())
+              json(res, { data: { dna: translated || cachedZh, cached: false } })
+            } catch {
+              json(res, { data: { dna: cachedZh, cached: true } })
+            }
+            return
+          }
+        }
 
         const incompleteSyncMessage = assertUserAiDataReady(db, login)
         if (incompleteSyncMessage) {
@@ -792,11 +805,13 @@ export function createRouter(db: Database.Database) {
 
           const now = new Date().toISOString()
 
-          // 自动翻译英文
+          // 中文请求不等待英文翻译，避免长耗时翻译拖垮首次生成。
           let dnaEn = ''
-          try {
-            dnaEn = await translateToEnglish(dnaZh)
-          } catch { /* 翻译失败不阻塞 */ }
+          if (lang === 'en') {
+            try {
+              dnaEn = await translateToEnglish(dnaZh)
+            } catch { /* 翻译失败不阻塞 */ }
+          }
 
           cacheUserAiTextPair(db, login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
           json(res, { data: { dna: lang === 'en' ? (dnaEn || dnaZh) : dnaZh, cached: false } })
@@ -860,6 +875,19 @@ export function createRouter(db: Database.Database) {
           json(res, { data: { path: cachedText, cached: true } })
           return
         }
+        if (!force && lang === 'en') {
+          const cachedZh = getUserAiTextCache(db, login, 'learning-zh')
+          if (cachedZh) {
+            try {
+              const translated = await translateToEnglish(cachedZh)
+              cacheUserAiTextPair(db, login, 'learning-zh', cachedZh, 'learning-en', translated, new Date().toISOString())
+              json(res, { data: { path: translated || cachedZh, cached: false } })
+            } catch {
+              json(res, { data: { path: cachedZh, cached: true } })
+            }
+            return
+          }
+        }
 
         const incompleteSyncMessage = assertUserAiDataReady(db, login)
         if (incompleteSyncMessage) {
@@ -905,11 +933,13 @@ export function createRouter(db: Database.Database) {
 
           const now = new Date().toISOString()
 
-          // 自动翻译英文
+          // 中文请求不等待英文翻译，避免长耗时翻译拖垮首次生成。
           let pathEn = ''
-          try {
-            pathEn = await translateToEnglish(pathZh)
-          } catch { /* 翻译失败不阻塞 */ }
+          if (lang === 'en') {
+            try {
+              pathEn = await translateToEnglish(pathZh)
+            } catch { /* 翻译失败不阻塞 */ }
+          }
 
           cacheUserAiTextPair(db, login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
           json(res, { data: { path: lang === 'en' ? (pathEn || pathZh) : pathZh, cached: false } })

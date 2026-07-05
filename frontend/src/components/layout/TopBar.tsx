@@ -97,7 +97,9 @@ export function TopBar() {
   const currentLang = languages.find((l) => l.code === currentLangCode) ?? languages[0]
 
   const handleLangChange = (code: string) => {
-    i18n.changeLanguage(code)
+    const language = code === 'en-US' ? 'en-US' : 'zh-CN'
+    saveSettings({ language })
+    i18n.changeLanguage(language)
     setLangOpen(false)
   }
 

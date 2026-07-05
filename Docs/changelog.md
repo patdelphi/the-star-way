@@ -65,3 +65,5 @@
 - 更新 Cloudflare 双架构文档和部署指南，记录本地 Wrangler CLI 已安装并授权，以及 Worker partial 同步语义。
 - 抽出 `shared/ai` 和 `shared/sync`：本地后端、前端和 Cloudflare Worker 共用 Star DNA / 学习路径 prompt、用户级 AI 缓存 key、同步状态语义和 AI 生成前置判断。
 - 本地同步完成后也清理用户级 AI 缓存；本地 AI 路由也按最新同步状态阻止基于不完整数据生成新缓存。
+- 修复 Star DNA / 学习路径中英文生成链路：中文请求不再等待英文翻译，英文请求在只有中文缓存时直接翻译缓存，避免首次生成被长耗时翻译拖垮。
+- 修复顶部语言切换未同步写入统一 settings 的问题，确保 AI 接口 `lang` 参数跟随当前 UI 语言。

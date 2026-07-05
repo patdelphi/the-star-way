@@ -7,7 +7,7 @@
  * - 直接调用 handleRequest，传入 mock Request 和 env
  * - 不测试 /api/sync（依赖外部 GitHub API，在 github-sync.test.ts 中覆盖）
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { Miniflare } from 'miniflare'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -175,12 +175,20 @@ afterAll(async () => {
 beforeEach(async () => {
   // 每个测试前清空数据并重新加载
   const d1 = env.DB
+  await d1.prepare('DELETE FROM translations').run()
   await d1.prepare('DELETE FROM repo_tags').run()
   await d1.prepare('DELETE FROM sync_runs').run()
   await d1.prepare('DELETE FROM stars').run()
   await d1.prepare('DELETE FROM repos').run()
   await d1.prepare('DELETE FROM users').run()
   await seedTestData()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  env.STARWAY_AI_BASE_URL = undefined
+  env.STARWAY_AI_API_KEY = undefined
+  env.STARWAY_AI_MODEL = undefined
 })
 
 // ===== CORS 预检 =====
@@ -533,6 +541,52 @@ describe('AI 接口', () => {
     expect(body.data.cached).toBe(true)
   })
 
+  it('GET /api/users/:login/star-dna 英文缺缓存时翻译中文缓存，不重新生成', async () => {
+    env.STARWAY_AI_BASE_URL = 'https://ai.test'
+    env.STARWAY_AI_API_KEY = 'test-key'
+    env.STARWAY_AI_MODEL = 'test-model'
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('user:testuser', 'dna-zh', '缓存 DNA 画像', new Date().toISOString()).run()
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: 'Cached DNA in English' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna?lang=en'),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data).toEqual({ dna: 'Cached DNA in English', cached: false })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('GET /api/users/:login/star-dna 中文生成不等待英文翻译', async () => {
+    env.STARWAY_AI_BASE_URL = 'https://ai.test'
+    env.STARWAY_AI_API_KEY = 'test-key'
+    env.STARWAY_AI_MODEL = 'test-model'
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '测试 DNA 画像' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna?lang=zh&force=1'),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data).toEqual({ dna: '测试 DNA 画像', cached: false })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('GET /api/users/:login/star-dna 最新同步为 partial 时拒绝生成新画像', async () => {
     const now = new Date(Date.now() + 1000).toISOString()
     await env.DB.prepare(`
@@ -588,6 +642,53 @@ describe('AI 接口', () => {
     const body = await res.json()
     expect(body.data.path).toBe('缓存的学习路径')
     expect(body.data.cached).toBe(true)
+  })
+
+  it('GET /api/users/:login/learning-path 英文缺缓存时翻译中文缓存，不重新生成', async () => {
+    env.STARWAY_AI_BASE_URL = 'https://ai.test'
+    env.STARWAY_AI_API_KEY = 'test-key'
+    env.STARWAY_AI_MODEL = 'test-model'
+    await env.DB.prepare(
+      `INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+       VALUES (?, ?, ?, 'ai', ?)`,
+    ).bind('user:testuser', 'learning-zh', '缓存学习路径', new Date().toISOString()).run()
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: 'Cached learning path in English' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/learning-path?lang=en'),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data).toEqual({ path: 'Cached learning path in English', cached: false })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('GET /api/users/:login/learning-path 中文生成不等待英文翻译', async () => {
+    env.STARWAY_AI_BASE_URL = 'https://ai.test'
+    env.STARWAY_AI_API_KEY = 'test-key'
+    env.STARWAY_AI_MODEL = 'test-model'
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: '## 阶段一：巩固基础\n- 测试学习路径' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/learning-path?lang=zh&force=1'),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.data.path).toContain('阶段一')
+    expect(body.data.cached).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('GET /api/users/:login/learning-path 最新同步为 partial 时拒绝生成新路径', async () => {

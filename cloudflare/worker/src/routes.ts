@@ -594,6 +594,18 @@ export async function handleRequest(
         if (cached) {
           return dataResponse({ dna: cached, cached: true })
         }
+        if (lang === 'en') {
+          const cachedZh = await repo.getCachedTranslation(`user:${login}`, 'dna-zh')
+          if (cachedZh) {
+            try {
+              const translated = await translateToEnglish(cachedZh, env)
+              await repo.cacheUserAiTextPair(login, 'dna-zh', cachedZh, 'dna-en', translated, new Date().toISOString())
+              return dataResponse({ dna: translated || cachedZh, cached: false })
+            } catch {
+              return dataResponse({ dna: cachedZh, cached: true })
+            }
+          }
+        }
       }
 
       // 3. 检查 AI 是否启用
@@ -651,13 +663,15 @@ export async function handleRequest(
         )
       }
 
-      // 8. 翻译英文（失败不阻塞）
+      // 8. 英文请求才同步翻译，中文请求不等待英文翻译。
       const now = new Date().toISOString()
       let dnaEn = ''
-      try {
-        dnaEn = await translateToEnglish(dnaZh, env)
-      } catch {
-        // 翻译失败不阻塞
+      if (lang === 'en') {
+        try {
+          dnaEn = await translateToEnglish(dnaZh, env)
+        } catch {
+          // 翻译失败不阻塞
+        }
       }
 
       // 9. 缓存中英文（事务写入）
@@ -689,6 +703,18 @@ export async function handleRequest(
         const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
         if (cached) {
           return dataResponse({ path: cached, cached: true })
+        }
+        if (lang === 'en') {
+          const cachedZh = await repo.getCachedTranslation(`user:${login}`, 'learning-zh')
+          if (cachedZh) {
+            try {
+              const translated = await translateToEnglish(cachedZh, env)
+              await repo.cacheUserAiTextPair(login, 'learning-zh', cachedZh, 'learning-en', translated, new Date().toISOString())
+              return dataResponse({ path: translated || cachedZh, cached: false })
+            } catch {
+              return dataResponse({ path: cachedZh, cached: true })
+            }
+          }
         }
       }
 
@@ -745,13 +771,15 @@ export async function handleRequest(
         )
       }
 
-      // 8. 翻译英文（失败不阻塞）
+      // 8. 英文请求才同步翻译，中文请求不等待英文翻译。
       const now = new Date().toISOString()
       let pathEn = ''
-      try {
-        pathEn = await translateToEnglish(pathZh, env)
-      } catch {
-        // 翻译失败不阻塞
+      if (lang === 'en') {
+        try {
+          pathEn = await translateToEnglish(pathZh, env)
+        } catch {
+          // 翻译失败不阻塞
+        }
       }
 
       // 9. 缓存中英文（事务写入）
