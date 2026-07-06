@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Search, Star, GitFork, Tags } from "lucide-react"
 import { getRepos } from "@/lib/api"
 import type { Repo } from "@/lib/api"
+import { getTagLabel } from "@/lib/tag-labels"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 // 格式化星数
@@ -42,7 +43,7 @@ interface CatalogRepo extends Repo {
 }
 
 const StarCatalog: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentLogin } = useDeveloper()
 
   // 数据状态
@@ -215,7 +216,7 @@ const StarCatalog: React.FC = () => {
                         : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-on-surface"
                     }`}
                   >
-                    <span className="font-medium">{tag}</span>
+                    <span className="font-medium">{getTagLabel(tag, i18n.language)}</span>
                     <span className={`text-[10px] ${selectedTags.includes(tag) ? "text-on-primary/70" : "text-muted-foreground"}`}>{count}</span>
                   </button>
                 ))}
@@ -237,7 +238,7 @@ const StarCatalog: React.FC = () => {
             <span>{t("starCatalog.filteredBy")}</span>
             {selectedTags.map((tag) => (
               <Badge key={tag} variant="secondary" className="gap-1">
-                {tag}
+                {getTagLabel(tag, i18n.language)}
                 <button
                   onClick={() => toggleTag(tag)}
                   className="ml-0.5 rounded-full hover:bg-surface-container-high"
@@ -279,7 +280,7 @@ const StarCatalog: React.FC = () => {
                           className={`text-[10px] cursor-pointer ${selectedTags.includes(tag) ? "border-primary text-primary" : ""}`}
                           onClick={() => toggleTag(tag)}
                         >
-                          {tag}
+                          {getTagLabel(tag, i18n.language)}
                         </Badge>
                       ))}
                       {repo.allTags.length > 4 && (

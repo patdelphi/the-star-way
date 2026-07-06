@@ -43,6 +43,7 @@ import { Select, SelectOption } from "@/components/ui/select"
 import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos, type SimilarRepo } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { getSettings } from "@/lib/settings"
+import { getTagLabel } from "@/lib/tag-labels"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 
 /* ========== 常量 ========== */
@@ -594,7 +595,7 @@ export default function RepositoryAnalysis() {
               {activeRepo.tags.length > 0 ? (
                 activeRepo.tags.map((tag) => (
                   <Badge key={tag} variant="outline" className="font-mono text-xs uppercase tracking-wider">
-                    {tag}
+                    {getTagLabel(tag, i18n.language)}
                   </Badge>
                 ))
               ) : (

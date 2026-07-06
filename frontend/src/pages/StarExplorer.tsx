@@ -185,7 +185,6 @@ export default function StarExplorer() {
   // 初始值从统一设置读取：pageSize 和 sortKey（从 'field:direction' 解析字段名）
   const [pageSize, setPageSize] = useState(() => getSettings().pageSize)
   const [selectedLanguage, setSelectedLanguage] = useState("")
-  const [selectedTopic, setSelectedTopic] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedLicense, setSelectedLicense] = useState("")
   const [sortKey, setSortKey] = useState(() => getSettings().defaultSort.split(":")[0])
@@ -673,7 +672,7 @@ export default function StarExplorer() {
 
   const visibleFilters = [
     selectedLanguage && { key: "lang", label: selectedLanguage },
-    ...selectedTags.map(tag => ({ key: `tag-${tag}`, label: tag })),
+    ...selectedTags.map(tag => ({ key: `tag-${tag}`, label: getTagLabel(tag, i18n.language) })),
     selectedLicense && { key: "license", label: selectedLicense },
     quickFilter === "hiddenGems" && { key: "quickFilter", label: t("starExplorer.filterHiddenGems") },
     quickFilter === "sleepStars" && { key: "quickFilter", label: t("starExplorer.filterSleepStars") },
@@ -906,10 +905,17 @@ export default function StarExplorer() {
                     </SelectOption>
                   ))}
                 </Select>
-                <Select value={selectedTopic} onChange={(event) => { setSelectedTopic(event.target.value); setCurrentPage(1) }}>
+                {/* 主题下拉与上方标签云共享 selectedTags（单选视图），选中后实时过滤 */}
+                <Select
+                  value={selectedTags[0] || ""}
+                  onChange={(event) => {
+                    setSelectedTags(event.target.value ? [event.target.value] : [])
+                    setCurrentPage(1)
+                  }}
+                >
                   <SelectOption value="">{t("starExplorer.topic")}</SelectOption>
                   {filterCounts.topics.map(([topic, count]) => (
-                    <SelectOption key={topic} value={topic.toLowerCase()}>
+                    <SelectOption key={topic} value={topic}>
                       {getTagLabel(topic, i18n.language)} ({count})
                     </SelectOption>
                   ))}
@@ -1059,7 +1065,7 @@ export default function StarExplorer() {
                           <div className="space-y-1">
                             <div className="flex flex-wrap gap-1">
                               {repo.allTags.slice(0, 3).map((tag) => (
-                                <Badge key={tag} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{tag}</Badge>
+                                <Badge key={tag} variant="outline" className="font-mono text-[10px] uppercase tracking-wider">{getTagLabel(tag, i18n.language)}</Badge>
                               ))}
                               {repo.allTags.length > 3 && (
                                 <span className="text-[10px] text-muted-foreground">+{repo.allTags.length - 3}</span>
@@ -1089,7 +1095,7 @@ export default function StarExplorer() {
                                 className="text-[10px] group relative cursor-pointer"
                                 title={t("starExplorer.clickToRemoveTag")}
                               >
-                                {tag}
+                                {getTagLabel(tag, i18n.language)}
                                 <span
                                   className="ml-0.5 hidden group-hover:inline text-on-primary/80"
                                   onClick={(e) => {
@@ -1106,7 +1112,7 @@ export default function StarExplorer() {
                               .slice(0, 3)
                               .map((tag) => (
                                 <Badge key={tag} variant="outline" className="text-[10px]">
-                                  {tag}
+                                  {getTagLabel(tag, i18n.language)}
                                 </Badge>
                               ))}
                             {repo.autoTags.filter((t) => !repo.manualTags.includes(t)).length > 3 && (
@@ -1222,7 +1228,7 @@ export default function StarExplorer() {
                               variant="default"
                               className="text-[10px] group relative cursor-pointer"
                             >
-                              {tag}
+                              {getTagLabel(tag, i18n.language)}
                               <span
                                 className="ml-0.5 hidden group-hover:inline text-on-primary/80"
                                 onClick={(e) => {
@@ -1238,7 +1244,7 @@ export default function StarExplorer() {
                             .filter((t) => !repo.manualTags.includes(t))
                             .map((tag) => (
                               <Badge key={tag} variant="outline" className="text-[10px]">
-                                {tag}
+                                {getTagLabel(tag, i18n.language)}
                               </Badge>
                             ))}
                           {repo.manualTags.length === 0 && repo.autoTags.length === 0 && (
