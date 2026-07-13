@@ -13,19 +13,6 @@
 - **Hidden Gems** — 发现被忽略的低星优质项目
 - **Tech Map** — 语言、主题、协议、活跃度统计
 
-## Screenshots
-
-![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
-![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
-![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
-![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
-![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
-![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
-![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
-![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
-
----
-
 ## 为什么值得用
 
 每个开发者都曾对着自己的 GitHub Stars 列表发呆——上千个仓库堆在一起，谁也说不清自己到底收藏了什么、为什么收藏。更有意思的是，当我们去看那些我们佩服的开发者的星标列表时，往往能发现一条隐藏的学习路径：他们关注什么技术、读过什么书、用什么工具链、最近在折腾什么新东西。
@@ -53,6 +40,17 @@
 - **多语言 UI** — 中文 / 英文切换
 - **主题三态** — 浅色 / 深色 / 跟随系统
 - **Demo 模式** — 内置真实星标仓库数据，无后端也能体验
+
+## Screenshots
+
+![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
+![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
+![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
+![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
+![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
+![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
+![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
+![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
 
 ## 技术栈
 

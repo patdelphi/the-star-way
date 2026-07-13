@@ -13,19 +13,6 @@ Enter any GitHub username to analyze their starred repositories:
 - **Hidden Gems** — Discover overlooked low-star quality projects
 - **Tech Map** — Language, topic, license, and activity statistics
 
-## Screenshots
-
-![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
-![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
-![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
-![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
-![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
-![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
-![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
-![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
-
----
-
 ## Why It Matters
 
 Every developer has stared at their own GitHub Stars list at some point—thousands of repos piled up, with no clear idea of what was actually saved or why. The interesting part is that when we look at the stars of developers we admire, we often uncover a hidden learning path: what technologies they care about, what they read, what toolchains they use, what they've been tinkering with lately.
@@ -53,6 +40,17 @@ Turning a chaotic stars list into a searchable, analyzable, inferable map of tec
 - **Bilingual UI** — Chinese / English switch
 - **Tri-state Theme** — Light / Dark / System
 - **Demo Mode** — Built-in real starred repo data, works without backend
+
+## Screenshots
+
+![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
+![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
+![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
+![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
+![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
+![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
+![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
+![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
 
 ## Tech Stack
 
