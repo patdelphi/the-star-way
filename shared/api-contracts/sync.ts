@@ -22,6 +22,10 @@ export interface SyncResult {
   totalPages: number
   rateLimit: RateLimitInfo | null
   complete: boolean
+  /** 当前批次对应的 sync_runs.id，未完成时用于续传。 */
+  syncId?: number
+  /** 下一次请求应从 GitHub 哪一页开始。 */
+  nextPage?: number
   warning?: string
 }
 

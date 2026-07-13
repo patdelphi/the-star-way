@@ -19,7 +19,10 @@ import type { Env } from '../env.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // migration SQL 文件路径
-const MIGRATION_PATH = resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql')
+const MIGRATION_PATHS = [
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql'),
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0002_star_sync_continuation.sql'),
+]
 
 let mf: Miniflare
 let env: Env
@@ -34,21 +37,16 @@ async function setupMiniflare(): Promise<Miniflare> {
     d1Databases: ['DB'],
   })
 
-  const migrationSql = readFileSync(MIGRATION_PATH, 'utf-8')
   const d1 = await mf.getD1Database('DB')
-
-  // 移除注释行，按 ; 分割，用 batch 执行
-  const cleanSql = migrationSql
-    .split('\n')
-    .filter(line => !line.trim().startsWith('--'))
-    .join('\n')
-  const statements = cleanSql
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-
-  const preparedStmts = statements.map(s => d1.prepare(s))
-  await d1.batch(preparedStmts)
+  for (const migrationPath of MIGRATION_PATHS) {
+    const migrationSql = readFileSync(migrationPath, 'utf-8')
+    const cleanSql = migrationSql
+      .split('\n')
+      .filter(line => !line.trim().startsWith('--'))
+      .join('\n')
+    const statements = cleanSql.split(';').map(s => s.trim()).filter(s => s.length > 0)
+    await d1.batch(statements.map(s => d1.prepare(s)))
+  }
 
   return mf
 }

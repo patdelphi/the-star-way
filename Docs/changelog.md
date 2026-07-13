@@ -1,5 +1,9 @@
 ﻿# the-star-way 变更记录
 
+## 2026-07-13
+
+- Cloudflare Worker 星标同步改为有界分批续传；通过 `syncId`、`nextPage` 和 D1 同步任务标识支持超过 2000 条 starred repos，只有最终批次才标记 removed。
+
 ## 2026-06-30
 
 - 基于 `init-idea.md` 创建项目规划文档。
@@ -67,3 +71,4 @@
 - 本地同步完成后也清理用户级 AI 缓存；本地 AI 路由也按最新同步状态阻止基于不完整数据生成新缓存。
 - 修复 Star DNA / 学习路径中英文生成链路：中文请求不再等待英文翻译，英文请求在只有中文缓存时直接翻译缓存，避免首次生成被长耗时翻译拖垮。
 - 修复顶部语言切换未同步写入统一 settings 的问题，确保 AI 接口 `lang` 参数跟随当前 UI 语言。
+- 2026-07-13：Cloudflare Worker 星标同步改为有界分批续传；通过 `syncId`、`nextPage` 和 D1 同步任务标识支持超过 2000 条 starred repos，只有最终批次才标记 removed。

@@ -27,7 +27,7 @@
 - 后端当前 API 已覆盖用户、仓库、统计、标签、同步、AI 分析、相似项目、导出、报告、状态检测等能力。
 - GitHub Token fallback 顺序为：请求 body token、`STARWAY_GITHUB_TOKEN`、`GITHUB_TOKEN`、`GH_TOKEN`。
 - AI 功能使用 OpenAI-compatible 配置：`STARWAY_AI_BASE_URL`、`STARWAY_AI_API_KEY`、`STARWAY_AI_MODEL`，三项齐全才启用。
-- Worker 同步默认最多拉取 20 页 starred repos（2000 条），可通过 `STARWAY_GITHUB_MAX_PAGES` 调整；达到上限时同步状态为 `partial`，不会标记 removed，也不会生成新的 Star DNA / 学习路径缓存。
+- Worker 同步每次最多拉取 20 页 starred repos（2000 条），可通过 `STARWAY_GITHUB_MAX_PAGES` 调整；达到单批上限时返回 `syncId`/`nextPage`，前端自动续传，最终批次才标记 removed 并生成新的 Star DNA / 学习路径缓存。
 
 ## 3. 为什么不能直接部署为 Worker
 
@@ -150,7 +150,7 @@ interface StarRepository {
 | `GET /api/users/:login/tags` | 已有，支持中英文 label | 是 |
 | `GET /api/users/:login/star-timeline` | 已有 | 是 |
 | `GET /api/repos/:fullName/similar` | 已有 | 第二阶段 |
-| `POST /api/sync` | 已有，真实 GitHub 同步 | 是，单用户同步，Worker 默认 20 页上限，超过后返回 `partial` |
+| `POST /api/sync` | 已有，真实 GitHub 同步 | 是，单用户分批同步；超过单批页数后返回续传游标 |
 | `GET /api/status` | 已有，会探测 GitHub 和 AI | 是，但避免长阻塞 |
 | `GET /api/token-source` | 已有 | 是 |
 | `GET /api/users/:login/sync-runs` | 已有 | 是 |
@@ -198,8 +198,8 @@ D1 migration 应从当前 `backend/src/db/schema.ts` 生成，但需要单独审
 - `PRAGMA journal_mode = WAL` 和 `synchronous = NORMAL` 只属于本地 SQLite，不迁移到 D1。
 - `translations` 当前复用 `repo_full_name = user:login` 存储用户级 AI 文本，迁移前应决定是否拆表。
 - Worker 同步大量 star 时可能超过执行时间，MVP 应限制同步页数，后续再引入 Queue。
-- 当前 Worker 同步达到页数上限时写入 `sync_runs.status = 'partial'`，保留已获取 star，但跳过 removed 标记，避免把未拉到的 star 误判为取消收藏。
-- 同步成功或 partial 后会清理用户级 AI 缓存（Star DNA、学习路径），避免旧缓存继续展示过期画像。
+- 当前 Worker 同步达到单批页数上限时写入 `sync_runs.status = 'partial'` 和 `next_page`，保留已获取 star，但跳过 removed 标记，等待后续请求续传。
+- 只有最终批次才会清理用户级 AI 缓存（Star DNA、学习路径），避免不完整数据生成过期画像。
 - AI prompt、用户级 AI 缓存 key、同步状态语义已抽到 `shared/ai` 和 `shared/sync`，本地后端、前端和 Worker 共用同一份定义。
 
 ## 9. 配置与密钥

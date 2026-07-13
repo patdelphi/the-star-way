@@ -501,18 +501,34 @@ export type SyncStarsResult = SyncResult
 export async function syncStars(username: string, token?: string): Promise<SyncStarsResult | null> {
   try {
     if (await checkApiAvailable()) {
-      const body: Record<string, string> = { username }
-      if (token) body.token = token
-      const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data?.error?.message || 'SYNC_FAILED')
+      let syncId: number | undefined
+      let startPage: number | undefined
+      let result: SyncStarsResult | null = null
+
+      // Worker 将长同步拆成多个有界请求，前端自动续传，调用方仍只等待一个 Promise。
+      for (let batch = 0; batch < 1000; batch++) {
+        const body: Record<string, string | number> = { username }
+        if (token) body.token = token
+        if (syncId !== undefined) body.syncId = syncId
+        if (startPage !== undefined) body.startPage = startPage
+        const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          throw new Error(data?.error?.message || 'SYNC_FAILED')
+        }
+        result = data.data as SyncStarsResult
+        if (result.complete || result.nextPage === undefined || result.syncId === undefined) {
+          return result
+        }
+        syncId = result.syncId
+        startPage = result.nextPage
       }
-      return data.data as SyncStarsResult
+
+      throw new Error('SYNC_CONTINUATION_LIMIT')
     }
   } catch (err) {
     if (err instanceof Error) throw err

@@ -4,7 +4,7 @@
  *
  * 与 backend/src/sync/star-syncer.ts 的差异：
  * - 数据库操作使用 D1StarRepository（异步、batch 替代 transaction）
- * - 分页上限 20 页（2000 条），超过上限标记为 partial
+ * - 单次请求分页上限可配置，超过本批次返回 continuation 游标
  * - 不支持请求 body 传 token，token 仅从 env.STARWAY_GITHUB_TOKEN 读取
  * - 同步流程整体保留：profile 验证 → upsert user → sync_runs → 分页拉取 → batch upsert → markRemoved → 更新 sync_runs
  *
@@ -23,6 +23,11 @@ import type { SyncResult } from '@shared/api-contracts/index.js'
  * 同步结果
  */
 export type StarSyncResult = SyncResult
+
+export interface SyncContinuationOptions {
+  syncId?: number
+  startPage?: number
+}
 
 /**
  * 规范化 GitHub 用户名输入：支持 @login、GitHub 用户主页 URL 和首尾空白。
@@ -55,6 +60,7 @@ export async function syncStars(
   env: Env,
   usernameInput: string,
   token?: string,
+  options: SyncContinuationOptions = {},
 ): Promise<StarSyncResult> {
   const username = normalizeGitHubUsername(usernameInput)
   if (!username) {
@@ -79,26 +85,46 @@ export async function syncStars(
   const profile = await client.getUserProfile(username)
 
   // 2. 创建用户记录（标记未删除）
+  let syncRunId: number
+  let startPage = options.startPage ?? 1
+  let reposUpsertedBefore = 0
+  let starsUpsertedBefore = 0
+  let pagesFetchedBefore = 0
+
+  if (options.syncId !== undefined) {
+    const existingRun = await repo.getSyncRun(options.syncId, profile.login)
+    if (!existingRun || existingRun.status === 'success') {
+      throw new GitHubSyncError('同步续传任务不存在或已完成', 'SYNC_CONTINUATION_INVALID', undefined, false)
+    }
+    syncRunId = existingRun.id
+    startPage = existingRun.next_page
+    reposUpsertedBefore = existingRun.repos_upserted
+    starsUpsertedBefore = existingRun.stars_upserted
+    pagesFetchedBefore = existingRun.pages_fetched
+    await repo.resumeSyncRun(syncRunId, startPage)
+  } else {
+    syncRunId = await repo.insertSyncRun(profile.login, now)
+  }
+
   await repo.upsertUserForSync(profile.login, now)
 
-  // 3. 创建 sync_runs 记录
-  const syncRunId = await repo.insertSyncRun(profile.login, now)
-
-  // 4. 分页拉取 starred repos
+  // 3. 分页拉取当前批次的 starred repos
   let totalPages = 0
   let rateLimit: RateLimitInfo | null = null
   let complete = true
+  let nextPage: number | undefined
   let warning: string | undefined
   let repos: Awaited<ReturnType<typeof client.listStarredRepos>>['repos'] = []
 
   try {
     const syncResult = await client.listStarredRepos(username, (page) => {
       totalPages = page
-    })
+    }, startPage)
     repos = syncResult.repos
     rateLimit = syncResult.rateLimit
     totalPages = syncResult.totalPages
     complete = syncResult.complete
+    nextPage = syncResult.nextPage
     warning = syncResult.warning
   } catch (err) {
     // 分页拉取失败：更新 sync_runs 后重抛
@@ -107,29 +133,32 @@ export async function syncStars(
     throw err
   }
 
-  // 5. 批量 upsert 仓库和星标
+  // 4. 批量 upsert 仓库和星标
   let upsertResult: { reposUpserted: number; starsUpserted: number }
   try {
-    upsertResult = await repo.batchUpsertReposAndStars(profile.login, repos, now)
+    upsertResult = await repo.batchUpsertReposAndStars(profile.login, repos, now, syncRunId)
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     await repo.updateSyncRunFailure(syncRunId, new Date().toISOString(), `DB 写入失败: ${errorMessage}`)
     throw err
   }
 
-  // 6. 标记 removed_at：本地有但本次 API 未返回的仓库
+  const reposUpserted = reposUpsertedBefore + upsertResult.reposUpserted
+  const starsUpserted = starsUpsertedBefore + upsertResult.starsUpserted
+  const pagesFetched = pagesFetchedBefore + totalPages
+
+  // 5. 只有完整同步的最终批次才标记 removed_at
   let reposMarkedRemoved = 0
-  if (complete && upsertResult.reposUpserted > 0) {
-    const seenFullNames = repos.map(r => r.repo.full_name)
+  if (complete) {
     try {
-      reposMarkedRemoved = await repo.markRemovedStars(profile.login, seenFullNames, now)
+      reposMarkedRemoved = await repo.markRemovedStarsBySyncRun(profile.login, syncRunId, now)
     } catch (err) {
       // markRemoved 失败不影响整体同步，记录日志即可
       console.warn('markRemovedStars 失败，不影响同步结果:', err)
     }
   }
 
-  // 7. 更新用户资料（含 avatar、bio 等扩展字段）
+  // 6. 更新用户资料（含 avatar、bio 等扩展字段）
   try {
     await repo.upsertUserProfile(
       {
@@ -150,22 +179,20 @@ export async function syncStars(
     console.warn('upsertUserProfile 失败，不影响同步结果:', err)
   }
 
-  // 8. 同步后清理用户级 AI 缓存，避免旧画像/学习路径继续展示。
-  try {
-    await repo.clearUserAiCache(profile.login)
-  } catch (err) {
-    console.warn('clearUserAiCache 失败，不影响同步结果:', err)
-  }
-
-  // 9. 更新 sync_runs 状态：完整同步才是 success，达到 Worker 上限则为 partial。
+  // 7. 更新 sync_runs 状态：完整同步才是 success，未完成则返回下一页游标。
   if (complete) {
+    try {
+      await repo.clearUserAiCache(profile.login)
+    } catch (err) {
+      console.warn('clearUserAiCache 失败，不影响同步结果:', err)
+    }
     await repo.updateSyncRunSuccess(
       syncRunId,
       new Date().toISOString(),
-      upsertResult.reposUpserted,
-      upsertResult.starsUpserted,
+      reposUpserted,
+      starsUpserted,
       reposMarkedRemoved,
-      totalPages,
+      pagesFetched,
       rateLimit?.remaining ?? null,
       rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
     )
@@ -173,24 +200,27 @@ export async function syncStars(
     await repo.updateSyncRunPartial(
       syncRunId,
       new Date().toISOString(),
-      upsertResult.reposUpserted,
-      upsertResult.starsUpserted,
-      totalPages,
+      reposUpserted,
+      starsUpserted,
+      pagesFetched,
       rateLimit?.remaining ?? null,
       rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
       warning ?? 'Worker 同步未完整完成',
+      nextPage ?? startPage + totalPages,
     )
   }
 
   return {
     username: profile.login,
     syncedAt: now,
-    reposUpserted: upsertResult.reposUpserted,
-    starsUpserted: upsertResult.starsUpserted,
+    reposUpserted: reposUpserted,
+    starsUpserted: starsUpserted,
     reposMarkedRemoved,
-    totalPages,
+    totalPages: pagesFetched,
     rateLimit,
     complete,
+    syncId: syncRunId,
+    ...(complete ? {} : { nextPage }),
     warning,
   }
 }

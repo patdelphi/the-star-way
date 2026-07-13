@@ -24,7 +24,10 @@ import { syncStars, normalizeGitHubUsername } from '../github-sync.js'
 import type { Env } from '../env.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const MIGRATION_PATH = resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql')
+const MIGRATION_PATHS = [
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql'),
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0002_star_sync_continuation.sql'),
+]
 
 let mf: Miniflare
 let env: Env
@@ -40,14 +43,16 @@ async function setupMiniflare(): Promise<Miniflare> {
     d1Databases: ['DB'],
   })
 
-  const migrationSql = readFileSync(MIGRATION_PATH, 'utf-8')
   const d1 = await mf.getD1Database('DB')
-  const cleanSql = migrationSql
-    .split('\n')
-    .filter(line => !line.trim().startsWith('--'))
-    .join('\n')
-  const statements = cleanSql.split(';').map(s => s.trim()).filter(s => s.length > 0)
-  await d1.batch(statements.map(s => d1.prepare(s)))
+  for (const migrationPath of MIGRATION_PATHS) {
+    const migrationSql = readFileSync(migrationPath, 'utf-8')
+    const cleanSql = migrationSql
+      .split('\n')
+      .filter(line => !line.trim().startsWith('--'))
+      .join('\n')
+    const statements = cleanSql.split(';').map(s => s.trim()).filter(s => s.length > 0)
+    await d1.batch(statements.map(s => d1.prepare(s)))
+  }
 
   return mf
 }
@@ -338,6 +343,35 @@ describe('正常同步流程', () => {
       .bind('testuser', 'testuser/old-outside-window')
       .first<{ removed_at: string | null }>()
     expect(oldStar?.removed_at).toBeNull()
+  })
+
+  it('分批同步可通过 syncId 和 nextPage 续传，并仅在最终批次标记 removed', async () => {
+    const repos: any[] = []
+    env.STARWAY_GITHUB_MAX_PAGES = '2'
+    for (let i = 1; i <= 250; i++) {
+      repos.push(makeStarredRepo(i, `testuser/repo${i}`, '2024-03-01T00:00:00Z'))
+    }
+    globalThis.fetch = makeMockFetch('testuser', repos) as any
+
+    const first = await (syncStars as any)(env, 'testuser', 'test-token')
+
+    expect(first.complete).toBe(false)
+    expect(first.syncId).toEqual(expect.any(Number))
+    expect(first.nextPage).toBe(3)
+    expect(first.reposUpserted).toBe(200)
+
+    const second = await (syncStars as any)(env, 'testuser', 'test-token', {
+      syncId: first.syncId,
+      startPage: first.nextPage,
+    })
+
+    expect(second.complete).toBe(true)
+    expect(second.nextPage).toBeUndefined()
+    expect(second.reposUpserted).toBe(250)
+    expect(second.reposMarkedRemoved).toBe(0)
+
+    const repoCount = await env.DB.prepare('SELECT COUNT(*) as cnt FROM repos').first<{ cnt: number }>()
+    expect(repoCount?.cnt).toBe(250)
   })
 
   it('用户名规范化：@login 形式输入', async () => {

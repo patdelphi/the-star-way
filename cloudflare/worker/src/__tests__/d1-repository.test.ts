@@ -15,7 +15,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // migration SQL 文件路径
 // __dirname = cloudflare/worker/src/__tests__
 // 需回退 3 层到 cloudflare/，然后进入 d1/migrations/
-const MIGRATION_PATH = resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql')
+const MIGRATION_PATHS = [
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql'),
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0002_star_sync_continuation.sql'),
+]
 
 // 测试用 miniflare 实例
 let mf: Miniflare
@@ -31,24 +34,16 @@ async function setupMiniflare(): Promise<Miniflare> {
     d1Databases: ['DB'],
   })
 
-  // 加载 migration
-  const migrationSql = readFileSync(MIGRATION_PATH, 'utf-8')
   const d1 = await mf.getD1Database('DB')
-
-  // 移除注释行（以 -- 开头的行），然后按 ; 分割
-  // D1 exec 对多行语句处理不稳定，改用 batch + prepare 执行
-  const cleanSql = migrationSql
-    .split('\n')
-    .filter(line => !line.trim().startsWith('--'))
-    .join('\n')
-  const statements = cleanSql
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-
-  // 用 batch 执行所有 CREATE 语句
-  const preparedStmts = statements.map(s => d1.prepare(s))
-  await d1.batch(preparedStmts)
+  for (const migrationPath of MIGRATION_PATHS) {
+    const migrationSql = readFileSync(migrationPath, 'utf-8')
+    const cleanSql = migrationSql
+      .split('\n')
+      .filter(line => !line.trim().startsWith('--'))
+      .join('\n')
+    const statements = cleanSql.split(';').map(s => s.trim()).filter(s => s.length > 0)
+    await d1.batch(statements.map(s => d1.prepare(s)))
+  }
 
   return mf
 }

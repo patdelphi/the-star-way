@@ -828,13 +828,43 @@ export class D1StarRepository {
   async insertSyncRun(userLogin: string, now: string): Promise<number> {
     const result = await this.db
       .prepare(`
-        INSERT INTO sync_runs (user_login, started_at, status)
-        VALUES (?, ?, 'running')
+        INSERT INTO sync_runs (user_login, started_at, status, next_page)
+        VALUES (?, ?, 'running', 1)
       `)
       .bind(userLogin, now)
       .run()
     // D1 返回 meta.last_row_id
     return (result.meta as any)?.last_row_id ?? 0
+  }
+
+  /** 读取指定用户的续传任务，防止串用其他用户的 syncId。 */
+  async getSyncRun(id: number, userLogin: string): Promise<{
+    id: number
+    user_login: string
+    started_at: string
+    status: string
+    repos_upserted: number
+    stars_upserted: number
+    pages_fetched: number
+    next_page: number
+  } | null> {
+    return await this.db
+      .prepare(`
+        SELECT id, user_login, started_at, status, repos_upserted, stars_upserted,
+               pages_fetched, next_page
+        FROM sync_runs
+        WHERE id = ? AND user_login = ?
+      `)
+      .bind(id, userLogin)
+      .first()
+  }
+
+  /** 将部分同步重新置为运行中，允许前端继续下一批。 */
+  async resumeSyncRun(id: number, nextPage: number): Promise<void> {
+    await this.db
+      .prepare(`UPDATE sync_runs SET status = 'running', ended_at = NULL, error_message = NULL, next_page = ? WHERE id = ?`)
+      .bind(nextPage, id)
+      .run()
   }
 
   /**
@@ -860,7 +890,8 @@ export class D1StarRepository {
           repos_removed = ?,
           pages_fetched = ?,
           rate_limit_remaining = ?,
-          rate_limit_reset = ?
+          rate_limit_reset = ?,
+          next_page = 0
         WHERE id = ?
       `)
       .bind(endedAt, reposUpserted, starsUpserted, reposRemoved, pagesFetched, rateLimitRemaining, rateLimitReset, id)
@@ -880,6 +911,7 @@ export class D1StarRepository {
     rateLimitRemaining: number | null,
     rateLimitReset: string | null,
     warning: string,
+    nextPage: number,
   ): Promise<void> {
     await this.db
       .prepare(`
@@ -892,10 +924,11 @@ export class D1StarRepository {
           pages_fetched = ?,
           rate_limit_remaining = ?,
           rate_limit_reset = ?,
+          next_page = ?,
           error_message = ?
         WHERE id = ?
       `)
-      .bind(endedAt, reposUpserted, starsUpserted, pagesFetched, rateLimitRemaining, rateLimitReset, warning, id)
+      .bind(endedAt, reposUpserted, starsUpserted, pagesFetched, rateLimitRemaining, rateLimitReset, nextPage, warning, id)
       .run()
   }
 
@@ -939,6 +972,7 @@ export class D1StarRepository {
       starred_at: string
     }>,
     now: string,
+    syncRunId = 0,
   ): Promise<{ reposUpserted: number; starsUpserted: number }> {
     if (repos.length === 0) {
       return { reposUpserted: 0, starsUpserted: 0 }
@@ -993,13 +1027,14 @@ export class D1StarRepository {
       // upsert 星标
       stmts.push(
         this.db.prepare(`
-          INSERT INTO stars (user_login, repo_full_name, starred_at, first_seen_at, last_seen_at, removed_at)
-          VALUES (?, ?, ?, ?, ?, NULL)
+          INSERT INTO stars (user_login, repo_full_name, starred_at, first_seen_at, last_seen_at, sync_run_id, removed_at)
+          VALUES (?, ?, ?, ?, ?, ?, NULL)
           ON CONFLICT(user_login, repo_full_name) DO UPDATE SET
             starred_at = excluded.starred_at,
             last_seen_at = excluded.last_seen_at,
+            sync_run_id = excluded.sync_run_id,
             removed_at = NULL
-        `).bind(userLogin, repo.full_name, item.starred_at, now, now),
+        `).bind(userLogin, repo.full_name, item.starred_at, now, now, syncRunId),
       )
     }
 
@@ -1047,6 +1082,20 @@ export class D1StarRepository {
 
     await this.db.batch(stmts)
     return toRemove.length
+  }
+
+  /** 最终批次按 sync_run_id 标记 removed，避免跨请求保存完整仓库名列表。 */
+  async markRemovedStarsBySyncRun(userLogin: string, syncRunId: number, now: string): Promise<number> {
+    const result = await this.db
+      .prepare(`
+        UPDATE stars
+        SET removed_at = ?
+        WHERE user_login = ? AND removed_at IS NULL
+          AND (sync_run_id IS NULL OR sync_run_id != ?)
+      `)
+      .bind(now, userLogin, syncRunId)
+      .run()
+    return Number(result.meta?.changes ?? 0)
   }
 
   /**

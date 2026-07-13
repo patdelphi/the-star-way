@@ -299,13 +299,21 @@ export async function handleRequest(
 
     // ===== POST /api/sync =====
     if (method === 'POST' && pathname === '/api/sync') {
-      const payload = await readBody(request) as { username?: string; token?: string }
+      const payload = await readBody(request) as { username?: string; token?: string; syncId?: number; startPage?: number }
       if (!payload.username) {
         throw new WorkerApiError('缺少 username 字段', 'MISSING_USERNAME', 400)
       }
       // Worker 版同步：token 从 env 读取，不支持请求 body 传 token
       const token = resolveGitHubToken(env)
-      const result = await syncStarsWorker(env, payload.username, token)
+      const syncId = payload.syncId === undefined ? undefined : Number(payload.syncId)
+      const startPage = payload.startPage === undefined ? undefined : Number(payload.startPage)
+      if (syncId !== undefined && (!Number.isInteger(syncId) || syncId < 1)) {
+        throw new WorkerApiError('syncId 必须是正整数', 'INVALID_SYNC_ID', 400)
+      }
+      if (startPage !== undefined && (!Number.isInteger(startPage) || startPage < 1)) {
+        throw new WorkerApiError('startPage 必须是正整数', 'INVALID_START_PAGE', 400)
+      }
+      const result = await syncStarsWorker(env, payload.username, token, { syncId, startPage })
       return dataResponse(result)
     }
 

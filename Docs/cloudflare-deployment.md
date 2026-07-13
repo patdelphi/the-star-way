@@ -15,7 +15,7 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Worker API（Cloudflare Workers）                          │
 │  - 路由、CORS、错误处理                                    │
-│  - GitHub 同步（默认最多 20 页 = 2000 条）                  │
+│  - GitHub 同步（单请求分批，前端自动续传）                  │
 │  - MVP 只读查询 + 轻量同步                                 │
 └────────────────────────┬─────────────────────────────────┘
                          │ 绑定
@@ -72,6 +72,9 @@ database_id = "替换为上一步获取的真实 ID"
 # 生产环境
 npx wrangler d1 execute starway-db --remote --file=../d1/migrations/0001_init.sql
 
+# 已有数据库继续执行续传字段迁移
+npx wrangler d1 execute starway-db --remote --file=../d1/migrations/0002_star_sync_continuation.sql
+
 # 开发环境（本地 D1 模拟）
 npx wrangler d1 execute starway-db --local --file=../d1/migrations/0001_init.sql
 ```
@@ -92,14 +95,14 @@ GitHub Token 必须通过 secret 注入，不要写入代码或 wrangler.toml：
 npx wrangler secret put STARWAY_GITHUB_TOKEN
 ```
 
-可选：调整 Worker 单次同步页数上限（默认 20 页，每页 100 条 starred repos）：
+可选：调整 Worker 单次同步批次页数上限（默认 20 页，每页 100 条 starred repos）：
 
 ```toml
 [vars]
 STARWAY_GITHUB_MAX_PAGES = "20"
 ```
 
-达到上限时 `/api/sync` 返回 `complete: false`，`sync_runs.status` 写入 `partial`，并暂停 Star DNA / 学习路径的新生成，避免基于不完整数据缓存错误画像。
+达到单批上限时 `/api/sync` 返回 `complete: false`、`syncId` 和 `nextPage`；前端会自动续传，直到全部页完成。只有最终批次才执行 removed 标记、清理 Star DNA / 学习路径缓存并将 `sync_runs.status` 更新为 `success`。
 
 按提示粘贴 GitHub Personal Access Token（建议 fine-grained token，仅需 `read:user` 和 `public_repo` 权限）。
 
