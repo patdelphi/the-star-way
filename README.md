@@ -2,7 +2,29 @@
 
 > [English](./README.en.md) | 简体中文
 
-> 从探索知名开发者的 GitHub 星标仓库中，发现自己下一步该学什么、该用什么。
+> **把 GitHub Stars 变成开发者技术画像、兴趣地图和学习路径。**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-starway.patdelphi.xyz-blue?style=flat-square)](https://starway.patdelphi.xyz) [![Docs](https://img.shields.io/badge/Docs-📚-green?style=flat-square)](./Docs) [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+
+输入任意 GitHub 用户名，分析他的 starred repositories：
+
+- **Star DNA** — 开发者技术画像（AI 生成）
+- **Learning Path** — 个性化学习路径推荐（AI 生成）
+- **Hidden Gems** — 发现被忽略的低星优质项目
+- **Tech Map** — 语言、主题、协议、活跃度统计
+
+## Screenshots
+
+![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
+![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
+![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
+![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
+![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
+![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
+![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
+![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
+
+---
 
 ## 为什么值得用
 
@@ -179,15 +201,6 @@ cd backend && corepack pnpm test
 # Worker 测试
 cd cloudflare/worker && corepack pnpm test
 ```
-
-## 路线图
-
-- **V0.1** 本地数据层、GitHub 同步、规则分类、导出 ✓
-- **V0.2** AI 增强：Star DNA / Learning Path / README 摘要 ✓
-- **V0.3** 设置页、三态主题、统一存储 ✓
-- **V0.4** 星标趋势图、Brush 缩放、年份智能显示 ✓
-- **V0.5** Cloudflare 双架构部署 ✓
-- **V0.6** 分享卡片、GitHub Profile Badge、Compare Users
 
 ## 开源协议
 

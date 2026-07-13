@@ -2,7 +2,29 @@
 
 > English | [简体中文](./README.md)
 
-> Discover what to learn next by exploring the GitHub stars of developers you admire.
+> **Turn GitHub Stars into your developer interest map and AI-powered learning path.**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-starway.patdelphi.xyz-blue?style=flat-square)](https://starway.patdelphi.xyz) [![Docs](https://img.shields.io/badge/Docs-📚-green?style=flat-square)](./Docs) [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+
+Enter any GitHub username to analyze their starred repositories:
+
+- **Star DNA** — Developer tech profile (AI-generated)
+- **Learning Path** — Personalized learning path recommendations (AI-generated)
+- **Hidden Gems** — Discover overlooked low-star quality projects
+- **Tech Map** — Language, topic, license, and activity statistics
+
+## Screenshots
+
+![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
+![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
+![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
+![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
+![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
+![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
+![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
+![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
+
+---
 
 ## Why It Matters
 
@@ -179,15 +201,6 @@ cd backend && corepack pnpm test
 # Worker tests
 cd cloudflare/worker && corepack pnpm test
 ```
-
-## Roadmap
-
-- **V0.1** Local data layer, GitHub sync, rule classification, export ✓
-- **V0.2** AI: Star DNA / Learning Path / README summary ✓
-- **V0.3** Settings page, tri-state theme, unified storage ✓
-- **V0.4** Star trend chart, Brush zoom, smart year display ✓
-- **V0.5** Cloudflare dual-architecture deployment ✓
-- **V0.6** Share cards, GitHub Profile Badge, Compare Users
 
 ## License
 
