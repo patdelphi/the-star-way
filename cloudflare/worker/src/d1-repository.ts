@@ -983,13 +983,27 @@ export class D1StarRepository {
     for (const item of repos) {
       const repo = item.repo
 
+      // GitHub 仓库改名后 github_id 不变；先迁移旧名称的星标关系，避免产生孤儿记录。
+      stmts.push(
+        this.db.prepare(`
+          UPDATE stars
+          SET repo_full_name = ?
+          WHERE repo_full_name = (SELECT full_name FROM repos WHERE github_id = ?)
+            AND repo_full_name != ?
+        `).bind(repo.full_name, repo.id, repo.full_name),
+      )
+
       // upsert 仓库
       stmts.push(
         this.db.prepare(`
           INSERT INTO repos (github_id, full_name, owner, name, html_url, description, language, license,
             stars, forks, open_issues, topics_json, created_at, updated_at, pushed_at, archived, fork, homepage)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(full_name) DO UPDATE SET
+          ON CONFLICT(github_id) DO UPDATE SET
+            full_name = excluded.full_name,
+            owner = excluded.owner,
+            name = excluded.name,
+            html_url = excluded.html_url,
             description = excluded.description,
             language = excluded.language,
             license = excluded.license,

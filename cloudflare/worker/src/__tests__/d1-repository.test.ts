@@ -399,6 +399,45 @@ describe('D1StarRepository', () => {
       expect(r?.repo.language).toBe('Rust')
     })
 
+    it('batchUpsertReposAndStars 应按 github_id 处理仓库改名', async () => {
+      const d1 = await mf.getD1Database('DB')
+      const now = new Date().toISOString()
+
+      // 模拟 GitHub 仓库改名：同一个 github_id 已存在旧 full_name。
+      await d1.prepare(`
+        INSERT INTO repos (github_id, full_name, owner, name, html_url, created_at, updated_at, archived, fork)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+      `).bind(
+        100, 'old-owner/old-name', 'old-owner', 'old-name',
+        'https://github.com/new-owner/new-name', now, now,
+      ).run()
+      await d1.prepare(`
+        INSERT INTO stars (user_login, repo_full_name, starred_at, first_seen_at, last_seen_at, removed_at)
+        VALUES (?, ?, ?, ?, ?, NULL)
+      `).bind('testuser', 'old-owner/old-name', now, now, now).run()
+
+      await repo.batchUpsertReposAndStars('testuser', [{
+        repo: {
+          id: 100, full_name: 'new-owner/new-name', owner: { login: 'new-owner' }, name: 'new-name',
+          html_url: 'https://github.com/new-owner/new-name', description: null,
+          language: 'TypeScript', license: null, stargazers_count: 10,
+          forks_count: 1, open_issues_count: 0, topics: [],
+          created_at: now, updated_at: now, pushed_at: now,
+          archived: false, fork: false, homepage: null,
+        },
+        starred_at: now,
+      }], now)
+
+      const renamedRepo = await d1.prepare('SELECT full_name FROM repos WHERE github_id = ?').bind(100).first<{ full_name: string }>()
+      expect(renamedRepo?.full_name).toBe('new-owner/new-name')
+      const renamedStar = await d1.prepare('SELECT 1 AS found FROM stars WHERE user_login = ? AND repo_full_name = ?')
+        .bind('testuser', 'new-owner/new-name').first<{ found: number }>()
+      expect(renamedStar?.found).toBe(1)
+      const staleStar = await d1.prepare('SELECT 1 AS found FROM stars WHERE user_login = ? AND repo_full_name = ?')
+        .bind('testuser', 'old-owner/old-name').first<{ found: number }>()
+      expect(staleStar).toBeNull()
+    })
+
     it('markRemovedStars 应标记未返回的星标为 removed', async () => {
       const now = new Date().toISOString()
       // 假设本次同步只返回 repo1，repo2 和 repo3 应被标记 removed
