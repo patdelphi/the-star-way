@@ -29,4 +29,11 @@ npm-debug.log*
 # aipython 数据同步产物（含导出的真实仓库数据，不入库）
 aipython/d1_sync/
 
+# 本地运行数据（SQLite 数据库，不入库）
+backend/data/starway.db
+backend/data/starway.db-*
+
+# Cloudflare Wrangler 本地缓存
+.wrangler/
+
 chat_history.md

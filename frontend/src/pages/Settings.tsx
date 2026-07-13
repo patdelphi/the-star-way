@@ -327,10 +327,11 @@ export default function Settings() {
                     : t("settings.serviceStatus.notConfigured")}
               </Badge>
             </div>
-            {(serviceStatus?.github.message || serviceStatus?.ai.message) && (
-              <p className="text-xs text-muted-foreground">
-                {serviceStatus?.github.message || serviceStatus?.ai.message}
-              </p>
+            {!serviceStatus?.github.configured && (
+              <p className="text-xs text-muted-foreground">{t("settings.serviceStatus.githubNotConfigured")}</p>
+            )}
+            {!serviceStatus?.ai.configured && (
+              <p className="text-xs text-muted-foreground">{t("settings.serviceStatus.aiNotConfigured")}</p>
             )}
             <Button variant="outline" size="sm" className="w-full gap-2" onClick={loadServiceStatus}>
               <RefreshCw className="h-4 w-4" />

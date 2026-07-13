@@ -413,7 +413,7 @@ const Dashboard: React.FC = () => {
         setStarTrend(overview.starTrend)
       } catch (err) {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : String(err))
+        setError(t("apiErrors.generic"))
         setUserCount(0)
         setRepoCount(0)
         setPersonalityData([])

@@ -26,7 +26,7 @@ import {
   Tags,
   X,
 } from "lucide-react"
-import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport, getCnSummaries } from "@/lib/api"
+import { getRepos, getStats, getTags, getUserSummary, exportData, classifyRepos, addRepoTag, removeRepoTag, getRemovedStars, downloadReport, getCnSummaries, getApiErrorMessage } from "@/lib/api"
 import { getSettings } from "@/lib/settings"
 import { getTagLabel } from "@/lib/tag-labels"
 import type { UserStats, RepoListResult } from "@/lib/api"
@@ -282,7 +282,7 @@ export default function StarExplorer() {
         }
       } catch (err) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : t("starExplorer.loadingHint")
+        const msg = getApiErrorMessage(err, t, t("starExplorer.loadingHint"))
         setError(msg)
         setAllRepos([])
         setUsingFallback(true)
@@ -563,7 +563,7 @@ export default function StarExplorer() {
         setAnalysisStatus(t("starExplorer.exportFailedNoData"))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t("starExplorer.exportError", { message: "" })
+      const msg = getApiErrorMessage(err, t, t("apiErrors.generic"))
       setAnalysisStatus(t("starExplorer.exportError", { message: msg }))
     }
     setExportOpen(false)
@@ -579,7 +579,7 @@ export default function StarExplorer() {
         setAnalysisStatus(t("starExplorer.classifyUnavailable"))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : ""
+      const msg = getApiErrorMessage(err, t, t("apiErrors.generic"))
       setAnalysisStatus(t("starExplorer.classifyError", { message: msg }))
     }
   }
@@ -644,7 +644,7 @@ export default function StarExplorer() {
         setAnalysisStatus(t("starExplorer.tagAddFailed", { tag }))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : ""
+      const msg = getApiErrorMessage(err, t, t("apiErrors.generic"))
       setAnalysisStatus(t("starExplorer.tagAddError", { message: msg }))
     }
   }
@@ -665,7 +665,7 @@ export default function StarExplorer() {
         setAnalysisStatus(t("starExplorer.tagRemoveFailed", { tag }))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : ""
+      const msg = getApiErrorMessage(err, t, t("apiErrors.generic"))
       setAnalysisStatus(t("starExplorer.tagRemoveError", { message: msg }))
     }
   }

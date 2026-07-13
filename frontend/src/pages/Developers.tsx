@@ -41,7 +41,7 @@ import {
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend, Brush } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline, deleteUser } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
 import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
@@ -690,7 +690,7 @@ export default function Developers() {
     } catch (err) {
       if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== dnaRequestSeq.current) return
       setStarDna(null)
-      setDnaError(err instanceof Error ? err.message : t("developers.dnaEmpty"))
+      setDnaError(getApiErrorMessage(err, t, t("developers.dnaEmpty")))
     }
     finally {
       if ((force || isInitialLoad) && isCurrentDeveloperRequest(login, requestSeq) && requestSeq === dnaRequestSeq.current) setDnaLoading(false)
@@ -718,7 +718,7 @@ export default function Developers() {
     } catch (err) {
       if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== pathRequestSeq.current) return
       setLearningPath(null)
-      setPathError(err instanceof Error ? err.message : t("developers.pathEmpty"))
+      setPathError(getApiErrorMessage(err, t, t("developers.pathEmpty")))
     }
     finally {
       if ((force || isInitialLoad) && isCurrentDeveloperRequest(login, requestSeq) && requestSeq === pathRequestSeq.current) setPathLoading(false)
@@ -820,7 +820,7 @@ export default function Developers() {
             }
           } catch (err) {
             if (isCurrentDeveloperRequest(syncedName, 0)) {
-              setDnaError(err instanceof Error ? err.message : t("developers.dnaEmpty"))
+              setDnaError(getApiErrorMessage(err, t, t("developers.dnaEmpty")))
             }
           }
           try {
@@ -832,7 +832,7 @@ export default function Developers() {
             }
           } catch (err) {
             if (isCurrentDeveloperRequest(syncedName, 0)) {
-              setPathError(err instanceof Error ? err.message : t("developers.pathEmpty"))
+              setPathError(getApiErrorMessage(err, t, t("developers.pathEmpty")))
             }
           }
         } else if (isCurrentDeveloperRequest(syncedName, 0)) {
@@ -848,8 +848,7 @@ export default function Developers() {
       if (isCurrentDeveloperRequest(name, 0)) {
         setSyncStatus("networkFail")
         setSyncMessage("")
-        const message = err instanceof Error ? err.message : ""
-        setSyncError(message === "SYNC_FAILED" ? t("developers.syncUnknownError") : message || t("developers.syncUnknownError"))
+        setSyncError(getApiErrorMessage(err, t, t("developers.syncUnknownError")))
       }
     } finally {
       // 统一重置：无论成功/失败/异常，都确保 isSyncingRef 复位

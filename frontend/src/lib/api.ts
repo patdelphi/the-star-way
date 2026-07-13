@@ -284,6 +284,26 @@ export async function getUsers(): Promise<UserInfo[]> {
   return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null, repoCount: 0, tagCount: 0 }]
 }
 
+/** 将 API 错误码转换为当前界面的本地化文案，避免直接展示后端中文 message。 */
+export function getApiErrorMessage(
+  error: unknown,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+  fallback: string,
+): string {
+  if (error instanceof ApiRequestError) {
+    const key = `apiErrors.${error.code}`
+    const translated = translate(key, { defaultValue: '' })
+    if (translated && translated !== key) return translated
+  }
+
+  if (error instanceof Error && ['Failed to fetch', 'NetworkError', 'Load failed'].includes(error.message)) {
+    const translated = translate('apiErrors.NETWORK_ERROR', { defaultValue: '' })
+    if (translated && translated !== 'apiErrors.NETWORK_ERROR') return translated
+  }
+
+  return fallback
+}
+
 /**
  * 逻辑删除用户；后端保留数据，重新同步同一 login 时恢复。
  */
@@ -474,7 +494,11 @@ export async function syncStars(username: string, token?: string): Promise<SyncS
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data?.error?.message || 'SYNC_FAILED')
+        throw new ApiRequestError(
+          data?.error?.code || 'API_ERROR',
+          data?.error?.message || 'SYNC_FAILED',
+          res.status,
+        )
       }
       result = data.data as SyncStarsResult
       if (result.complete || result.nextPage === undefined || result.syncId === undefined) {

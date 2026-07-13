@@ -6,6 +6,29 @@
     "errorDescription": "The current page state is invalid. Refresh and try again.",
     "errorAction": "Refresh page"
   },
+  "apiErrors": {
+    "NETWORK_ERROR": "Network request failed. Please try again.",
+    "GITHUB_INVALID_USERNAME": "The GitHub username is invalid.",
+    "GITHUB_NO_TOKEN": "The GitHub token is not configured on the server.",
+    "GITHUB_UNAUTHORIZED": "The GitHub token is invalid or lacks permission.",
+    "GITHUB_FORBIDDEN": "GitHub access was denied or rate limited.",
+    "GITHUB_NOT_FOUND": "The GitHub user or repository was not found.",
+    "GITHUB_RATE_LIMITED": "GitHub API rate limit reached. Please try again later.",
+    "GITHUB_SERVER_ERROR": "GitHub is temporarily unavailable.",
+    "GITHUB_API_ERROR": "The GitHub API request failed.",
+    "SYNC_CONTINUATION_INVALID": "The sync continuation is no longer available. Please start a new sync.",
+    "SYNC_INCOMPLETE": "Star data is not fully synchronized yet.",
+    "MISSING_USERNAME": "A GitHub username is required.",
+    "INVALID_SYNC_ID": "The sync task identifier is invalid.",
+    "USER_NOT_FOUND": "The developer was not found.",
+    "REPO_NOT_FOUND": "The repository was not found.",
+    "AI_NOT_CONFIGURED": "The AI service is not configured.",
+    "EMPTY_STAR_DATA": "No starred repositories were found. Sync stars first.",
+    "NOT_IMPLEMENTED": "This feature is not available in the Worker version.",
+    "INTERNAL_ERROR": "The server encountered an internal error.",
+    "API_ERROR": "The request failed.",
+    "generic": "The request failed. Please try again."
+  },
   "nav": {
     "groupOverview": "Overview",
     "groupBrowse": "Browse",
@@ -551,7 +574,9 @@
       "valid": "Valid",
       "invalid": "Invalid",
       "notConfigured": "Not configured",
-      "none": "None"
+      "none": "None",
+      "githubNotConfigured": "The server has no GitHub Token configured.",
+      "aiNotConfigured": "The AI service is not configured."
     },
     "timeouts": {
       "title": "API Timeouts",
