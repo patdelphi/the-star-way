@@ -33,9 +33,10 @@ function useTheme() {
   return { theme, cycleTheme }
 }
 
+// 语言列表：label 使用该语言的自称（永远显示原文，不随当前 UI 语言变化）
 const languages = [
-  { code: "zh-CN", labelKey: "topBar.languageZh" },
-  { code: "en-US", labelKey: "topBar.languageEn" },
+  { code: "zh-CN", label: "中文" },
+  { code: "en-US", label: "English" },
 ]
 
 export function TopBar() {
@@ -180,7 +181,8 @@ export function TopBar() {
             className="text-on-surface-variant hover:text-primary font-sans text-sm tracking-wider gap-1.5"
             onClick={() => setLangOpen(!langOpen)}
           >
-            {t(currentLang.labelKey)}
+            <span aria-hidden>🌐</span>
+            {currentLang.label}
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${langOpen ? "rotate-180" : ""}`} />
           </Button>
 
@@ -203,7 +205,7 @@ export function TopBar() {
                     }`}
                     onClick={() => handleLangChange(l.code)}
                   >
-                    {t(l.labelKey)}
+                    {l.label}
                   </button>
                 ))}
               </div>
