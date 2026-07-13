@@ -1070,43 +1070,6 @@ export class D1StarRepository {
     return { reposUpserted: repos.length, starsUpserted: repos.length }
   }
 
-  /**
-   * 标记 removed_at：本地有但本次 API 未返回的仓库
-   *
-   * 实现说明：D1 对单条 SQL 的绑定变量数有上限，当仓库数量较多时
-   * 使用 NOT IN (?, ?, ...) 会触发 "too many SQL variables" 错误。
-   * 改用「查询当前活跃星标 → JS 集合差 → 批量 UPDATE」的方式，
-   * 既绕过变量数限制，又能保证语义等价。
-   */
-  async markRemovedStars(userLogin: string, seenFullNames: string[], now: string): Promise<number> {
-    if (seenFullNames.length === 0) return 0
-
-    // 1. 查询该用户当前所有活跃星标的 repo_full_name
-    const result = await this.db
-      .prepare('SELECT repo_full_name FROM stars WHERE user_login = ? AND removed_at IS NULL')
-      .bind(userLogin)
-      .all<{ repo_full_name: string }>()
-
-    const currentFullNames = result.results?.map(r => r.repo_full_name) ?? []
-    if (currentFullNames.length === 0) return 0
-
-    // 2. 计算需要标记移除的仓库（本地有但 seenFullNames 中没有）
-    const seenSet = new Set(seenFullNames)
-    const toRemove = currentFullNames.filter(name => !seenSet.has(name))
-
-    if (toRemove.length === 0) return 0
-
-    // 3. 用 D1 batch 批量 UPDATE，每条语句仅 3 个绑定变量，避免变量数限制
-    const stmts: D1PreparedStatement[] = toRemove.map(fullName =>
-      this.db
-        .prepare('UPDATE stars SET removed_at = ? WHERE user_login = ? AND repo_full_name = ? AND removed_at IS NULL')
-        .bind(now, userLogin, fullName),
-    )
-
-    await this.db.batch(stmts)
-    return toRemove.length
-  }
-
   /** 最终批次按 sync_run_id 标记 removed，避免跨请求保存完整仓库名列表。 */
   async markRemovedStarsBySyncRun(userLogin: string, syncRunId: number, now: string): Promise<number> {
     const result = await this.db

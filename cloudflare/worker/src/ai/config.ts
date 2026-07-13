@@ -52,11 +52,3 @@ export function loadAiConfig(env: Env): AiProviderConfig {
     model,
   }
 }
-
-/**
- * 判断 AI 功能是否已配置
- * 与 env.ts 中的 isAiConfigured 保持兼容
- */
-export function isAiConfigured(env: Env): boolean {
-  return loadAiConfig(env).enabled
-}

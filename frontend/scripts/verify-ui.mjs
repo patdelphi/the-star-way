@@ -197,7 +197,7 @@ const checks = [
   ["仓库分析导航命名", getByPath(locales.zh, "nav.repoAnalysis") === "仓库分析"],
   ["星标仓库接入真实 API", ["getRepos", "getStats", "getTags", "exportData", "classifyRepos"].every((name) => files.explorer.includes(name))],
   ["星标仓库 API 不可用时不展示样例仓库", files.explorer.includes("usingFallback") && files.explorer.includes("setAllRepos([])")],
-  ["星标仓库筛选排序状态", ["selectedLanguage", "selectedTopic", "selectedLicense", "sortKey", "quickFilter"].every((name) => files.explorer.includes(name))],
+  ["星标仓库筛选排序状态", ["selectedLanguage", "selectedTags", "selectedLicense", "sortKey", "quickFilter"].every((name) => files.explorer.includes(name))],
   ["星标仓库导出弹窗", files.explorer.includes("exportOpen") && files.explorer.includes("exportPreview")],
   ["星标仓库列表可跳仓库分析", files.explorer.includes("selected-star-repo") && files.explorer.includes("/analysis?repo=")],
   ["顶部 8 个信息块", [
@@ -249,7 +249,7 @@ const checks = [
   ["AI 行为使用拨动开关", files.settingsPage.includes('role="switch"') && files.settingsPage.includes("aria-checked")],
   ["全局渲染异常兜底", files.app.includes("ErrorBoundary") && getByPath(locales.zh, "app.errorTitle") && getByPath(locales.en, "app.errorTitle")],
   ["API 客户端集中兜底数组响应", files.api.includes("function safeArray") && files.api.includes("normalizeRepoList") && files.api.includes("normalizeUserStats") && files.api.includes("normalizeGlobalOverview")],
-  ["API 可用性离线后会重试", files.api.includes("if (apiAvailable === true) return true") && !files.api.includes("if (apiAvailable !== null) return apiAvailable")],
+  ["API 请求不重复执行全局可用性预探测", !files.api.includes("checkApiAvailable") && !files.api.includes("apiAvailable")],
   ["API 仓库列表不会返回空结构", !files.api.includes("return data.data as RepoListResult") && files.api.includes("return normalizeRepoList(data.data)")],
   ["API 统计数据不会返回半结构", !files.api.includes("return data.data as UserStats") && files.api.includes("return normalizeUserStats(data.data)")],
   ["开发者搜索结果不复用同步成功提示", !files.developers.includes('setSearchResult(t("developers.starUpdated"')],

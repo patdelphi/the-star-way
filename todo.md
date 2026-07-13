@@ -52,3 +52,13 @@
 - [x] 部署修复并验证 `syncId=134` 续传成功
 - [x] 修复仓库转移导致的 `repos.full_name` 唯一键冲突
 - [x] 部署版本 `2c725b4f-4a66-4b9b-b6a5-7ac25665012c` 并验证 `syncId=137` 续传成功
+
+## 2026-07-13：冗余与过度设计清理
+
+- [x] 移除前端每次请求前重复执行的 `/api/users` 可用性预探测
+- [x] 合并 Worker AI 配置就绪判断，统一委托 `loadAiConfig(env).enabled`
+- [x] 移除前端和 Worker 路由的冗余 `startPage` 入参，续传页码只读取 D1 `sync_runs.next_page`
+- [x] 删除未使用的旧版 `markRemovedStars`，保留按 `sync_run_id` 的最终批次处理
+- [x] 更新前端静态 UI 校验规则，覆盖新的 API 请求设计
+- [x] 验证 Worker 测试、TypeScript、前端 UI 校验和生产构建
+- [ ] 后端与 Worker 的同名用户名规范化函数暂不合并：两者属于独立运行时且均被实际使用

@@ -362,7 +362,6 @@ describe('正常同步流程', () => {
 
     const second = await (syncStars as any)(env, 'testuser', 'test-token', {
       syncId: first.syncId,
-      startPage: first.nextPage,
     })
 
     expect(second.complete).toBe(true)

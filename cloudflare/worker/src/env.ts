@@ -1,3 +1,5 @@
+import { loadAiConfig } from './ai/config.js'
+
 /**
  * Worker 环境变量与配置类型
  * Worker 运行时通过 env 注入 D1 数据库绑定和 secrets
@@ -52,5 +54,5 @@ export function getGitHubTokenSource(env: Env): string | null {
  * 实际配置加载逻辑见 ai/config.ts
  */
 export function isAiConfigured(env: Env): boolean {
-  return !!(env.STARWAY_AI_BASE_URL && env.STARWAY_AI_API_KEY && env.STARWAY_AI_MODEL)
+  return loadAiConfig(env).enabled
 }

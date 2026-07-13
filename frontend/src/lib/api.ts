@@ -269,25 +269,6 @@ async function readJsonDataOrThrow<T>(res: Response): Promise<T> {
   return data.data as T
 }
 
-/**
- * 判断 API 是否可用
- */
-let apiAvailable: boolean | null = null
-
-async function checkApiAvailable(): Promise<boolean> {
-  if (apiAvailable === true) return true
-  try {
-    const response = await fetchWithTimeout(`${API_BASE}/api/users`, {
-      method: 'GET',
-    })
-    apiAvailable = response.ok
-    return apiAvailable
-  } catch {
-    apiAvailable = false
-    return false
-  }
-}
-
 // ===== API 调用 =====
 
 /**
@@ -295,11 +276,9 @@ async function checkApiAvailable(): Promise<boolean> {
  */
 export async function getUsers(): Promise<UserInfo[]> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users`)
-      const data = await res.json()
-      return safeArray<UserInfo>(data.data)
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users`)
+    const data = await res.json()
+    return safeArray<UserInfo>(data.data)
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底
   return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null, repoCount: 0, tagCount: 0 }]
@@ -310,12 +289,10 @@ export async function getUsers(): Promise<UserInfo[]> {
  */
 export async function deleteUser(login: string): Promise<boolean> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}`, {
-        method: 'DELETE',
-      })
-      return res.ok
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}`, {
+      method: 'DELETE',
+    })
+    return res.ok
   } catch { /* 忽略错误 */ }
   return false
 }
@@ -325,11 +302,9 @@ export async function deleteUser(login: string): Promise<boolean> {
  */
 export async function getServiceStatus(): Promise<ServiceStatus | null> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/status`)
-      const data = await res.json()
-      return data.data as ServiceStatus
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/status`)
+    const data = await res.json()
+    return data.data as ServiceStatus
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -339,20 +314,18 @@ export async function getServiceStatus(): Promise<ServiceStatus | null> {
  */
 export async function getRepos(login: string, params: RepoQueryParams = {}): Promise<RepoListResult> {
   try {
-    if (await checkApiAvailable()) {
-      const query = new URLSearchParams()
-      if (params.language) query.set('language', params.language)
-      if (params.tag) query.set('tag', params.tag)
-      if (params.q) query.set('q', params.q)
-      if (params.sort) query.set('sort', params.sort)
-      if (params.direction) query.set('direction', params.direction)
-      if (params.page) query.set('page', String(params.page))
-      if (params.pageSize) query.set('pageSize', String(params.pageSize))
+    const query = new URLSearchParams()
+    if (params.language) query.set('language', params.language)
+    if (params.tag) query.set('tag', params.tag)
+    if (params.q) query.set('q', params.q)
+    if (params.sort) query.set('sort', params.sort)
+    if (params.direction) query.set('direction', params.direction)
+    if (params.page) query.set('page', String(params.page))
+    if (params.pageSize) query.set('pageSize', String(params.pageSize))
 
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos?${query}`)
-      const data = await res.json()
-      return normalizeRepoList(data.data)
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos?${query}`)
+    const data = await res.json()
+    return normalizeRepoList(data.data)
   } catch { /* 忽略错误，降级到 mock */ }
   // Demo 模式兜底 - 返回空列表
   return { items: [], total: 0 }
@@ -363,23 +336,21 @@ export async function getRepos(login: string, params: RepoQueryParams = {}): Pro
  */
 export async function getRepo(login: string, fullName: string): Promise<(Repo & { starred_at: string; tags: string[] }) | null> {
   try {
-    if (await checkApiAvailable()) {
-      // 先尝试从当前用户获取
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos/${encodeURIComponent(fullName)}`)
-      if (res.ok) {
-        const data = await res.json()
-        const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
-        return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
-      }
-      // 回退到全局仓库查询
-      const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}`)
-      if (globalRes.ok) {
-        const data = await globalRes.json()
-        const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
-        return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
-      }
-      return null
+    // 先尝试从当前用户获取
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/repos/${encodeURIComponent(fullName)}`)
+    if (res.ok) {
+      const data = await res.json()
+      const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
+      return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
     }
+    // 回退到全局仓库查询
+    const globalRes = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}`)
+    if (globalRes.ok) {
+      const data = await globalRes.json()
+      const repo = data.data as (Repo & { starred_at?: string | null; tags?: string[] }) | null
+      return repo ? { ...repo, starred_at: repo.starred_at || "", tags: safeArray<string>(repo.tags) } : null
+    }
+    return null
   } catch { /* 忽略错误，降级到 mock */ }
   return null
 }
@@ -400,12 +371,10 @@ export interface SimilarRepo {
  */
 export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/similar`)
-      if (res.ok) {
-        const data = await res.json()
-        return safeArray<SimilarRepo>(data.data)
-      }
+    const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/similar`)
+    if (res.ok) {
+      const data = await res.json()
+      return safeArray<SimilarRepo>(data.data)
     }
   } catch { /* 忽略 */ }
   return []
@@ -416,11 +385,9 @@ export async function getSimilarRepos(fullName: string): Promise<SimilarRepo[]> 
  */
 export async function getStats(login: string): Promise<UserStats | null> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/stats`)
-      const data = await res.json()
-      return normalizeUserStats(data.data)
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/stats`)
+    const data = await res.json()
+    return normalizeUserStats(data.data)
   } catch { /* 忽略错误，降级到 mock */ }
   return null
 }
@@ -430,11 +397,9 @@ export async function getStats(login: string): Promise<UserStats | null> {
  */
 export async function getUserStarTimeline(login: string): Promise<Array<{ month: string; count: number }> | null> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-timeline`)
-      const data = await res.json()
-      return safeArray<{ month: string; count: number }>(data.data)
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-timeline`)
+    const data = await res.json()
+    return safeArray<{ month: string; count: number }>(data.data)
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -444,17 +409,15 @@ export async function getUserStarTimeline(login: string): Promise<Array<{ month:
  */
 export async function getGlobalOverview(): Promise<GlobalOverview | null> {
   try {
-    if (await checkApiAvailable()) {
-      // 带上用户自定义的业务阈值
-      const s = getSettings()
-      const params = new URLSearchParams()
-      params.set('sleepDays', String(s.sleepDays))
-      params.set('gemStarsMin', String(s.gemStarsMin))
-      params.set('gemStarsMax', String(s.gemStarsMax))
-      const res = await fetchWithTimeout(`${API_BASE}/api/overview?${params}`)
-      const data = await res.json()
-      return normalizeGlobalOverview(data.data)
-    }
+    // 带上用户自定义的业务阈值
+    const s = getSettings()
+    const params = new URLSearchParams()
+    params.set('sleepDays', String(s.sleepDays))
+    params.set('gemStarsMin', String(s.gemStarsMin))
+    params.set('gemStarsMax', String(s.gemStarsMax))
+    const res = await fetchWithTimeout(`${API_BASE}/api/overview?${params}`)
+    const data = await res.json()
+    return normalizeGlobalOverview(data.data)
   } catch { /* 忽略错误，降级到 mock */ }
   return null
 }
@@ -464,13 +427,11 @@ export async function getGlobalOverview(): Promise<GlobalOverview | null> {
  */
 export async function getTags(login: string): Promise<{ tag: string; count: number; label: string }[]> {
   try {
-    if (await checkApiAvailable()) {
-      const params = new URLSearchParams()
-      params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/tags?${params}`)
-      const data = await res.json()
-      return safeArray<{ tag: string; count: number; label: string }>(data.data)
-    }
+    const params = new URLSearchParams()
+    params.set('lang', getLangParam())
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/tags?${params}`)
+    const data = await res.json()
+    return safeArray<{ tag: string; count: number; label: string }>(data.data)
   } catch { /* 忽略错误，降级到 mock */ }
   return []
 }
@@ -480,15 +441,13 @@ export async function getTags(login: string): Promise<{ tag: string; count: numb
  */
 export async function classifyRepos(login: string): Promise<{ classified: number; errors: number } | null> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/classify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const data = await res.json()
-      return data.data as { classified: number; errors: number }
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/classify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const data = await res.json()
+    return data.data as { classified: number; errors: number }
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -500,36 +459,31 @@ export type SyncStarsResult = SyncResult
 
 export async function syncStars(username: string, token?: string): Promise<SyncStarsResult | null> {
   try {
-    if (await checkApiAvailable()) {
-      let syncId: number | undefined
-      let startPage: number | undefined
-      let result: SyncStarsResult | null = null
+    let syncId: number | undefined
+    let result: SyncStarsResult | null = null
 
-      // Worker 将长同步拆成多个有界请求，前端自动续传，调用方仍只等待一个 Promise。
-      for (let batch = 0; batch < 1000; batch++) {
-        const body: Record<string, string | number> = { username }
-        if (token) body.token = token
-        if (syncId !== undefined) body.syncId = syncId
-        if (startPage !== undefined) body.startPage = startPage
-        const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        const data = await res.json()
-        if (!res.ok) {
-          throw new Error(data?.error?.message || 'SYNC_FAILED')
-        }
-        result = data.data as SyncStarsResult
-        if (result.complete || result.nextPage === undefined || result.syncId === undefined) {
-          return result
-        }
-        syncId = result.syncId
-        startPage = result.nextPage
+    // Worker 将长同步拆成多个有界请求，前端自动续传，调用方仍只等待一个 Promise。
+    for (let batch = 0; batch < 1000; batch++) {
+      const body: Record<string, string | number> = { username }
+      if (token) body.token = token
+      if (syncId !== undefined) body.syncId = syncId
+      const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error?.message || 'SYNC_FAILED')
       }
-
-      throw new Error('SYNC_CONTINUATION_LIMIT')
+      result = data.data as SyncStarsResult
+      if (result.complete || result.nextPage === undefined || result.syncId === undefined) {
+        return result
+      }
+      syncId = result.syncId
     }
+
+    throw new Error('SYNC_CONTINUATION_LIMIT')
   } catch (err) {
     if (err instanceof Error) throw err
   }
@@ -549,17 +503,15 @@ export async function getUserSummary(login: string): Promise<{
   lastSyncedAt: string | null
 } | null> {
   try {
-    if (await checkApiAvailable()) {
-      // 带上用户自定义的业务阈值（Sleep Stars 天数、Hidden Gems stars 区间）
-      const s = getSettings()
-      const params = new URLSearchParams()
-      params.set('sleepDays', String(s.sleepDays))
-      params.set('gemStarsMin', String(s.gemStarsMin))
-      params.set('gemStarsMax', String(s.gemStarsMax))
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/summary?${params}`)
-      const data = await res.json()
-      return data.data
-    }
+    // 带上用户自定义的业务阈值（Sleep Stars 天数、Hidden Gems stars 区间）
+    const s = getSettings()
+    const params = new URLSearchParams()
+    params.set('sleepDays', String(s.sleepDays))
+    params.set('gemStarsMin', String(s.gemStarsMin))
+    params.set('gemStarsMax', String(s.gemStarsMax))
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/summary?${params}`)
+    const data = await res.json()
+    return data.data
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -582,11 +534,9 @@ export async function getSyncRuns(login: string): Promise<{
   error_message: string | null
 }[]> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/sync-runs`)
-      const data = await res.json()
-      return safeArray(data.data)
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/sync-runs`)
+    const data = await res.json()
+    return safeArray(data.data)
   } catch { /* 忽略错误 */ }
   return []
 }
@@ -596,15 +546,13 @@ export async function getSyncRuns(login: string): Promise<{
  */
 export async function getRemovedStars(login: string): Promise<RepoWithStar[]> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/removed-stars`)
-      const data = await res.json()
-      return safeArray<Repo & { starred_at?: string | null; tags?: string[] }>(data.data).map((repo) => ({
-        ...repo,
-        starred_at: repo.starred_at || "",
-        tags: repo.tags || [],
-      }))
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/removed-stars`)
+    const data = await res.json()
+    return safeArray<Repo & { starred_at?: string | null; tags?: string[] }>(data.data).map((repo) => ({
+      ...repo,
+      starred_at: repo.starred_at || "",
+      tags: repo.tags || [],
+    }))
   } catch { /* 忽略错误 */ }
   return []
 }
@@ -622,14 +570,12 @@ export interface RepoSummaryResult {
 
 export async function getReadmeSummary(fullName: string, force = false): Promise<RepoSummaryResult | null> {
   try {
-    if (await checkApiAvailable()) {
-      const params = new URLSearchParams()
-      if (force) params.set('force', '1')
-      params.set('lang', getLangParam())
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary?${params}`)
-      const data = await res.json()
-      return data.data
-    }
+    const params = new URLSearchParams()
+    if (force) params.set('force', '1')
+    params.set('lang', getLangParam())
+    const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/readme-summary?${params}`)
+    const data = await res.json()
+    return data.data
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -641,14 +587,11 @@ export async function getStarDna(login: string, force = false): Promise<{
   dna: string
   cached: boolean
 } | null> {
-  if (await checkApiAvailable()) {
-    const params = new URLSearchParams()
-    if (force) params.set('force', '1')
-    params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-dna?${params}`)
-    return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
-  }
-  return null
+  const params = new URLSearchParams()
+  if (force) params.set('force', '1')
+  params.set('lang', getLangParam())
+  const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/star-dna?${params}`)
+  return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
 }
 
 /**
@@ -672,14 +615,11 @@ export async function getLearningPath(login: string, force = false): Promise<{
   path: string
   cached: boolean
 } | null> {
-  if (await checkApiAvailable()) {
-    const params = new URLSearchParams()
-    if (force) params.set('force', '1')
-    params.set('lang', getLangParam())
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/learning-path?${params}`)
-    return readJsonDataOrThrow<{ path: string; cached: boolean }>(res)
-  }
-  return null
+  const params = new URLSearchParams()
+  if (force) params.set('force', '1')
+  params.set('lang', getLangParam())
+  const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/learning-path?${params}`)
+  return readJsonDataOrThrow<{ path: string; cached: boolean }>(res)
 }
 
 /**
@@ -687,11 +627,9 @@ export async function getLearningPath(login: string, force = false): Promise<{
  */
 export async function getCnSummaries(login: string): Promise<Record<string, string>> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/cn-summaries`)
-      const data = await res.json()
-      return data.data ?? {}
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/cn-summaries`)
+    const data = await res.json()
+    return data.data ?? {}
   } catch { /* 忽略错误 */ }
   return {}
 }
@@ -705,11 +643,9 @@ export async function getTokenSource(): Promise<{
   envVar: string | null
 } | null> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/token-source`)
-      const data = await res.json()
-      return data.data
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/token-source`)
+    const data = await res.json()
+    return data.data
   } catch { /* 忽略错误 */ }
   return null
 }
@@ -719,14 +655,12 @@ export async function getTokenSource(): Promise<{
  */
 export async function addRepoTag(fullName: string, tag: string): Promise<boolean> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag }),
-      })
-      return res.ok
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag }),
+    })
+    return res.ok
   } catch { /* 忽略错误 */ }
   return false
 }
@@ -736,12 +670,10 @@ export async function addRepoTag(fullName: string, tag: string): Promise<boolean
  */
 export async function removeRepoTag(fullName: string, tag: string): Promise<boolean> {
   try {
-    if (await checkApiAvailable()) {
-      const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags/${encodeURIComponent(tag)}`, {
-        method: 'DELETE',
-      })
-      return res.ok
-    }
+    const res = await fetchWithTimeout(`${API_BASE}/api/repos/${encodeURIComponent(fullName)}/tags/${encodeURIComponent(tag)}`, {
+      method: 'DELETE',
+    })
+    return res.ok
   } catch { /* 忽略错误 */ }
   return false
 }
@@ -758,20 +690,18 @@ export async function exportData(
   params: Omit<RepoQueryParams, 'page' | 'pageSize'> = {},
 ): Promise<string | null> {
   try {
-    if (await checkApiAvailable()) {
-      const query = new URLSearchParams({ format, login })
-      if (params.language) query.set('language', params.language)
-      if (params.tag) query.set('tag', params.tag)
-      if (params.q) query.set('q', params.q)
-      if (params.sort) query.set('sort', params.sort)
-      if (params.direction) query.set('direction', params.direction)
+    const query = new URLSearchParams({ format, login })
+    if (params.language) query.set('language', params.language)
+    if (params.tag) query.set('tag', params.tag)
+    if (params.q) query.set('q', params.q)
+    if (params.sort) query.set('sort', params.sort)
+    if (params.direction) query.set('direction', params.direction)
 
-      const res = await fetchWithTimeout(`${API_BASE}/api/export?${query}`)
-      if (res.ok) {
-        return await res.text()
-      }
-      return null
+    const res = await fetchWithTimeout(`${API_BASE}/api/export?${query}`)
+    if (res.ok) {
+      return await res.text()
     }
+    return null
   } catch { /* 忽略错误 */ }
   return null
 }

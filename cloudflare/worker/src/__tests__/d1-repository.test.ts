@@ -471,16 +471,6 @@ describe('D1StarRepository', () => {
       expect(duplicateCount?.count).toBe(1)
     })
 
-    it('markRemovedStars 应标记未返回的星标为 removed', async () => {
-      const now = new Date().toISOString()
-      // 假设本次同步只返回 repo1，repo2 和 repo3 应被标记 removed
-      const removed = await repo.markRemovedStars('testuser', ['testuser/repo1'], now)
-      expect(removed).toBe(2)
-      // 验证 repo2 和 repo3 被标记
-      const r2 = await repo.getRepoForUser('testuser', 'testuser/repo2')
-      // 注：getRepoForUser 不筛选 removed_at，仍可查到，但 removed_at 字段应被设置
-      // 这里通过查询 stars 表验证
-    })
   })
 
   // ===== 分类 =====

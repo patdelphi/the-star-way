@@ -26,7 +26,6 @@ export type StarSyncResult = SyncResult
 
 export interface SyncContinuationOptions {
   syncId?: number
-  startPage?: number
 }
 
 /**
@@ -86,7 +85,7 @@ export async function syncStars(
 
   // 2. 创建用户记录（标记未删除）
   let syncRunId: number
-  let startPage = options.startPage ?? 1
+  let startPage = 1
   let reposUpsertedBefore = 0
   let starsUpsertedBefore = 0
   let pagesFetchedBefore = 0
