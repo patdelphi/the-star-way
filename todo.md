@@ -50,3 +50,5 @@
 - [x] 重新验证 Worker `/api/sync` 分批续传
 - [x] 修复仓库改名导致的 `repos.github_id` 唯一键冲突
 - [x] 部署修复并验证 `syncId=134` 续传成功
+- [x] 修复仓库转移导致的 `repos.full_name` 唯一键冲突
+- [x] 部署版本 `2c725b4f-4a66-4b9b-b6a5-7ac25665012c` 并验证 `syncId=137` 续传成功

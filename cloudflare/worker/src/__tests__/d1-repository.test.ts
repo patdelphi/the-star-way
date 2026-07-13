@@ -438,6 +438,39 @@ describe('D1StarRepository', () => {
       expect(staleStar).toBeNull()
     })
 
+    it('batchUpsertReposAndStars 应处理 full_name 被旧 github_id 占用', async () => {
+      const d1 = await mf.getD1Database('DB')
+      const now = new Date().toISOString()
+
+      // 模拟仓库转移或 GitHub 数据更正：full_name 相同但 github_id 发生变化。
+      await d1.prepare(`
+        INSERT INTO repos (github_id, full_name, owner, name, html_url, created_at, updated_at, archived, fork)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+      `).bind(
+        101, 'new-owner/new-name', 'new-owner', 'new-name',
+        'https://github.com/new-owner/new-name', now, now,
+      ).run()
+
+      await repo.batchUpsertReposAndStars('testuser', [{
+        repo: {
+          id: 102, full_name: 'new-owner/new-name', owner: { login: 'new-owner' }, name: 'new-name',
+          html_url: 'https://github.com/new-owner/new-name', description: null,
+          language: 'TypeScript', license: null, stargazers_count: 10,
+          forks_count: 1, open_issues_count: 0, topics: [],
+          created_at: now, updated_at: now, pushed_at: now,
+          archived: false, fork: false, homepage: null,
+        },
+        starred_at: now,
+      }], now)
+
+      const currentRepo = await d1.prepare('SELECT github_id FROM repos WHERE full_name = ?')
+        .bind('new-owner/new-name').first<{ github_id: number }>()
+      expect(currentRepo?.github_id).toBe(102)
+      const duplicateCount = await d1.prepare('SELECT COUNT(*) AS count FROM repos WHERE full_name = ?')
+        .bind('new-owner/new-name').first<{ count: number }>()
+      expect(duplicateCount?.count).toBe(1)
+    })
+
     it('markRemovedStars 应标记未返回的星标为 removed', async () => {
       const now = new Date().toISOString()
       // 假设本次同步只返回 repo1，repo2 和 repo3 应被标记 removed

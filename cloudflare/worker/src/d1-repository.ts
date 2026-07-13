@@ -983,6 +983,15 @@ export class D1StarRepository {
     for (const item of repos) {
       const repo = item.repo
 
+      // 仓库转移或历史数据更正时，full_name 可能仍被旧 github_id 占用；先删除冲突的旧实体。
+      // stars/repo_tags 使用 full_name 关联，删除实体不会丢失这些关系。
+      stmts.push(
+        this.db.prepare(`
+          DELETE FROM repos
+          WHERE full_name = ? AND github_id != ?
+        `).bind(repo.full_name, repo.id),
+      )
+
       // GitHub 仓库改名后 github_id 不变；先迁移旧名称的星标关系，避免产生孤儿记录。
       stmts.push(
         this.db.prepare(`
