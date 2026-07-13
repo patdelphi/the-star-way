@@ -43,14 +43,24 @@
 
 ## Screenshots
 
-![screenshot-1](./Docs/assets/ScreenShot_2026-07-13_135427_573.png)
-![screenshot-2](./Docs/assets/ScreenShot_2026-07-13_135505_819.png)
-![screenshot-3](./Docs/assets/ScreenShot_2026-07-13_141748_448.png)
-![screenshot-4](./Docs/assets/ScreenShot_2026-07-13_141805_171.png)
-![screenshot-5](./Docs/assets/ScreenShot_2026-07-13_141827_584.png)
-![screenshot-6](./Docs/assets/ScreenShot_2026-07-13_141844_689.png)
-![screenshot-7](./Docs/assets/ScreenShot_2026-07-13_141911_794.png)
-![screenshot-8](./Docs/assets/ScreenShot_2026-07-13_141922_378.png)
+<table style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_135427_573.png" width="400" alt="screenshot-1"/></td>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_135505_819.png" width="400" alt="screenshot-2"/></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141748_448.png" width="400" alt="screenshot-3"/></td>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141805_171.png" width="400" alt="screenshot-4"/></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141827_584.png" width="400" alt="screenshot-5"/></td>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141844_689.png" width="400" alt="screenshot-6"/></td>
+  </tr>
+  <tr>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141911_794.png" width="400" alt="screenshot-7"/></td>
+    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;"><img src="./Docs/assets/ScreenShot_2026-07-13_141922_378.png" width="400" alt="screenshot-8"/></td>
+  </tr>
+</table>
 
 ## 技术栈
 
