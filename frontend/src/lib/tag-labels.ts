@@ -29,16 +29,19 @@ export const TAG_LABEL_EN: Record<string, string> = {
   'CLI / Shell': 'CLI / Shell',
   '云计算': 'Cloud Computing',
   '监控 / 可观测': 'Monitoring / Observability',
+  'Homelab': 'Homelab',
 
   // 数据
   '数据库': 'Database',
   '数据库工具': 'Database Tools',
   '数据科学': 'Data Science',
   '大数据': 'Big Data',
+  '数据工程': 'Data Engineering',
 
   // 安全
   '安全 / 隐私': 'Security / Privacy',
   '加密 / 密码学': 'Cryptography',
+  '安全工具': 'Security Tools',
 
   // 工具
   '版本控制': 'Version Control',
@@ -58,6 +61,7 @@ export const TAG_LABEL_EN: Record<string, string> = {
   // 语言
   'Python': 'Python',
   'Rust': 'Rust',
+  'Rust 生态': 'Rust Ecosystem',
   'Go': 'Go',
   'Java / JVM': 'Java / JVM',
   'C / C++': 'C / C++',

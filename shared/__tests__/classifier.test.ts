@@ -74,4 +74,31 @@ describe('classifyRepo', () => {
     const tags = classifyRepo('test', 'test', 'invalid json')
     expect(tags).toEqual([])
   })
+
+  it('应从 topics 匹配 Rust 生态标签', () => {
+    const tags = classifyRepo('tokio', 'A runtime for async Rust', '["rust", "tokio", "async"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('Rust 生态')
+    expect(tagNames).toContain('Rust')
+  })
+
+  it('应从 topics 匹配安全工具标签', () => {
+    const tags = classifyRepo('pwntools', 'CTF framework', '["ctf", "pentest", "security"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('安全工具')
+    expect(tagNames).toContain('安全 / 隐私')
+  })
+
+  it('应从 topics 匹配数据工程标签', () => {
+    const tags = classifyRepo('dbt-core', 'Data build tool', '["dbt", "data-engineering", "sql"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('数据工程')
+  })
+
+  it('应从 topics 匹配 Homelab 标签', () => {
+    const tags = classifyRepo('pi-hole', 'Network ad blocker', '["pihole", "dns", "homelab"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('Homelab')
+    expect(tagNames).toContain('网络')
+  })
 })

@@ -62,6 +62,18 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   { keywords: ['documentation', 'docs', 'static-site', 'docusaurus', 'mdbook', 'mkdocs'], label: '文档', category: '工具' },
   { keywords: ['testing', 'test', 'jest', 'vitest', 'pytest', 'cypress', 'playwright', 'selenium', 'unit-test', 'e2e'], label: '测试', category: '工具' },
 
+  // Rust 生态
+  { keywords: ['rust', 'cargo', 'tokio', 'serde', 'axum', 'actix', 'warp', 'tower', 'tracing', 'clap', 'ratatui'], label: 'Rust 生态', category: '语言' },
+
+  // 安全工具
+  { keywords: ['pentest', 'penetration-testing', 'ctf', 'capture-the-flag', 'reverse-engineering', 'owasp', 'exploit', 'vulnerability', 'red-team', 'bug-bounty'], label: '安全工具', category: '安全' },
+
+  // 数据工程
+  { keywords: ['airflow', 'dbt', 'data-engineering', 'data-pipeline', 'data-lake', 'data-warehouse', 'etl-pipeline', 'data-quality', 'great-expectations'], label: '数据工程', category: '数据' },
+
+  // Homelab
+  { keywords: ['proxmox', 'truenas', 'pihole', 'unraid', 'home-assistant', 'home-automation', 'homelab', 'self-hosted-service', 'umbrel'], label: 'Homelab', category: 'DevOps' },
+
   // 语言生态
   { keywords: ['python', 'python3', 'python-library'], label: 'Python', category: '语言' },
   { keywords: ['rust', 'cargo'], label: 'Rust', category: '语言' },
