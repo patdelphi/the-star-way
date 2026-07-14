@@ -35,6 +35,7 @@ export interface ShareCardData {
     fullReportHint: string
     ctaTitle: string
     ctaSubtitle: string
+    basedOnStars: string
   }
 }
 
@@ -69,6 +70,11 @@ const summarizeProfile = (value: string, fallback: string): string => {
   const text = normalizeCardText(value || fallback)
   const firstSentence = text.split(/[。.!?？]/).find((item) => item.trim().length > 0)
   return truncate(firstSentence || text || fallback, 54)
+}
+
+const buildProfileBadge = (interests: string[], fallback: string): string => {
+  const selected = interests.slice(0, 3).map((item) => normalizeCardText(item)).filter(Boolean)
+  return selected.length > 0 ? truncate(selected.join(" / "), 42) : truncate(fallback, 42)
 }
 
 /** 按近似字宽拆分 SVG 文本，避免浏览器不能自动换行导致文本越界。 */
@@ -281,8 +287,8 @@ export function buildShareCardSvg(data: ShareCardData): string {
   const login = escapeXml(data.login)
   const shareUrl = data.shareUrl || `https://github.com/${data.login}`
   const systemUrl = data.systemUrl || "https://starway.patdelphi.xyz"
-  const systemUrlText = truncate(systemUrl.replace(/^https?:\/\//, ""), 36)
-  const profileText = truncate(shareUrl.replace(/^https?:\/\//, ""), 32)
+  const systemUrlText = truncate(systemUrl, 44)
+  const profileText = truncate(shareUrl, 40)
   const tags = data.topInterests.slice(0, 3).map((tag) => truncate(tag, 14))
   const tagMarkup = tags.map((tag, index) => {
     const x = 150 + index * 176
@@ -292,6 +298,8 @@ export function buildShareCardSvg(data: ShareCardData): string {
     return `<g><rect x="${x}" y="${y}" width="${width}" height="40" rx="20" fill="${color}" fill-opacity="0.18" stroke="${color}" stroke-opacity="0.55"/><text x="${x + width / 2}" y="${y + 25}" text-anchor="middle" class="tag">${escapeXml(tag)}</text></g>`
   }).join("")
   const dnaLines = wrapTextLines(summarizeProfile(data.starDna || "", data.labels.fallbackPath), 34, 1)
+  const profileBadge = buildProfileBadge(tags, data.labels.fallbackPath)
+  const basedOnStars = data.labels.basedOnStars.replace("{{count}}", displayValue(data.repoCount))
   const ctaLines = wrapTextLines(data.labels.ctaSubtitle, 29, 2)
   // 二维码固定在独立 CTA 区，和统计/正文彻底分离。
   const qr = renderQrSvg(systemUrl, 720, 738, 190)
@@ -314,8 +322,10 @@ export function buildShareCardSvg(data: ShareCardData): string {
     <text x="890" y="186" text-anchor="end" font-size="17" font-weight="760" letter-spacing="3" fill="#9EEAFF">${escapeXml(data.labels.title)}</text>
     <text x="150" y="260" font-size="54" font-weight="880">${title}${escapeXml(data.labels.userTitleSuffix)}</text>
     <text x="150" y="302" font-size="21" class="muted">@${login} · ${escapeXml(data.labels.githubProfileLabel)} ${escapeXml(profileText)}</text>
-    <text x="150" y="362" class="label">${escapeXml(data.labels.dnaLabel)}</text>
-    ${wrapSvgText(dnaLines, 150, 394, 29, "small")}
+    <text x="150" y="350" class="label">${escapeXml(data.labels.dnaLabel)}</text>
+    <text x="150" y="386" font-size="28" font-weight="850">${escapeXml(profileBadge)}</text>
+    ${wrapSvgText(dnaLines, 150, 424, 29, "small")}
+    <text x="150" y="454" font-size="16" class="muted">${escapeXml(basedOnStars)}</text>
     <text x="150" y="636" class="label">${escapeXml(data.labels.interests)}</text>
     ${tagMarkup}
     ${renderMetric(data.labels.starredRepos, displayValue(data.repoCount), 150, 476)}

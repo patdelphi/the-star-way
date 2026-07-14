@@ -126,6 +126,7 @@
     "shareCardFullReportHint": "Scan for full report",
     "shareCardCtaTitle": "Generate your Star DNA",
     "shareCardCtaSubtitle": "Sync GitHub Stars to discover your tech interests, hidden gems, and next learning path.",
+    "shareCardBasedOnStars": "Based on {{count}} GitHub starred repos",
     "shareCardInterests": "Top Interests",
     "shareCardStarredRepos": "Starred Repos",
     "shareCardHiddenGems": "Hidden Gems",

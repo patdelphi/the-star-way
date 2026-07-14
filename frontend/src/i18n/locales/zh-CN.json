@@ -126,6 +126,7 @@
     "shareCardFullReportHint": "扫码查看完整内容",
     "shareCardCtaTitle": "生成你的 Star DNA",
     "shareCardCtaSubtitle": "同步 GitHub Star，发现你的技术兴趣、隐藏宝石和下一步学习路线。",
+    "shareCardBasedOnStars": "基于 {{count}} 个 GitHub 星标仓库",
     "shareCardInterests": "核心兴趣",
     "shareCardStarredRepos": "星标仓库",
     "shareCardHiddenGems": "隐藏宝石",

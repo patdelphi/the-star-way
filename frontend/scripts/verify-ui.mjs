@@ -138,6 +138,7 @@ const requiredLocaleKeys = [
   "developers.shareCardFullReportHint",
   "developers.shareCardCtaTitle",
   "developers.shareCardCtaSubtitle",
+  "developers.shareCardBasedOnStars",
 ]
 
 const requiredChineseTexts = [
@@ -302,6 +303,7 @@ const checks = [
   ["分享卡片不展示长学习路径正文", !files.shareCardBuilder.includes("summarizeLearningPath") && !files.shareCardBuilder.includes("interestSummary") && !files.shareCardBuilder.includes('fill="url(#accent)"')],
   ["分享卡片展示 Star Way 项目信息", files.shareCardBuilder.includes("projectName") && files.shareCardBuilder.includes("ctaSubtitle") && files.developers.includes("shareCardProjectDescription")],
   ["分享卡片展示线上系统网址", files.shareCardBuilder.includes("https://starway.patdelphi.xyz") && files.shareCardBuilder.includes("systemUrl") && files.developers.includes("systemUrl: STARWAY_PUBLIC_URL")],
+  ["分享卡片显示完整 https 网址", files.shareCardBuilder.includes("const systemUrlText = truncate(systemUrl, 44)") && files.shareCardBuilder.includes("const profileText = truncate(shareUrl, 40)")],
   ["分享卡片二维码指向线上系统", files.shareCardBuilder.includes("renderQrSvg(systemUrl") && !files.shareCardBuilder.includes("renderQrSvg(shareUrl")],
   ["分享卡片只展示摘要并引导查看完整内容", files.shareCardBuilder.includes("ctaSubtitle") && files.shareCardBuilder.includes("fullReportHint")],
   ["分享卡片用户区和项目 CTA 不混杂", files.shareCardBuilder.includes("userTitleSuffix") && !files.shareCardBuilder.includes("systemUrlLabel") && !files.shareCardBuilder.includes("githubProfileLabel)} ·")],
@@ -309,6 +311,7 @@ const checks = [
   ["分享卡片二维码不侵入统计区域", !files.shareCardBuilder.includes("renderQrSvg(systemUrl, 744, 780, 132)") && files.shareCardBuilder.includes("二维码固定在独立 CTA 区")],
   ["分享卡片三项指标横向同排", files.shareCardBuilder.includes("displayValue(data.repoCount), 150, 476") && files.shareCardBuilder.includes("displayValue(data.hiddenGemsCount), 382, 476") && files.shareCardBuilder.includes("displayValue(data.sleepStarsCount), 614, 476")],
   ["分享卡片兴趣标签跟随当前语言", files.developers.includes('import { getTagLabel }') && files.developers.includes("getTagLabel(item.tag, i18n.language)")],
+  ["分享卡片增加画像短标签和来源说明", files.shareCardBuilder.includes("profileBadge") && files.shareCardBuilder.includes("basedOnStars") && files.developers.includes("shareCardBasedOnStars")],
   ["分享卡片装饰路径禁止默认黑色填充", files.shareCardBuilder.includes('fill="none" stroke="#9D9AFF"') && !files.shareCardBuilder.includes('M54 270C220 80 470 54 715 110C900 152 1010 270 1044 446" stroke=')],
   ["分享卡片提供双语下载文案", getByPath(locales.zh, "developers.downloadShareCard") && getByPath(locales.en, "developers.downloadShareCard")],
   ["纯英文演示标签已清理", forbiddenTexts.every((text) => !allPageText.includes(text) && !zhText.includes(text))],

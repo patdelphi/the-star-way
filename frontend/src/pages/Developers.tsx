@@ -984,6 +984,7 @@ export default function Developers() {
         fullReportHint: t("developers.shareCardFullReportHint"),
         ctaTitle: t("developers.shareCardCtaTitle"),
         ctaSubtitle: t("developers.shareCardCtaSubtitle"),
+        basedOnStars: t("developers.shareCardBasedOnStars"),
       },
     }
   }, [activeDev, developerStats, developerSummary, developerTags, i18n.language, learningPath, starDna, t])
