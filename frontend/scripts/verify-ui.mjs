@@ -301,6 +301,8 @@ const checks = [
   ["分享卡片包含网址二维码", files.shareCardBuilder.includes("buildQrMatrix") && files.shareCardBuilder.includes("renderQrSvg") && files.developers.includes("shareUrl: activeDev.profile_url")],
   ["分享卡片长文本使用多行 SVG tspan", files.shareCardBuilder.includes("wrapSvgText") && files.shareCardBuilder.includes("<tspan")],
   ["分享卡片不展示长学习路径正文", !files.shareCardBuilder.includes("summarizeLearningPath") && !files.shareCardBuilder.includes("interestSummary") && !files.shareCardBuilder.includes('fill="url(#accent)"')],
+  ["分享卡片 QR 纠错码按多项式求余生成", files.shareCardBuilder.includes("const remainder = [...data, ...new Array(QR_EC_CODEWORDS).fill(0)]") && files.shareCardBuilder.includes("return remainder.slice(-QR_EC_CODEWORDS)")],
+  ["分享卡片 QR 格式位包含右上第八格", files.shareCardBuilder.includes("[QR_SIZE - 8, 8]") && !files.shareCardBuilder.includes("[8, QR_SIZE - 8], [8, QR_SIZE - 7]")],
   ["分享卡片展示 Star Way 项目信息", files.shareCardBuilder.includes("projectName") && files.shareCardBuilder.includes("ctaSubtitle") && files.developers.includes("shareCardProjectDescription")],
   ["分享卡片展示线上系统网址", files.shareCardBuilder.includes("https://starway.patdelphi.xyz") && files.shareCardBuilder.includes("systemUrl") && files.developers.includes("systemUrl: STARWAY_PUBLIC_URL")],
   ["分享卡片显示完整 https 网址", files.shareCardBuilder.includes("const systemUrlText = truncate(systemUrl, 44)") && files.shareCardBuilder.includes("const profileText = truncate(shareUrl, 40)")],

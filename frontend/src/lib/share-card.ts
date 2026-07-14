@@ -156,25 +156,25 @@ function buildGaloisTables() {
 function qrErrorCorrection(data: number[]): number[] {
   const { exp, log } = buildGaloisTables()
   const multiply = (a: number, b: number) => (a === 0 || b === 0 ? 0 : exp[log[a] + log[b]])
-  let generator = [1]
+  let generator: number[] = [1]
   for (let i = 0; i < QR_EC_CODEWORDS; i += 1) {
     const next = new Array(generator.length + 1).fill(0)
     generator.forEach((coef, index) => {
-      next[index] ^= multiply(coef, exp[i])
-      next[index + 1] ^= coef
+      next[index] ^= coef
+      next[index + 1] ^= multiply(coef, exp[i])
     })
     generator = next
   }
 
-  const message = [...data, ...new Array(QR_EC_CODEWORDS).fill(0)]
+  const remainder = [...data, ...new Array(QR_EC_CODEWORDS).fill(0)]
   for (let i = 0; i < data.length; i += 1) {
-    const coef = message[i]
+    const coef = remainder[i]
     if (coef === 0) continue
     generator.forEach((gen, index) => {
-      message[i + index] ^= multiply(gen, coef)
+      remainder[i + index] ^= multiply(gen, coef)
     })
   }
-  return message.slice(data.length)
+  return remainder.slice(-QR_EC_CODEWORDS)
 }
 
 function reserve(matrix: (boolean | null)[][], reserved: boolean[][], x: number, y: number, dark: boolean) {
@@ -217,7 +217,7 @@ function formatBits(mask: number): number {
 function addFormat(matrix: (boolean | null)[][], reserved: boolean[][], mask: number) {
   const bits = formatBits(mask)
   const coordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]]
-  const coordsB = [[QR_SIZE - 1, 8], [QR_SIZE - 2, 8], [QR_SIZE - 3, 8], [QR_SIZE - 4, 8], [QR_SIZE - 5, 8], [QR_SIZE - 6, 8], [QR_SIZE - 7, 8], [8, QR_SIZE - 8], [8, QR_SIZE - 7], [8, QR_SIZE - 6], [8, QR_SIZE - 5], [8, QR_SIZE - 4], [8, QR_SIZE - 3], [8, QR_SIZE - 2], [8, QR_SIZE - 1]]
+  const coordsB = [[QR_SIZE - 1, 8], [QR_SIZE - 2, 8], [QR_SIZE - 3, 8], [QR_SIZE - 4, 8], [QR_SIZE - 5, 8], [QR_SIZE - 6, 8], [QR_SIZE - 7, 8], [QR_SIZE - 8, 8], [8, QR_SIZE - 7], [8, QR_SIZE - 6], [8, QR_SIZE - 5], [8, QR_SIZE - 4], [8, QR_SIZE - 3], [8, QR_SIZE - 2], [8, QR_SIZE - 1]]
   coordsA.forEach(([x, y], index) => reserve(matrix, reserved, x, y, Boolean((bits >> index) & 1)))
   coordsB.forEach(([x, y], index) => reserve(matrix, reserved, x, y, Boolean((bits >> index) & 1)))
 }
