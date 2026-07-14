@@ -1,9 +1,10 @@
 /**
  * AI 模块框架测试
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createConnection, initDatabase } from '../../db/connection.js'
 import { loadAiConfig, DEFAULT_AI_CONFIG } from '../config.js'
+import { chat } from '../client.js'
 import { cacheTranslation, getCachedTranslation, cacheAnalysisReport, getCachedAnalysisReport } from '../cache.js'
 import type Database from 'better-sqlite3'
 import { rmSync, existsSync } from 'node:fs'
@@ -15,6 +16,42 @@ function getTestDbPath() { return join(TEST_DB_DIR, 'test.db') }
 function cleanup() { if (existsSync(TEST_DB_DIR)) rmSync(TEST_DB_DIR, { recursive: true, force: true }) }
 
 let db: Database.Database
+
+describe('AI 请求', () => {
+  it('AI 接口无响应时应在超时后失败', async () => {
+    const oldBaseUrl = process.env.STARWAY_AI_BASE_URL
+    const oldApiKey = process.env.STARWAY_AI_API_KEY
+    const oldModel = process.env.STARWAY_AI_MODEL
+    const oldTimeout = process.env.STARWAY_AI_TIMEOUT_MS
+    const fetchMock = vi.fn((_url: string, options?: RequestInit) => new Promise<Response>((_, reject) => {
+      options?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+
+    process.env.STARWAY_AI_BASE_URL = 'https://api.example.com/v1'
+    process.env.STARWAY_AI_API_KEY = 'test-key'
+    process.env.STARWAY_AI_MODEL = 'test-model'
+    process.env.STARWAY_AI_TIMEOUT_MS = '5000'
+    vi.stubGlobal('fetch', fetchMock)
+    vi.useFakeTimers()
+
+    try {
+      const pending = expect(chat([{ role: 'user', content: '测试' }])).rejects.toThrow('AI_REQUEST_TIMEOUT')
+      await vi.advanceTimersByTimeAsync(5_000)
+      await pending
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+      if (oldBaseUrl === undefined) delete process.env.STARWAY_AI_BASE_URL
+      else process.env.STARWAY_AI_BASE_URL = oldBaseUrl
+      if (oldApiKey === undefined) delete process.env.STARWAY_AI_API_KEY
+      else process.env.STARWAY_AI_API_KEY = oldApiKey
+      if (oldModel === undefined) delete process.env.STARWAY_AI_MODEL
+      else process.env.STARWAY_AI_MODEL = oldModel
+      if (oldTimeout === undefined) delete process.env.STARWAY_AI_TIMEOUT_MS
+      else process.env.STARWAY_AI_TIMEOUT_MS = oldTimeout
+    }
+  })
+})
 
 describe('AI 配置', () => {
   it('默认配置应为关闭状态', () => {

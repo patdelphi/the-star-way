@@ -5,6 +5,15 @@
 import { loadAiConfig } from './config.js'
 import { buildLearningPathPrompt, buildStarDnaPrompt } from '@shared/ai/index.js'
 
+const DEFAULT_AI_REQUEST_TIMEOUT_MS = 55_000
+
+/** 读取 AI 请求超时；默认略低于前端 60s，确保后端先返回结构化错误。 */
+function getAiRequestTimeoutMs(): number {
+  const raw = Number(process.env.STARWAY_AI_TIMEOUT_MS)
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_AI_REQUEST_TIMEOUT_MS
+  return Math.min(Math.max(raw, 5_000), 300_000)
+}
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -29,19 +38,33 @@ export async function chat(messages: AiMessage[]): Promise<string> {
     throw new Error('AI 功能未启用，请配置 STARWAY_AI_BASE_URL、STARWAY_AI_API_KEY、STARWAY_AI_MODEL')
   }
 
-  const res = await fetch(`${config.base_url}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.api_key}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), getAiRequestTimeoutMs())
+
+  let res: Response
+  try {
+    res = await fetch(`${config.base_url}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.api_key}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if ((err as { name?: string })?.name === 'AbortError') {
+      throw new Error('AI_REQUEST_TIMEOUT')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!res.ok) {
     const text = await res.text()

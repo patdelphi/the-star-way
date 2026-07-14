@@ -4,6 +4,9 @@
  */
 import { GitHubSyncError, createSyncError } from './errors.js'
 
+// 单次 GitHub 请求的最长等待时间，避免网络卡住时本地同步永远不结束。
+const GITHUB_REQUEST_TIMEOUT_MS = 30_000
+
 // GitHub starred repo API 返回的数据结构（使用 starred_at media type）
 export interface GitHubStarredRepo {
   starred_at: string
@@ -176,10 +179,21 @@ export class GitHubClient {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), GITHUB_REQUEST_TIMEOUT_MS)
+
     try {
-      const response = await fetch(url, { headers })
+      const response = await fetch(url, { headers, signal: controller.signal })
       return response
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new GitHubSyncError(
+          `GitHub 请求超时（${GITHUB_REQUEST_TIMEOUT_MS / 1000} 秒）：${url}`,
+          'GITHUB_TIMEOUT',
+          undefined,
+          true,
+        )
+      }
       // 网络错误处理
       if (err instanceof TypeError) {
         throw new GitHubSyncError(
@@ -195,6 +209,8 @@ export class GitHubClient {
         undefined,
         false,
       )
+    } finally {
+      clearTimeout(timer)
     }
   }
 }

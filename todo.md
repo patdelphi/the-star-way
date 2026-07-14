@@ -71,3 +71,21 @@
 - [x] 设置页移除服务端原始中文状态 message，改用本地化配置提示
 - [x] 验证前端 UI 校验、生产构建和 Worker 测试
 - [ ] 提交、推送并部署本次多语言修复
+
+## 2026-07-14：本地开发者页星标同步与 AI 推荐重构
+
+### 关键假设
+
+- 只处理本地版本链路：`frontend/src/pages/Developers.tsx`、`frontend/src/lib/api.ts`、`backend/src/api/routes.ts`、`backend/src/ai/*`、`backend/src/sync/*`；Cloudflare Worker 不纳入本次重构。
+- 保留现有 UI 形态，不做视觉重设计；目标是修正状态归属、缓存、同步后刷新和长耗时 AI 请求逻辑。
+- 不执行部署、迁移、commit、push、pull；测试只跑幂等的 backend test、frontend build / verify-ui。
+
+### 待执行计划
+
+- [x] 梳理当前本地端到端链路：添加/选择开发者 -> 同步星标 -> 刷新用户列表与统计 -> 生成 Star DNA -> 生成学习路径。
+- [x] 先写失败测试，覆盖本地后端 AI 生成缓存、同步中/同步后缓存失效、强制刷新、用户不存在/无星标/不完整同步状态。
+- [x] 抽出后端用户级 AI 服务函数，统一 DNA 与学习路径的缓存读取、数据准备、生成、翻译、事务写入和错误回退。
+- [x] 重构前端开发者页状态机，明确 active login 归属，避免旧请求覆盖、切换页面/用户后误清空或误写入。
+- [x] 同步成功后只刷新目标用户相关数据，清理目标用户 AI 缓存并重新拉取当前可见用户数据。
+- [x] 更新 `Docs/changelog.md` 记录根因、改动和验证结果。
+- [x] 运行幂等验证：backend 相关测试、frontend 静态 UI 校验、frontend build。

@@ -73,6 +73,25 @@ const LEGACY_LANG_KEY = 'starway-lang'
 let cachedSettings: AppSettings | null = null
 let migrated = false
 
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.round(n)))
+}
+
+function normalizeSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    aiTimeout: clampNumber(settings.aiTimeout, DEFAULT_SETTINGS.aiTimeout, 5000, 300000),
+    syncTimeout: clampNumber(settings.syncTimeout, DEFAULT_SETTINGS.syncTimeout, 10000, 600000),
+    apiTimeout: clampNumber(settings.apiTimeout, DEFAULT_SETTINGS.apiTimeout, 1000, 60000),
+    pageSize: clampNumber(settings.pageSize, DEFAULT_SETTINGS.pageSize, 5, 100),
+    sleepDays: clampNumber(settings.sleepDays, DEFAULT_SETTINGS.sleepDays, 30, 365),
+    gemStarsMin: clampNumber(settings.gemStarsMin, DEFAULT_SETTINGS.gemStarsMin, 0, 10000),
+    gemStarsMax: clampNumber(settings.gemStarsMax, DEFAULT_SETTINGS.gemStarsMax, 1, 50000),
+  }
+}
+
 /**
  * 一次性迁移老的分散 key 到统一 starway-settings。
  * 迁移策略：老值存在且新字段为默认值时，用老值覆盖；迁移后删除老 key。
@@ -127,7 +146,7 @@ export function getSettings(): AppSettings {
   let merged: AppSettings = { ...DEFAULT_SETTINGS, ...stored }
 
   // 迁移老 key（仅执行一次）
-  merged = migrateLegacyKeys(merged)
+  merged = normalizeSettings(migrateLegacyKeys(merged))
 
   // 持久化合并后的结果（包含迁移后的值），保证下次读取一致
   try {
@@ -145,7 +164,7 @@ export function getSettings(): AppSettings {
  */
 export function saveSettings(partial: Partial<AppSettings>): AppSettings {
   const current = getSettings()
-  const next: AppSettings = { ...current, ...partial }
+  const next: AppSettings = normalizeSettings({ ...current, ...partial })
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   } catch {

@@ -284,6 +284,23 @@ export async function getUsers(): Promise<UserInfo[]> {
   return [{ login: 'patdelphi', avatar_url: null, profile_url: null, synced_at: null, repoCount: 0, tagCount: 0 }]
 }
 
+/**
+ * 在读取响应体时也设置超时，避免 fetch 已拿到响应头但 res.json() 长时间不结束。
+ */
+async function readJsonWithTimeout<T>(res: Response, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      res.json() as Promise<T>,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("REQUEST_BODY_TIMEOUT")), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 /** 将 API 错误码转换为当前界面的本地化文案，避免直接展示后端中文 message。 */
 export function getApiErrorMessage(
   error: unknown,
@@ -479,35 +496,25 @@ export type SyncStarsResult = SyncResult
 
 export async function syncStars(username: string, token?: string): Promise<SyncStarsResult | null> {
   try {
-    let syncId: number | undefined
-    let result: SyncStarsResult | null = null
-
-    // Worker 将长同步拆成多个有界请求，前端自动续传，调用方仍只等待一个 Promise。
-    for (let batch = 0; batch < 1000; batch++) {
-      const body: Record<string, string | number> = { username }
-      if (token) body.token = token
-      if (syncId !== undefined) body.syncId = syncId
-      const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new ApiRequestError(
-          data?.error?.code || 'API_ERROR',
-          data?.error?.message || 'SYNC_FAILED',
-          res.status,
-        )
-      }
-      result = data.data as SyncStarsResult
-      if (result.complete || result.nextPage === undefined || result.syncId === undefined) {
-        return result
-      }
-      syncId = result.syncId
+    const body: Record<string, string> = { username }
+    if (token) body.token = token
+    const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await readJsonWithTimeout<{
+      data?: SyncStarsResult
+      error?: { code?: string; message?: string }
+    }>(res, resolveTimeout('/api/sync'))
+    if (!res.ok) {
+      throw new ApiRequestError(
+        data?.error?.code || 'API_ERROR',
+        data?.error?.message || 'SYNC_FAILED',
+        res.status,
+      )
     }
-
-    throw new Error('SYNC_CONTINUATION_LIMIT')
+    return data.data ?? null
   } catch (err) {
     if (err instanceof Error) throw err
   }

@@ -378,6 +378,27 @@ describe('API 路由', () => {
     expect(data.data).toEqual({ dna: '缓存 DNA 画像', cached: true })
   })
 
+  it('GET /api/users/:login/star-dna 生成失败且无缓存时应返回本地兜底画像', async () => {
+    vi.mocked(aiClient.generateStarDna).mockRejectedValueOnce(new Error('AI_REQUEST_TIMEOUT'))
+
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks(`/api/users/${DEMO_USER_LOGIN}/star-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(200)
+    expect(data.data.dna).toContain(`${DEMO_USER_LOGIN} 已同步`)
+    expect(data.data.cached).toBe(false)
+
+    const cached = db.prepare(`
+      SELECT provider, translated_readme_summary
+      FROM translations
+      WHERE repo_full_name = ? AND target_lang = 'dna-zh'
+    `).get(`user:${DEMO_USER_LOGIN}`) as { provider: string; translated_readme_summary: string }
+    expect(cached.provider).toBe('local')
+    expect(cached.translated_readme_summary).toContain('本地')
+  })
+
   it('GET /api/users/:login/star-dna 中文生成不等待英文翻译', async () => {
     vi.mocked(aiClient.translateToEnglish).mockRejectedValueOnce(new Error('translation timeout'))
 
@@ -469,6 +490,27 @@ describe('API 路由', () => {
 
     const data = JSON.parse(getBody())
     expect(data.data).toEqual({ path: '缓存学习路径', cached: true })
+  })
+
+  it('GET /api/users/:login/learning-path 生成失败且无缓存时应返回本地兜底路径', async () => {
+    vi.mocked(aiClient.generateLearningPath).mockRejectedValueOnce(new Error('AI unavailable'))
+
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks(`/api/users/${DEMO_USER_LOGIN}/learning-path?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(200)
+    expect(data.data.path).toContain('## 阶段一：巩固基础')
+    expect(data.data.cached).toBe(false)
+
+    const cached = db.prepare(`
+      SELECT provider, translated_readme_summary
+      FROM translations
+      WHERE repo_full_name = ? AND target_lang = 'learning-zh'
+    `).get(`user:${DEMO_USER_LOGIN}`) as { provider: string; translated_readme_summary: string }
+    expect(cached.provider).toBe('local')
+    expect(cached.translated_readme_summary).toContain('本地已同步统计')
   })
 
   it('GET /api/users/不存在的用户/repos 应返回 404', async () => {

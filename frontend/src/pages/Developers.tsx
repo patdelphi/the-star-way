@@ -38,11 +38,13 @@ import {
   Clock,
   RefreshCw,
   GraduationCap,
+  Share2,
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend, Brush } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserSummary, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
 import type { UserStats } from "@/lib/api"
+import { ShareCard } from "@/components/ShareCard"
 import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Select, SelectOption } from "@/components/ui/select"
@@ -403,24 +405,36 @@ export default function Developers() {
   const [pathLoading, setPathLoading] = useState(false)
   const [pathError, setPathError] = useState("")
   const [developerStats, setDeveloperStats] = useState<UserStats | null>(null)
+  const [developerSummary, setDeveloperSummary] = useState<Awaited<ReturnType<typeof getUserSummary>>>(null)
   const [developerTags, setDeveloperTags] = useState<{ tag: string; count: number }[]>([])
   const [starTimeline, setStarTimeline] = useState<Array<{ month: string; count: number }>>([])
+  const [shareCardOpen, setShareCardOpen] = useState(false)
   // 请求序号用于防止切换开发者/语言时旧响应覆盖当前页面
   const dnaRequestSeq = useRef(0)
   const pathRequestSeq = useRef(0)
   const detailRequestSeq = useRef(0)
-  const currentLoginRef = useRef(currentLogin)
+  const syncRunsRequestSeq = useRef(0)
+  const detailLoginRef = useRef<string | null>(null)
+  const syncRunsLoginRef = useRef<string | null>(null)
+  const currentLoginRef = useRef(normalizeGitHubLogin(currentLogin))
+  const activeDevNameRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const syncingLoginRef = useRef<string | null>(null)
+  const aiContentLoginRef = useRef<string | null>(null)
   // 同步进行中标记：防止 useEffect [activeDevName] 在同步后清空 DNA/学习路径
   // 同步完成后由 runSync 显式用 force=true 重新加载
   const isSyncingRef = useRef(false)
 
   useEffect(() => {
-    currentLoginRef.current = currentLogin
-  }, [currentLogin])
+    const normalized = normalizeGitHubLogin(currentLogin)
+    currentLoginRef.current = normalized
+    if (normalized && normalized !== currentLogin) {
+      setCurrentLogin(normalized)
+    }
+  }, [currentLogin, setCurrentLogin])
 
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
       isMountedRef.current = false
     }
@@ -428,7 +442,22 @@ export default function Developers() {
 
   // 长耗时 AI 请求返回时，只有仍属于当前选中开发者的结果才允许写入页面状态。
   const isCurrentDeveloperRequest = (login: string, requestSeq: number) => {
-    return isMountedRef.current && currentLoginRef.current === login && requestSeq >= 0
+    const normalizedLogin = normalizeGitHubLogin(login)
+    return (
+      isMountedRef.current &&
+      requestSeq >= 0 &&
+      Boolean(normalizedLogin) &&
+      (currentLoginRef.current === normalizedLogin || activeDevNameRef.current === normalizedLogin)
+    )
+  }
+
+  // 统计、时间线和同步历史按最后请求的 login 归属；同一用户重复触发不应互相丢结果。
+  const isLatestDetailRequest = (login: string) => {
+    return isMountedRef.current && detailLoginRef.current === login
+  }
+
+  const isLatestSyncRunsRequest = (login: string) => {
+    return isMountedRef.current && syncRunsLoginRef.current === login
   }
 
   // 获取同步状态显示文本
@@ -454,7 +483,7 @@ export default function Developers() {
       const realUsers = users.filter((user) => user.login !== "demo-user")
       const isValidApiData = realUsers.some((user) => Boolean(user.synced_at))
       if (isValidApiData) {
-        const preferred = preferredLogin || currentLoginRef.current
+        const preferred = normalizeGitHubLogin(preferredLogin || currentLoginRef.current)
         const activeLogin = realUsers.some((user) => user.login === preferred)
           ? preferred
           : realUsers[0]?.login
@@ -478,6 +507,16 @@ export default function Developers() {
           setCurrentLogin(activeLogin)
         }
         setDevelopers(mapped)
+        if (activeLogin) {
+          // 列表刷新已确定当前用户时，立即补齐详情和同步历史；不能只依赖 activeDevName 变化触发。
+          loadDeveloperDetails(activeLogin)
+          loadSyncRuns(activeLogin)
+          const activeUser = realUsers.find((user) => user.login === activeLogin)
+          if (activeUser?.synced_at && !isSyncingRef.current) {
+            setSyncStatus("successToken")
+            setSyncError("")
+          }
+        }
         setIsApiMode(true)
       } else {
         setDevelopers([])
@@ -529,22 +568,23 @@ export default function Developers() {
     return sortedDevelopers.slice(start, start + ITEMS_PER_PAGE)
   }, [sortedDevelopers, currentPage])
 
-  // 当前选中的开发者
-  const activeDev = developers.find((d) => d.isActive)
+  // 当前选中的开发者：以规范化后的 currentLogin 为唯一归属源，isActive 只作为渲染兜底。
+  const normalizedCurrentLogin = normalizeGitHubLogin(currentLogin)
+  const activeDev = developers.find((d) => d.name === normalizedCurrentLogin) ?? developers.find((d) => d.isActive)
+
+  const activateDeveloper = (name: string) => {
+    const login = normalizeGitHubLogin(name)
+    currentLoginRef.current = login
+    setCurrentLogin(login)
+    setDevelopers((prev) => prev.map((dev) => ({ ...dev, isActive: dev.name === login })))
+  }
 
   // 选中某个开发者
   const selectDeveloper = (id: string) => {
     const target = developers.find((dev) => dev.id === id)
     if (target) {
-      currentLoginRef.current = target.name
-      setCurrentLogin(target.name)
+      activateDeveloper(target.name)
     }
-    setDevelopers((prev) =>
-      prev.map((dev) => ({
-        ...dev,
-        isActive: dev.id === id,
-      }))
-    )
   }
 
   // 删除开发者
@@ -558,11 +598,11 @@ export default function Developers() {
       return
     }
     const remaining = developers.filter((d) => d.id !== id)
-    if (target.isActive && remaining.length > 0) {
+    if (target.name === currentLoginRef.current && remaining.length > 0) {
       remaining[0] = { ...remaining[0], isActive: true }
       currentLoginRef.current = remaining[0].name
       setCurrentLogin(remaining[0].name)
-    } else if (remaining.length === 0) {
+    } else if (target.name === currentLoginRef.current && remaining.length === 0) {
       currentLoginRef.current = ""
       setCurrentLogin("")
     }
@@ -579,9 +619,7 @@ export default function Developers() {
     setSyncMessage("")
     if (developers.find((d) => d.name === name)) {
       // 用户已存在，直接选中
-      setDevelopers((prev) => prev.map((d) => ({ ...d, isActive: d.name === name })))
-      currentLoginRef.current = name
-      setCurrentLogin(name)
+      activateDeveloper(name)
       setSearchInput("")
       setSearchResult("")
       return
@@ -619,50 +657,56 @@ export default function Developers() {
   }
 
   // 加载同步历史记录
-  const loadSyncRuns = async (name: string, requestSeq = detailRequestSeq.current) => {
+  const loadSyncRuns = async (name: string) => {
+    syncRunsRequestSeq.current += 1
+    syncRunsLoginRef.current = name
     try {
       const runs = await getSyncRuns(name)
-      if (!isCurrentDeveloperRequest(name, requestSeq) || requestSeq !== detailRequestSeq.current) return
+      // 只接受当前用户和最新一次历史请求，避免并发请求的旧结果清空新结果。
+      if (!isLatestSyncRunsRequest(name)) return
       setSyncRuns(runs)
     } catch {
-      if (!isCurrentDeveloperRequest(name, requestSeq) || requestSeq !== detailRequestSeq.current) return
+      if (!isLatestSyncRunsRequest(name)) return
       setSyncRuns([])
     }
   }
 
   const loadDeveloperDetails = (name: string) => {
-    const requestSeq = ++detailRequestSeq.current
-    loadSyncRuns(name, requestSeq)
+    detailRequestSeq.current += 1
+    detailLoginRef.current = name
     getStats(name)
       .then((stats) => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
+        if (stats && isLatestDetailRequest(name)) {
           setDeveloperStats(stats)
         }
       })
-      .catch(() => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
-          setDeveloperStats(null)
+      .catch(() => { /* 切换用户时已清空；单次失败不覆盖同用户的成功结果 */ })
+    getUserSummary(name)
+      .then((summary) => {
+        if (summary && isLatestDetailRequest(name)) {
+          setDeveloperSummary(summary)
         }
       })
+      .catch(() => { /* 切换用户时已清空；单次失败不覆盖同用户的成功结果 */ })
     getTags(name)
       .then((tags) => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
+        if (isLatestDetailRequest(name)) {
           setDeveloperTags(Array.isArray(tags) ? tags : [])
         }
       })
       .catch(() => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
+        if (isLatestDetailRequest(name)) {
           setDeveloperTags([])
         }
       })
     getUserStarTimeline(name)
       .then((timeline) => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
+        if (isLatestDetailRequest(name)) {
           setStarTimeline(Array.isArray(timeline) ? timeline : [])
         }
       })
       .catch(() => {
-        if (isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current) {
+        if (isLatestDetailRequest(name)) {
           setStarTimeline([])
         }
       })
@@ -670,85 +714,86 @@ export default function Developers() {
 
   // 加载 Star DNA 画像
   const loadStarDna = async (login: string, force = false) => {
-    const requestSeq = ++dnaRequestSeq.current
+    const normalizedLogin = normalizeGitHubLogin(login)
+    if (!normalizedLogin) return
+    ++dnaRequestSeq.current
     const isInitialLoad = !force
-    const showLoading = isCurrentDeveloperRequest(login, requestSeq)
-    // 首次生成和强制刷新都显示 loading；只有强制刷新清空旧数据。
+    const showLoading = isMountedRef.current
+    // 首次生成和强制刷新都显示 loading；强制刷新成功前保留旧数据，避免失败时页面变空。
     if (showLoading) setDnaLoading(true)
-    if (force && showLoading) {
-      setStarDna(null)
-    }
     if (showLoading) setDnaError("")
     try {
-      const result = await getStarDna(login, force)
-      if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== dnaRequestSeq.current) return
+      const result = await getStarDna(normalizedLogin, force)
+      if (!isMountedRef.current) return
       if (result?.dna) {
         setStarDna(result.dna)
-      } else if (force) {
-        setStarDna(null)
       }
     } catch (err) {
-      if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== dnaRequestSeq.current) return
-      setStarDna(null)
+      if (!isMountedRef.current) return
       setDnaError(getApiErrorMessage(err, t, t("developers.dnaEmpty")))
     }
     finally {
-      if ((force || isInitialLoad) && isCurrentDeveloperRequest(login, requestSeq) && requestSeq === dnaRequestSeq.current) setDnaLoading(false)
+      if ((force || isInitialLoad) && isMountedRef.current) setDnaLoading(false)
     }
   }
 
   // 加载学习路径
   const loadLearningPath = async (login: string, force = false) => {
-    const requestSeq = ++pathRequestSeq.current
+    const normalizedLogin = normalizeGitHubLogin(login)
+    if (!normalizedLogin) return
+    ++pathRequestSeq.current
     const isInitialLoad = !force
-    const showLoading = isCurrentDeveloperRequest(login, requestSeq)
+    const showLoading = isMountedRef.current
     if (showLoading) setPathLoading(true)
-    if (force && showLoading) {
-      setLearningPath(null)
-    }
     if (showLoading) setPathError("")
     try {
-      const result = await getLearningPath(login, force)
-      if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== pathRequestSeq.current) return
+      const result = await getLearningPath(normalizedLogin, force)
+      if (!isMountedRef.current) return
       if (result?.path) {
         setLearningPath(result.path)
-      } else if (force) {
-        setLearningPath(null)
       }
     } catch (err) {
-      if (!isCurrentDeveloperRequest(login, requestSeq) || requestSeq !== pathRequestSeq.current) return
-      setLearningPath(null)
+      if (!isMountedRef.current) return
       setPathError(getApiErrorMessage(err, t, t("developers.pathEmpty")))
     }
     finally {
-      if ((force || isInitialLoad) && isCurrentDeveloperRequest(login, requestSeq) && requestSeq === pathRequestSeq.current) setPathLoading(false)
+      if ((force || isInitialLoad) && isMountedRef.current) setPathLoading(false)
     }
   }
 
   // 当前选中开发者变化时，加载同步历史和 Star DNA
   const activeDevName = activeDev?.name
+  activeDevNameRef.current = activeDevName ? normalizeGitHubLogin(activeDevName) : null
   useEffect(() => {
     if (activeDevName) {
+      const normalizedActiveLogin = normalizeGitHubLogin(activeDevName)
       // 当前用户正在首次同步时跳过加载，避免请求还没入库的新用户导致 404。
       // 如果同步 A 时切换到 B，B 仍然应该正常加载，不能被全局同步状态挡住。
-      if (syncingLoginRef.current !== activeDevName) {
-        if (isSyncingRef.current) {
-          setSyncStatus("pending")
-          setSyncError("")
-          setSyncMessage("")
-        }
-        // 切换开发者时清空旧数据（上一个开发者的内容）
+      const isSyncingActiveDeveloper = syncingLoginRef.current === activeDevName
+      if (isSyncingRef.current && !isSyncingActiveDeveloper) {
+        setSyncStatus("pending")
+        setSyncError("")
+        setSyncMessage("")
+      }
+      // 只有真实切换开发者才清空旧 AI 内容，避免重复刷新把刚返回的内容覆盖为空态。
+      if (aiContentLoginRef.current !== normalizedActiveLogin) {
+        aiContentLoginRef.current = normalizedActiveLogin
         setStarDna(null)
         setLearningPath(null)
         setDnaError("")
         setPathError("")
         setDnaLoading(false)
         setPathLoading(false)
-        // 加载 DNA 和学习路径（force=false，使用缓存或首次生成）
+      }
+      setDeveloperSummary(null)
+      setShareCardOpen(false)
+      // 加载统计、标签、时间轴、同步历史；即使当前开发者正在同步，也要刷新这些轻量数据，避免页面卡在旧状态。
+      loadDeveloperDetails(activeDevName)
+      loadSyncRuns(activeDevName)
+      // 当前开发者正在同步时不抢跑 AI 生成，等待 runSync 完成后统一刷新。
+      if (!isSyncingActiveDeveloper) {
         loadStarDna(activeDevName)
         loadLearningPath(activeDevName)
-        // 加载统计、标签、时间轴、同步历史
-        loadDeveloperDetails(activeDevName)
       }
     } else {
       detailRequestSeq.current += 1
@@ -758,7 +803,9 @@ export default function Developers() {
       setDnaError("")
       setPathError("")
       setDeveloperStats(null)
+      setDeveloperSummary(null)
       setDeveloperTags([])
+      setShareCardOpen(false)
       setStarTimeline([])
     }
   }, [activeDevName])
@@ -766,8 +813,6 @@ export default function Developers() {
   // 语言切换时重新加载 DNA、学习路径和标签
   useEffect(() => {
     if (activeDevName) {
-      setStarDna(null)
-      setLearningPath(null)
       setDnaError("")
       setPathError("")
       loadStarDna(activeDevName)
@@ -776,8 +821,25 @@ export default function Developers() {
     }
   }, [i18n.language])
 
+  // 同步完成后独立刷新 AI 内容，不阻塞同步状态和同步按钮。
+  const refreshDeveloperAi = (login: string) => {
+    if (isCurrentDeveloperRequest(login, 0)) {
+      void Promise.allSettled([loadStarDna(login, true), loadLearningPath(login, true)]).then(() => {
+        if (isCurrentDeveloperRequest(login, 0)) {
+          loadDeveloperDetails(login)
+        }
+      })
+      return
+    }
+
+    // 用户已切换时只写入缓存，不更新当前页面。
+    void Promise.allSettled([getStarDna(login, true), getLearningPath(login, true)])
+  }
+
   // 同步当前开发者星标（调用真实 API）
   const runSync = async (name: string) => {
+    const requestedLogin = normalizeGitHubLogin(name)
+    if (!requestedLogin) return
     setSyncStatus("syncing")
     setSyncError("")
     setSyncMessage("")
@@ -785,14 +847,19 @@ export default function Developers() {
     // 整个 runSync 期间（含 loadStarDna/loadLearningPath 的 force=true 请求）保持 true
     // 由 finally 块统一重置，确保异常路径也能复位
     isSyncingRef.current = true
-    syncingLoginRef.current = name
+    syncingLoginRef.current = requestedLogin
     try {
       const token = getGitHubToken()
-      const result = await syncStars(name, token || undefined)
+      const result = await syncStars(requestedLogin, token || undefined)
       if (result !== null) {
-        const syncedName = result.username || name
+        const syncedName = normalizeGitHubLogin(result.username || requestedLogin)
         const syncComplete = result.complete !== false
-        if (isCurrentDeveloperRequest(syncedName, 0)) {
+        isSyncingRef.current = false
+        if (syncingLoginRef.current === requestedLogin) {
+          syncingLoginRef.current = null
+        }
+        // 同步状态是本次按钮操作的结果；后端返回后必须立即退出 syncing，不能被共享选择状态阻塞。
+        if (isMountedRef.current) {
           if (syncComplete) {
             setSyncStatus(token ? "successToken" : "successAnon")
             setSyncMessage(t("developers.starUpdated", { name: syncedName }))
@@ -803,49 +870,27 @@ export default function Developers() {
             setPathError(t("developers.syncPartialAiBlocked"))
           }
         }
-        // 先刷新开发者列表，更新星标数（isSyncingRef=true 时 useEffect 不会清空数据）
-        if (isMountedRef.current) {
-          await refreshDevelopers(currentLoginRef.current === syncedName ? syncedName : currentLoginRef.current)
-        }
-        if (isCurrentDeveloperRequest(syncedName, 0)) {
-          await loadSyncRuns(syncedName)
-        }
+        // 后续刷新全部后台执行，不能再阻塞同步按钮从 syncing 退出。
+        void refreshDevelopers(currentLoginRef.current === syncedName ? syncedName : currentLoginRef.current)
+          .then(() => {
+            if (isCurrentDeveloperRequest(syncedName, 0)) {
+              loadSyncRuns(syncedName)
+            }
+          })
         if (syncComplete) {
-          // 强制重新生成 DNA 和学习路径。若用户已切走，仅触发后端缓存写入，不写当前页面 UI。
-          try {
-            if (isCurrentDeveloperRequest(syncedName, 0)) {
-              await loadStarDna(syncedName, true)
-            } else {
-              await getStarDna(syncedName, true)
-            }
-          } catch (err) {
-            if (isCurrentDeveloperRequest(syncedName, 0)) {
-              setDnaError(getApiErrorMessage(err, t, t("developers.dnaEmpty")))
-            }
-          }
-          try {
-            if (isCurrentDeveloperRequest(syncedName, 0)) {
-              await loadLearningPath(syncedName, true)
-              loadDeveloperDetails(syncedName)
-            } else {
-              await getLearningPath(syncedName, true)
-            }
-          } catch (err) {
-            if (isCurrentDeveloperRequest(syncedName, 0)) {
-              setPathError(getApiErrorMessage(err, t, t("developers.pathEmpty")))
-            }
-          }
+          // 同步已经完成；AI 后处理后台运行，不改变同步结果。
+          refreshDeveloperAi(syncedName)
         } else if (isCurrentDeveloperRequest(syncedName, 0)) {
           loadDeveloperDetails(syncedName)
         }
       } else {
-        if (isCurrentDeveloperRequest(name, 0)) {
+        if (isMountedRef.current) {
           setSyncStatus("networkFail")
           setSyncError(t("developers.syncUnknownError"))
         }
       }
     } catch (err) {
-      if (isCurrentDeveloperRequest(name, 0)) {
+      if (isMountedRef.current) {
         setSyncStatus("networkFail")
         setSyncMessage("")
         setSyncError(getApiErrorMessage(err, t, t("developers.syncUnknownError")))
@@ -853,7 +898,7 @@ export default function Developers() {
     } finally {
       // 统一重置：无论成功/失败/异常，都确保 isSyncingRef 复位
       isSyncingRef.current = false
-      if (syncingLoginRef.current === name) {
+      if (syncingLoginRef.current === requestedLogin) {
         syncingLoginRef.current = null
       }
     }
@@ -900,6 +945,35 @@ export default function Developers() {
     () => (developerStats?.languages ?? []).slice(0, 8).reduce((sum, l) => sum + l.count, 0),
     [developerStats]
   )
+  // Share card consumes already-loaded page data and does not trigger AI requests.
+  const shareCardData = useMemo(() => {
+    if (!activeDev) return null
+    const sortedTags = [...developerTags].sort((a, b) => b.count - a.count).slice(0, 5).map((item) => item.tag)
+    const fallbackLanguages = (developerStats?.languages || []).slice(0, 5).map((item) => item.language).filter(Boolean)
+    return {
+      login: activeDev.name,
+      displayName: activeDev.displayName,
+      repoCount: developerSummary?.repoCount ?? developerStats?.repoCount ?? null,
+      hiddenGemsCount: developerSummary?.hiddenGemsCount ?? null,
+      sleepStarsCount: developerSummary?.sleepStarsCount ?? null,
+      topInterests: sortedTags.length > 0 ? sortedTags : fallbackLanguages,
+      learningPath,
+      starDna,
+      language: getSettings().language,
+      labels: {
+        brand: "the-star-way",
+        title: "STAR DNA",
+        subtitle: t("developers.shareCardPreview"),
+        interests: t("developers.shareCardInterests"),
+        starredRepos: t("developers.shareCardStarredRepos"),
+        hiddenGems: t("developers.shareCardHiddenGems"),
+        sleepingStars: t("developers.shareCardSleepingStars"),
+        learningPath: t("developers.shareCardLearningPath"),
+        fallbackPath: t("developers.shareCardFallbackPath"),
+        footer: t("developers.shareCardFooter"),
+      },
+    }
+  }, [activeDev, developerStats, developerSummary, developerTags, learningPath, starDna, t])
   // 星标趋势图表数据：保留完整 YYYY-MM，前端按需截短显示（同年只显示 MM，跨年显示完整）
   const trendData = useMemo(
     () => (Array.isArray(starTimeline) ? starTimeline : []).map((item) => ({ label: item.month, value: item.count })),
@@ -1249,6 +1323,10 @@ export default function Developers() {
                     {t("developers.viewStarRepos")}
                   </Link>
                 </Button>
+                <Button variant="outline" className="gap-2" onClick={() => setShareCardOpen(true)}>
+                  <Share2 className="h-4 w-4" />
+                  {t("developers.shareCard")}
+                </Button>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -1354,14 +1432,27 @@ export default function Developers() {
                 </CardContent>
               </Card>
             )}
-            {syncRuns.length > 0 && (
+            {activeDev && shareCardData && (
+              <ShareCard
+                data={shareCardData}
+                open={shareCardOpen}
+                title={t("developers.shareCard")}
+                previewLabel={t("developers.shareCardPreview")}
+                downloadLabel={t("developers.downloadShareCard")}
+                closeLabel={t("developers.closeShareCard")}
+                downloadFailedLabel={t("developers.shareCardDownloadFailed")}
+                onClose={() => setShareCardOpen(false)}
+              />
+            )}
+            {activeDev && (
               <div className="mt-4 space-y-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                   <Clock className="w-4 h-4" />
                   {t("developers.syncHistory")}
                 </h3>
-                <div className="space-y-1.5">
-                  {syncRuns.slice(0, 5).map((run) => (
+                {syncRuns.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {syncRuns.slice(0, 5).map((run) => (
                     <div
                       key={run.id}
                       className="flex flex-wrap items-center gap-3 text-sm rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 py-2"
@@ -1390,8 +1481,11 @@ export default function Developers() {
                         {t("developers.syncPages")}: {run.pages_fetched}
                       </span>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{t("developers.syncHistory")}</p>
+                )}
               </div>
             )}
             <div className="flex items-baseline gap-2 pt-2">

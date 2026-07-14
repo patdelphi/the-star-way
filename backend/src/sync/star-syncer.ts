@@ -199,11 +199,11 @@ export async function syncStars(
       reposMarkedRemoved = removedResult.changes
     }
 
-    // 同步数据变化后清理用户级 AI 缓存，避免继续展示旧画像/学习路径。
+    // 星标数据变化后，用户级 AI 内容必须重新生成；只清理该用户画像/学习路径缓存，不影响仓库摘要缓存。
     db.prepare(`
       DELETE FROM translations
       WHERE repo_full_name = ?
-        AND target_lang IN (${USER_AI_CACHE_KEYS.map(() => '?').join(', ')})
+        AND target_lang IN (${USER_AI_CACHE_KEYS.map(() => '?').join(',')})
     `).run(getUserAiCacheKey(username), ...USER_AI_CACHE_KEYS)
 
     return { reposUpserted, starsUpserted, reposMarkedRemoved }

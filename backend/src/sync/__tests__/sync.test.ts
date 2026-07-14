@@ -152,9 +152,14 @@ describe('GitHub 同步', () => {
     const result = await syncStars(db, 'testuser')
 
     expect(result.username).toBe('testuser')
+    expect(result.complete).toBe(true)
     expect(result.reposUpserted).toBe(3)
     expect(result.starsUpserted).toBe(3)
     expect(result.reposMarkedRemoved).toBe(0)
+
+    const run = db.prepare('SELECT status, ended_at, pages_fetched FROM sync_runs WHERE user_login = ?').get('testuser') as any
+    expect(run.status).toBe('success')
+    expect(run.ended_at).toBeTruthy()
   })
 
   it('同步后应可查询仓库和星标', async () => {
@@ -177,6 +182,33 @@ describe('GitHub 同步', () => {
     expect(star).toBeDefined()
     expect((star as any).starred_at).toBe('2025-06-01T00:00:00Z')
     expect((star as any).removed_at).toBeNull()
+  })
+
+  it('同步成功后应清理该用户的 AI 缓存，避免基于旧星标生成结果', async () => {
+    for (const key of ['dna-zh', 'dna-en', 'learning-zh', 'learning-en']) {
+      db.prepare(`
+        INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+        VALUES (?, ?, ?, 'ai', ?)
+      `).run('user:testuser', key, `旧缓存 ${key}`, '2026-07-12T00:00:00.000Z')
+    }
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'zh', ?, 'ai', ?)
+    `).run('testuser/alpha-project', '仓库摘要缓存', '2026-07-12T00:00:00.000Z')
+
+    await syncStars(db, 'testuser')
+
+    const userCacheCount = db.prepare(`
+      SELECT COUNT(*) as cnt FROM translations
+      WHERE repo_full_name = ?
+    `).get('user:testuser') as { cnt: number }
+    expect(userCacheCount.cnt).toBe(0)
+
+    const repoCache = db.prepare(`
+      SELECT translated_readme_summary FROM translations
+      WHERE repo_full_name = ? AND target_lang = 'zh'
+    `).get('testuser/alpha-project') as { translated_readme_summary: string } | undefined
+    expect(repoCache?.translated_readme_summary).toBe('仓库摘要缓存')
   })
 
   it('同步用户头像应来自用户资料而不是仓库 owner', async () => {

@@ -24,15 +24,10 @@ import { classifyReposForUser } from '../classification/classifier.js'
 import { syncStars } from '../sync/star-syncer.js'
 import { exportCsv, exportJson, exportMarkdown, exportHtml, exportReportMarkdown } from '../export/exporter.js'
 import { loadAiConfig } from '../ai/config.js'
-import { generateReadmeSummary, generateRepoAnalysis, translateRepoAnalysisToEnglish, translateToEnglish, generateStarDna, generateLearningPath, type RepoAnalysisResult } from '../ai/client.js'
+import { generateRepoAnalysis, translateRepoAnalysisToEnglish, type RepoAnalysisResult } from '../ai/client.js'
 import { getTagLabel } from '../classification/tag-labels-bilingual.js'
 import { loadEnv } from '../config/env.js'
-import { getUserAiCacheKey } from '@shared/ai/index.js'
-import {
-  canGenerateUserAiFromSyncStatus,
-  getIncompleteSyncMessage,
-  type SyncStatus,
-} from '@shared/sync/index.js'
+import { getUserAiContent, UserAiContentError } from '../ai/user-ai.js'
 
 // ===== 工具函数 =====
 
@@ -93,6 +88,8 @@ function json(res: ServerResponse, data: unknown, status = 200): void {
   const body = JSON.stringify(data)
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
+    // 明确响应体长度，避免本地代理把长同步响应误判为未结束的流。
+    'Content-Length': Buffer.byteLength(body),
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -127,77 +124,6 @@ function decodePathParam(value: string): string {
 /** 规范化路由中的用户 login，确保所有用户级 API 行为一致 */
 function normalizeRouteLogin(login: string): string {
   return normalizeGitHubLogin(decodePathParam(login))
-}
-
-/** 读取用户级 AI 文本缓存 */
-function getUserAiTextCache(db: Database.Database, login: string, key: string): string | null {
-  const cached = db.prepare(`
-    SELECT translated_readme_summary
-    FROM translations
-    WHERE repo_full_name = ? AND target_lang = ?
-  `).get(getUserAiCacheKey(login), key) as { translated_readme_summary: string } | undefined
-  return cached?.translated_readme_summary || null
-}
-
-/** 读取最新同步状态，用于阻止基于不完整数据生成 AI 缓存 */
-function getLatestSyncStatus(db: Database.Database, login: string): { status: SyncStatus; error_message: string | null } | null {
-  const row = db.prepare(`
-    SELECT status, error_message
-    FROM sync_runs
-    WHERE user_login = ?
-    ORDER BY started_at DESC, id DESC
-    LIMIT 1
-  `).get(login) as { status: SyncStatus; error_message: string | null } | undefined
-  return row ?? null
-}
-
-/** AI 画像/学习路径依赖完整星标数据，本地和 Worker 使用同一状态语义 */
-function assertUserAiDataReady(db: Database.Database, login: string): string | null {
-  const latestRun = getLatestSyncStatus(db, login)
-  if (!latestRun) return null
-  if (canGenerateUserAiFromSyncStatus(latestRun.status)) return null
-  return getIncompleteSyncMessage(login, latestRun.status, latestRun.error_message)
-}
-
-/** 获取用户星标数量，用于 AI 内容生成前的空数据保护 */
-function getUserStarCount(db: Database.Database, login: string): number {
-  const row = db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE user_login = ?').get(login) as { cnt: number }
-  return row.cnt
-}
-
-/** 缓存用户级 AI 文本，所有写入放在同一事务中 */
-function cacheUserAiTextPair(
-  db: Database.Database,
-  login: string,
-  zhKey: string,
-  zhText: string,
-  enKey: string,
-  enText: string,
-  updatedAt: string,
-): void {
-  const save = db.transaction(() => {
-    db.prepare(`
-      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-      VALUES (?, ?, ?, 'ai', ?)
-      ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-        translated_readme_summary = excluded.translated_readme_summary,
-        provider = excluded.provider,
-        updated_at = excluded.updated_at
-    `).run(getUserAiCacheKey(login), zhKey, zhText, updatedAt)
-
-    if (enText) {
-      db.prepare(`
-        INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
-        VALUES (?, ?, ?, 'ai', ?)
-        ON CONFLICT(repo_full_name, target_lang) DO UPDATE SET
-          translated_readme_summary = excluded.translated_readme_summary,
-          provider = excluded.provider,
-          updated_at = excluded.updated_at
-      `).run(getUserAiCacheKey(login), enKey, enText, updatedAt)
-    }
-  })
-
-  save()
 }
 
 /** 发送文本响应（用于导出） */
@@ -731,93 +657,12 @@ export function createRouter(db: Database.Database) {
         const login = normalizeRouteLogin(starDnaMatch.login)
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
-        const cacheKey = `dna-${lang}`
-        const cachedText = getUserAiTextCache(db, login, cacheKey)
-
-        if (!ensureUserExists(db, login)) {
-          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
-          return
-        }
-
-        // 查缓存（非强制刷新时）
-        if (!force && cachedText) {
-          json(res, { data: { dna: cachedText, cached: true } })
-          return
-        }
-        if (!force && lang === 'en') {
-          const cachedZh = getUserAiTextCache(db, login, 'dna-zh')
-          if (cachedZh) {
-            try {
-              const translated = await translateToEnglish(cachedZh)
-              cacheUserAiTextPair(db, login, 'dna-zh', cachedZh, 'dna-en', translated, new Date().toISOString())
-              json(res, { data: { dna: translated || cachedZh, cached: false } })
-            } catch {
-              json(res, { data: { dna: cachedZh, cached: true } })
-            }
-            return
-          }
-        }
-
-        const incompleteSyncMessage = assertUserAiDataReady(db, login)
-        if (incompleteSyncMessage) {
-          error(res, 'SYNC_INCOMPLETE', incompleteSyncMessage, 409)
-          return
-        }
-
-        const starCount = getUserStarCount(db, login)
-        if (starCount === 0) {
-          error(res, 'EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
-          return
-        }
-
-        // 收集统计
-        const languages = db.prepare(`
-          SELECT language, COUNT(*) as count FROM repos
-          WHERE full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
-          GROUP BY language ORDER BY count DESC LIMIT 5
-        `).all(login) as { language: string; count: number }[]
-
-        const tags = db.prepare(`
-          SELECT tag, COUNT(*) as count FROM repo_tags
-          WHERE repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
-          GROUP BY tag ORDER BY count DESC LIMIT 8
-        `).all(login) as { tag: string; count: number }[]
-
-        const activeRepoCount = queryActiveRepoCount(db, login)
-
-        // 获取代表性星标项目（按 stars 排序取前 5）
-        const topRepos = db.prepare(`
-          SELECT r.full_name, r.description, r.stars
-          FROM repos r JOIN stars s ON r.full_name = s.repo_full_name
-          WHERE s.user_login = ? AND r.description IS NOT NULL
-          ORDER BY r.stars DESC LIMIT 5
-        `).all(login) as { full_name: string; description: string; stars: number }[]
-
         try {
-          // 先生成中文
-          const dnaZh = await generateStarDna(login, {
-            repoCount: starCount,
-            activeRepoCount,
-            languages,
-            tags,
-            topRepos,
-          })
-
-          const now = new Date().toISOString()
-
-          // 中文请求不等待英文翻译，避免长耗时翻译拖垮首次生成。
-          let dnaEn = ''
-          if (lang === 'en') {
-            try {
-              dnaEn = await translateToEnglish(dnaZh)
-            } catch { /* 翻译失败不阻塞 */ }
-          }
-
-          cacheUserAiTextPair(db, login, 'dna-zh', dnaZh, 'dna-en', dnaEn, now)
-          json(res, { data: { dna: lang === 'en' ? (dnaEn || dnaZh) : dnaZh, cached: false } })
+          const result = await getUserAiContent(db, login, 'star-dna', lang, force)
+          json(res, { data: { dna: result.content, cached: result.cached } })
         } catch (err: any) {
-          if (cachedText) {
-            json(res, { data: { dna: cachedText, cached: true } })
+          if (err instanceof UserAiContentError) {
+            error(res, err.code, err.message, err.status)
             return
           }
           error(res, 'AI_ERROR', err?.message || 'AI 生成画像失败', 500)
@@ -862,90 +707,12 @@ export function createRouter(db: Database.Database) {
         const login = normalizeRouteLogin(learningMatch.login)
         const force = parseQuery(url).force === '1'
         const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
-        const cacheKey = `learning-${lang}`
-        const cachedText = getUserAiTextCache(db, login, cacheKey)
-
-        if (!ensureUserExists(db, login)) {
-          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
-          return
-        }
-
-        // 查缓存（非强制刷新时）
-        if (!force && cachedText) {
-          json(res, { data: { path: cachedText, cached: true } })
-          return
-        }
-        if (!force && lang === 'en') {
-          const cachedZh = getUserAiTextCache(db, login, 'learning-zh')
-          if (cachedZh) {
-            try {
-              const translated = await translateToEnglish(cachedZh)
-              cacheUserAiTextPair(db, login, 'learning-zh', cachedZh, 'learning-en', translated, new Date().toISOString())
-              json(res, { data: { path: translated || cachedZh, cached: false } })
-            } catch {
-              json(res, { data: { path: cachedZh, cached: true } })
-            }
-            return
-          }
-        }
-
-        const incompleteSyncMessage = assertUserAiDataReady(db, login)
-        if (incompleteSyncMessage) {
-          error(res, 'SYNC_INCOMPLETE', incompleteSyncMessage, 409)
-          return
-        }
-
-        const starCount = getUserStarCount(db, login)
-        if (starCount === 0) {
-          error(res, 'EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
-          return
-        }
-
-        // 收集统计
-        const languages = db.prepare(`
-          SELECT language, COUNT(*) as count FROM repos
-          WHERE full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
-          GROUP BY language ORDER BY count DESC LIMIT 5
-        `).all(login) as { language: string; count: number }[]
-
-        const tags = db.prepare(`
-          SELECT tag, COUNT(*) as count FROM repo_tags
-          WHERE repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
-          GROUP BY tag ORDER BY count DESC LIMIT 10
-        `).all(login) as { tag: string; count: number }[]
-
-        // 获取代表性星标项目（按 stars 排序取前 8）
-        const topRepos = db.prepare(`
-          SELECT r.full_name, r.description, r.stars
-          FROM repos r JOIN stars s ON r.full_name = s.repo_full_name
-          WHERE s.user_login = ? AND r.description IS NOT NULL
-          ORDER BY r.stars DESC LIMIT 8
-        `).all(login) as { full_name: string; description: string; stars: number }[]
-
         try {
-          // 先生成中文
-          const pathZh = await generateLearningPath(login, {
-            repoCount: starCount,
-            languages,
-            tags,
-            topRepos,
-          })
-
-          const now = new Date().toISOString()
-
-          // 中文请求不等待英文翻译，避免长耗时翻译拖垮首次生成。
-          let pathEn = ''
-          if (lang === 'en') {
-            try {
-              pathEn = await translateToEnglish(pathZh)
-            } catch { /* 翻译失败不阻塞 */ }
-          }
-
-          cacheUserAiTextPair(db, login, 'learning-zh', pathZh, 'learning-en', pathEn, now)
-          json(res, { data: { path: lang === 'en' ? (pathEn || pathZh) : pathZh, cached: false } })
+          const result = await getUserAiContent(db, login, 'learning-path', lang, force)
+          json(res, { data: { path: result.content, cached: result.cached } })
         } catch (err: any) {
-          if (cachedText) {
-            json(res, { data: { path: cachedText, cached: true } })
+          if (err instanceof UserAiContentError) {
+            error(res, err.code, err.message, err.status)
             return
           }
           error(res, 'AI_ERROR', err?.message || 'AI 生成学习路径失败', 500)

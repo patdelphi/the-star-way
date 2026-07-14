@@ -40,6 +40,8 @@ function findChineseStringLiterals() {
     const lines = withoutBlockComments.split(/\r?\n/).map((line) => line.replace(/\/\/.*$/, ""))
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i]
+      // Language self-names intentionally remain in their native language.
+      if (file.endsWith(resolve(root, "src/components/layout/TopBar.tsx")) && line.includes('label: "中文"')) continue
       const re = /(['"])(?:\\.|(?!\1).)*?\1/g
       let match
       while ((match = re.exec(line))) {
@@ -66,6 +68,8 @@ const files = {
   dashboard: readText("src/pages/Dashboard.tsx"),
   catalog: readText("src/pages/StarCatalog.tsx"),
   chartTooltip: readText("src/components/ui/chart-tooltip.tsx"),
+  shareCard: readText("src/components/ShareCard.tsx"),
+  shareCardBuilder: readText("src/lib/share-card.ts"),
 }
 
 const locales = {
@@ -97,6 +101,7 @@ const requiredLocaleKeys = [
   "nav.repoAnalysis",
   "developers.syncStatus",
   "developers.syncStates.rateLimit",
+  "apiErrors.AI_TIMEOUT",
   "starExplorer.title",
   "starExplorer.desc",
   "starExplorer.designatedDev",
@@ -120,6 +125,10 @@ const requiredLocaleKeys = [
   "repoAnalysis.techStack",
   "repoAnalysis.licenseRisk",
   "repoAnalysis.similarRepos",
+  "developers.shareCard",
+  "developers.shareCardPreview",
+  "developers.downloadShareCard",
+  "developers.shareCardDownloadFailed",
 ]
 
 const requiredChineseTexts = [
@@ -148,6 +157,8 @@ const requiredChineseTexts = [
   "技术栈解析",
   "维护信号",
   "相似项目",
+  "分享卡片",
+  "下载分享卡片",
 ]
 
 const forbiddenTexts = [
@@ -185,6 +196,7 @@ const checks = [
   ["顶部搜索使用 i18n", files.topbar.includes("topBar.searchPlaceholder") && files.topbar.includes("topBar.searchResults")],
   ["侧边栏导航使用 i18n", files.sidebar.includes("nav.starExplorer") && files.sidebar.includes("nav.repoAnalysis")],
   ["开发者上下文 Provider", files.app.includes("DeveloperProvider") && files.developerContext.includes("useDeveloper")],
+  ["开发者上下文归一化 GitHub login", files.developerContext.includes("normalizeGitHubLogin") && files.developerContext.includes("replace(/^@+/")],
   ["开发者选择可跨页面共享", files.developers.includes("setCurrentLogin") && files.explorer.includes("currentLogin") && files.analysis.includes("currentLogin") && files.catalog.includes("currentLogin")],
   ["核心页面不写死 demo-user", ![files.explorer, files.analysis, files.catalog].some((content) => content.includes('"demo-user"') || content.includes("'demo-user'"))],
   ["星标仓库标题显示当前开发者", files.explorer.includes("@{currentLogin}") && !files.explorer.includes("developerProfile.login")],
@@ -242,7 +254,14 @@ const checks = [
   ["开发者页接入同步 API", files.developers.includes("getUsers") && files.developers.includes("syncStars")],
   ["开发者删除走确认和后端逻辑删除", files.developers.includes("window.confirm") && files.developers.includes("deleteUser") && files.api.includes("export async function deleteUser")],
   ["开发者同步状态", files.developers.includes("syncStatus") && getByPath(locales.zh, "developers.syncStates.rateLimit") === "GitHub API 限流"],
+  ["本地同步只发送一次请求", !files.api.includes("for (let batch = 0; batch < 1000; batch++)") && !files.api.includes("syncId = result.syncId")],
+  ["同步完成不等待 AI 后处理", !files.developers.includes("await loadStarDna(syncedName, true)") && !files.developers.includes("await loadLearningPath(syncedName, true)")],
+  ["同步接口返回后状态直接退出 syncing", files.developers.includes("后端返回后必须立即退出 syncing") && files.developers.includes("if (isMountedRef.current) {\n          if (syncComplete)")],
+  ["同步状态可从真实 synced_at 兜底恢复", files.developers.includes("activeUser?.synced_at") && files.developers.includes('setSyncStatus("successToken")')],
+  ["同步流程使用规范化 login 归属状态", files.developers.includes("const requestedLogin = normalizeGitHubLogin(name)") && files.developers.includes("const syncedName = normalizeGitHubLogin(result.username || requestedLogin)")],
   ["GitHub 同步长超时和错误透出", files.api.includes("resolveTimeout") && files.settings.includes("syncTimeout") && files.developers.includes("syncError") && getByPath(locales.zh, "developers.syncUnknownError")],
+  ["本地设置会归一化超时避免请求立即中止", files.settings.includes("function normalizeSettings") && files.settings.includes("apiTimeout: clampNumber") && files.settings.includes("syncTimeout: clampNumber")],
+  ["同步响应体读取有超时", files.api.includes("readJsonWithTimeout") && files.api.includes("readJsonWithTimeout<{") && files.api.includes('resolveTimeout(\'/api/sync\')')],
   ["设置页移除 Token 导出 AI 增强配置卡", !["settings.githubToken", "settings.export", "settings.aiEnhance"].some((key) => files.settingsPage.includes(key))],
   ["设置页移除数据库卡", !files.settingsPage.includes("settings.database") && !files.settingsPage.includes("dbModeSynced")],
   ["设置页显示服务有效性", files.settingsPage.includes("getServiceStatus") && files.settingsPage.includes("serviceStatus.githubToken") && files.settingsPage.includes("serviceStatus.aiApi")],
@@ -254,9 +273,21 @@ const checks = [
   ["API 统计数据不会返回半结构", !files.api.includes("return data.data as UserStats") && files.api.includes("return normalizeUserStats(data.data)")],
   ["开发者搜索结果不复用同步成功提示", !files.developers.includes('setSearchResult(t("developers.starUpdated"')],
   ["开发者星标趋势空值兜底", files.developers.includes("setStarTimeline(Array.isArray(timeline) ? timeline : [])") && !files.developers.includes("then(setStarTimeline)")],
-  ["开发者 AI 长任务写 UI 前校验当前用户", files.developers.includes("currentLoginRef") && files.developers.includes("isCurrentDeveloperRequest(login, requestSeq)")],
-  ["开发者列表刷新保持指定用户选中", files.developers.includes("preferredLogin?: string") && files.developers.includes("preferredLogin || currentLoginRef.current")],
+  ["开发者 AI 长任务成功后不依赖共享 login 写回", files.developers.includes("if (!isMountedRef.current) return") && files.developers.includes("setStarDna(result.dna)") && files.developers.includes("setLearningPath(result.path)")],
+  ["StrictMode 重新挂载会恢复 mounted ref", files.developers.includes("isMountedRef.current = true") && files.developers.includes("isMountedRef.current = false")],
+  ["长任务状态归属使用可见开发者兜底", files.developers.includes("activeDevNameRef") && files.developers.includes("activeDevNameRef.current === normalizedLogin")],
+  ["开发者列表刷新保持指定用户选中", files.developers.includes("preferredLogin?: string") && files.developers.includes("normalizeGitHubLogin(preferredLogin || currentLoginRef.current)")],
+  ["开发者列表刷新后立即补齐详情和同步历史", files.developers.includes("loadDeveloperDetails(activeLogin)") && files.developers.includes("loadSyncRuns(activeLogin)")],
   ["开发者首次 AI 生成也显示 loading", files.developers.includes("setDnaLoading(true)") && files.developers.includes("setPathLoading(true)") && files.developers.includes("isInitialLoad")],
+  ["同步中的当前开发者仍会加载统计和同步历史", !files.developers.includes("if (syncingLoginRef.current !== activeDevName)") && files.developers.includes("const isSyncingActiveDeveloper = syncingLoginRef.current === activeDevName")],
+  ["开发者详情和同步历史按最后请求 login 防旧响应", files.developers.includes("detailLoginRef") && files.developers.includes("syncRunsLoginRef") && files.developers.includes("detailLoginRef.current === login") && !files.developers.includes("isCurrentDeveloperRequest(name, requestSeq) && requestSeq === detailRequestSeq.current")],
+  ["同步历史不因并发请求竞态丢失", files.developers.includes("syncRunsRequestSeq") && files.developers.includes("syncRunsLoginRef.current = name")],
+  ["重新生成失败保留已有 AI 内容", !files.developers.includes("if (force && showLoading) {\\n      setStarDna(null)" ) && !files.developers.includes("if (force && showLoading) {\\n      setLearningPath(null)" )],
+  ["同步历史区域始终可见", files.developers.includes("{activeDev && (") && files.developers.includes("syncRuns.length > 0 ?")],
+  ["分享卡片组件已接入开发者页", files.developers.includes("ShareCard") && files.shareCard.includes("ShareCard")],
+  ["分享按钮位于开发者顶部操作区", files.developers.indexOf('t("developers.shareCard")') < files.developers.indexOf("Star DNA 画像卡片")],
+  ["分享卡片包含 SVG 构建和 PNG 下载", files.shareCardBuilder.includes("buildShareCardSvg") && files.shareCardBuilder.includes("downloadShareCard")],
+  ["分享卡片提供双语下载文案", getByPath(locales.zh, "developers.downloadShareCard") && getByPath(locales.en, "developers.downloadShareCard")],
   ["纯英文演示标签已清理", forbiddenTexts.every((text) => !allPageText.includes(text) && !zhText.includes(text))],
 ]
 
