@@ -21,6 +21,7 @@ export interface ShareCardData {
     projectDescription: string
     title: string
     subtitle: string
+    userTitleSuffix: string
     dnaLabel: string
     interests: string
     starredRepos: string
@@ -30,9 +31,10 @@ export interface ShareCardData {
     fallbackPath: string
     footer: string
     qrLabel: string
-    systemUrlLabel: string
     githubProfileLabel: string
     fullReportHint: string
+    ctaTitle: string
+    ctaSubtitle: string
   }
 }
 
@@ -63,23 +65,10 @@ const truncate = (value: string, maxLength: number): string => {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text
 }
 
-const summarizeLearningPath = (value: string, fallback: string): string => {
-  const text = normalizeCardText(value || fallback)
-  if (!text) return fallback
-  const withoutStagePrefix = text.replace(/^阶段[一二三四五六七八九十\d]+[:：]\s*/, "")
-  const sentence = withoutStagePrefix.split(/[。.!?？]/).find((item) => item.trim().length > 0)
-  return truncate(sentence || withoutStagePrefix, 92)
-}
-
 const summarizeProfile = (value: string, fallback: string): string => {
   const text = normalizeCardText(value || fallback)
   const firstSentence = text.split(/[。.!?？]/).find((item) => item.trim().length > 0)
   return truncate(firstSentence || text || fallback, 54)
-}
-
-const buildLearningSummary = (interests: string[], fallback: string): string => {
-  const selected = interests.slice(0, 3).map((item) => normalizeCardText(item)).filter(Boolean)
-  return selected.length > 0 ? selected.join(" / ") : fallback
 }
 
 /** 按近似字宽拆分 SVG 文本，避免浏览器不能自动换行导致文本越界。 */
@@ -282,8 +271,8 @@ function renderQrSvg(value: string, x: number, y: number, size: number): string 
   return `<g><rect x="${x - 14}" y="${y - 14}" width="${size + 28}" height="${size + 28}" rx="24" fill="#F8FAFF"/>${cells}</g>`
 }
 
-function renderMetric(label: string, value: string, x: number): string {
-  return `<g transform="translate(${x} 686)"><rect width="198" height="106" rx="22" fill="#0C1430" fill-opacity=".42" stroke="#FFFFFF" stroke-opacity=".14"/><text x="22" y="34" class="label">${escapeXml(label)}</text><text x="22" y="82" font-size="37" font-weight="800">${escapeXml(value)}</text></g>`
+function renderMetric(label: string, value: string, x: number, y: number): string {
+  return `<g transform="translate(${x} ${y})"><rect width="214" height="78" rx="22" fill="#0D1534" fill-opacity=".62" stroke="#FFFFFF" stroke-opacity=".16"/><text x="22" y="28" class="label">${escapeXml(label)}</text><text x="22" y="64" font-size="32" font-weight="850">${escapeXml(value)}</text></g>`
 }
 
 /** Build a fixed-size share card SVG. */
@@ -294,52 +283,51 @@ export function buildShareCardSvg(data: ShareCardData): string {
   const systemUrl = data.systemUrl || "https://starway.patdelphi.xyz"
   const systemUrlText = truncate(systemUrl.replace(/^https?:\/\//, ""), 36)
   const profileText = truncate(shareUrl.replace(/^https?:\/\//, ""), 32)
-  const tags = data.topInterests.slice(0, 4).map((tag) => truncate(tag, 15))
+  const tags = data.topInterests.slice(0, 3).map((tag) => truncate(tag, 14))
   const tagMarkup = tags.map((tag, index) => {
-    const x = 176 + index * 172
-    const y = 620
-    const width = Math.max(128, Math.min(150, tag.length * 8 + 38))
+    const x = 150 + index * 176
+    const y = 648
+    const width = Math.max(130, Math.min(154, tag.length * 8 + 40))
     const color = index % 2 === 0 ? "#7DE3FF" : "#B58CFF"
     return `<g><rect x="${x}" y="${y}" width="${width}" height="40" rx="20" fill="${color}" fill-opacity="0.18" stroke="${color}" stroke-opacity="0.55"/><text x="${x + width / 2}" y="${y + 25}" text-anchor="middle" class="tag">${escapeXml(tag)}</text></g>`
   }).join("")
-  const projectLines = wrapTextLines(data.labels.projectDescription, 35, 2)
-  const dnaLines = wrapTextLines(summarizeProfile(data.starDna || "", data.labels.fallbackPath), 30, 2)
-  const pathLines = wrapTextLines(buildLearningSummary(tags, summarizeLearningPath(data.learningPath || "", data.labels.fallbackPath)), 24, 2)
-  const qr = renderQrSvg(systemUrl, 744, 780, 132)
+  const dnaLines = wrapTextLines(summarizeProfile(data.starDna || "", data.labels.fallbackPath), 34, 1)
+  const ctaLines = wrapTextLines(data.labels.ctaSubtitle, 29, 2)
+  // 二维码固定在独立 CTA 区，和统计/正文彻底分离。
+  const qr = renderQrSvg(systemUrl, 720, 738, 190)
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
   <defs>
-    <linearGradient id="bg" x1="80" y1="40" x2="1000" y2="1060" gradientUnits="userSpaceOnUse"><stop stop-color="#111B3D"/><stop offset="0.52" stop-color="#20205C"/><stop offset="1" stop-color="#381D63"/></linearGradient>
-    <linearGradient id="accent" x1="160" y1="700" x2="900" y2="930" gradientUnits="userSpaceOnUse"><stop stop-color="#7DE3FF"/><stop offset="1" stop-color="#B58CFF"/></linearGradient>
-    <style>.body{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#F8FAFF}.muted{fill:#C9D2F1}.label{font-size:15px;font-weight:700;letter-spacing:1.6px;fill:#A9B5DA}.tag{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;fill:#F8FAFF}.copy{font-size:18px;font-weight:700;fill:#F8FAFF}.small{font-size:17px;font-weight:700;fill:#D8E0FF}.url{font-size:17px;font-weight:800;fill:#9EEAFF}</style>
+    <linearGradient id="bg" x1="70" y1="30" x2="1020" y2="1060" gradientUnits="userSpaceOnUse"><stop stop-color="#102340"/><stop offset="0.48" stop-color="#222057"/><stop offset="1" stop-color="#36205D"/></linearGradient>
+    <linearGradient id="hero" x1="120" y1="104" x2="920" y2="916" gradientUnits="userSpaceOnUse"><stop stop-color="#7DE3FF" stop-opacity=".20"/><stop offset="1" stop-color="#B58CFF" stop-opacity=".16"/></linearGradient>
+    <linearGradient id="cta" x1="120" y1="738" x2="960" y2="966" gradientUnits="userSpaceOnUse"><stop stop-color="#E7FBFF"/><stop offset="1" stop-color="#F5F0FF"/></linearGradient>
+    <style>.body{font-family:Inter,Segoe UI,Arial,sans-serif;fill:#F8FAFF}.muted{fill:#C9D2F1}.label{font-size:15px;font-weight:750;letter-spacing:1.5px;fill:#A9B5DA}.tag{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:16px;font-weight:750;fill:#F8FAFF}.copy{font-size:20px;font-weight:760;fill:#F8FAFF}.small{font-size:18px;font-weight:720;fill:#D8E0FF}.url{font-size:18px;font-weight:820;fill:#9EEAFF}.dark{fill:#15213F}.darkMuted{fill:#536079}</style>
   </defs>
-  <rect width="1080" height="1080" rx="48" fill="url(#bg)"/>
-  <circle cx="140" cy="160" r="2.5" fill="#B8DFFF"/><circle cx="930" cy="135" r="3" fill="#D7C6FF"/><circle cx="940" cy="910" r="2.5" fill="#B8DFFF"/>
-  <path d="M54 270C220 80 470 54 715 110C900 152 1010 270 1044 446" fill="none" stroke="#9D9AFF" stroke-opacity=".18" stroke-width="2"/>
-  <rect x="120" y="100" width="840" height="880" rx="42" fill="#FFFFFF" fill-opacity=".09" stroke="#FFFFFF" stroke-opacity=".22"/>
+  <rect width="1080" height="1080" rx="56" fill="url(#bg)"/>
+  <path d="M72 260C240 76 486 56 724 116C900 160 1016 286 1040 456" fill="none" stroke="#9D9AFF" stroke-opacity=".16" stroke-width="2"/>
+  <path d="M64 840C258 1018 594 1040 1016 842" fill="none" stroke="#7DE3FF" stroke-opacity=".14" stroke-width="2"/>
+  <rect x="108" y="96" width="864" height="888" rx="48" fill="#FFFFFF" fill-opacity=".08" stroke="#FFFFFF" stroke-opacity=".18"/>
+  <rect x="136" y="126" width="808" height="582" rx="42" fill="url(#hero)" stroke="#FFFFFF" stroke-opacity=".14"/>
+  <rect x="136" y="724" width="808" height="240" rx="42" fill="url(#cta)" class="share-card-cta"/>
   <g class="body">
-    <text x="176" y="176" font-size="23" font-weight="700">${escapeXml(data.labels.brand)}</text>
-    <text x="878" y="176" text-anchor="end" font-size="17" font-weight="700" letter-spacing="3" fill="#9EEAFF">${escapeXml(data.labels.title)}</text>
-    <text x="176" y="236" font-size="44" font-weight="850">${escapeXml(data.labels.projectName)}</text>
-    ${wrapSvgText(projectLines, 176, 278, 26, "small")}
-    <text x="176" y="336" class="label">${escapeXml(data.labels.systemUrlLabel)}</text>
-    <text x="176" y="366" class="url">${escapeXml(systemUrlText)}</text>
-    <text x="176" y="446" font-size="56" font-weight="850">${title}</text>
-    <text x="176" y="486" font-size="20" class="muted">@${login}</text>
-    <text x="176" y="522" class="label">${escapeXml(data.labels.dnaLabel)}</text>
-    ${wrapSvgText(dnaLines, 176, 550, 27, "small")}
-    <text x="176" y="598" class="label">${escapeXml(data.labels.interests)}</text>
+    <text x="150" y="186" font-size="24" font-weight="760">${escapeXml(data.labels.brand)}</text>
+    <text x="890" y="186" text-anchor="end" font-size="17" font-weight="760" letter-spacing="3" fill="#9EEAFF">${escapeXml(data.labels.title)}</text>
+    <text x="150" y="260" font-size="54" font-weight="880">${title}${escapeXml(data.labels.userTitleSuffix)}</text>
+    <text x="150" y="302" font-size="21" class="muted">@${login} · ${escapeXml(data.labels.githubProfileLabel)} ${escapeXml(profileText)}</text>
+    <text x="150" y="362" class="label">${escapeXml(data.labels.dnaLabel)}</text>
+    ${wrapSvgText(dnaLines, 150, 394, 29, "small")}
+    <text x="150" y="636" class="label">${escapeXml(data.labels.interests)}</text>
     ${tagMarkup}
-    ${renderMetric(data.labels.starredRepos, displayValue(data.repoCount), 176)}
-    ${renderMetric(data.labels.hiddenGems, displayValue(data.hiddenGemsCount), 403)}
-    ${renderMetric(data.labels.sleepingStars, displayValue(data.sleepStarsCount), 630)}
-    <rect x="176" y="822" width="500" height="108" rx="28" fill="url(#accent)" fill-opacity=".13" stroke="#A7E9FF" stroke-opacity=".32"/>
-    <text x="208" y="862" class="label" fill="#A9EFFF">${escapeXml(data.labels.learningPath)}</text>
-    ${wrapSvgText(pathLines, 208, 894, 24, "copy")}
+    ${renderMetric(data.labels.starredRepos, displayValue(data.repoCount), 150, 476)}
+    ${renderMetric(data.labels.hiddenGems, displayValue(data.hiddenGemsCount), 382, 476)}
+    ${renderMetric(data.labels.sleepingStars, displayValue(data.sleepStarsCount), 614, 476)}
+    <text x="176" y="798" font-size="38" font-weight="880" class="dark">${escapeXml(data.labels.ctaTitle)}</text>
+    ${wrapSvgText(ctaLines, 176, 840, 27, "darkMuted")}
+    <text x="176" y="904" font-size="17" font-weight="820" class="darkMuted">${escapeXml(data.labels.projectName)}</text>
+    <text x="176" y="934" font-size="18" font-weight="780" class="darkMuted">${escapeXml(systemUrlText)}</text>
     ${qr}
-    <text x="810" y="946" text-anchor="middle" class="label">${escapeXml(data.labels.qrLabel)}</text>
-    <text x="744" y="758" class="label">${escapeXml(data.labels.fullReportHint)}</text>
-    <text x="176" y="950" font-size="16" class="muted">${escapeXml(data.labels.githubProfileLabel)} · ${escapeXml(profileText)}</text>
+    <text x="815" y="930" text-anchor="middle" font-size="18" font-weight="850" class="dark">${escapeXml(data.labels.qrLabel)}</text>
+    <text x="815" y="956" text-anchor="middle" font-size="15" class="darkMuted">${escapeXml(data.labels.fullReportHint)}</text>
   </g>
 </svg>`
 }

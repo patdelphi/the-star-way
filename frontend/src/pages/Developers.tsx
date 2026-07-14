@@ -48,6 +48,7 @@ import { ShareCard } from "@/components/ShareCard"
 import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
 import { Select, SelectOption } from "@/components/ui/select"
+import { getTagLabel } from "@/lib/tag-labels"
 
 // ===== 排序类型定义 =====
 type SortField = "name" | "synced_at" | "stars"
@@ -949,7 +950,7 @@ export default function Developers() {
   // Share card consumes already-loaded page data and does not trigger AI requests.
   const shareCardData = useMemo(() => {
     if (!activeDev) return null
-    const sortedTags = [...developerTags].sort((a, b) => b.count - a.count).slice(0, 5).map((item) => item.tag)
+    const sortedTags = [...developerTags].sort((a, b) => b.count - a.count).slice(0, 5).map((item) => getTagLabel(item.tag, i18n.language))
     const fallbackLanguages = (developerStats?.languages || []).slice(0, 5).map((item) => item.language).filter(Boolean)
     return {
       login: activeDev.name,
@@ -969,6 +970,7 @@ export default function Developers() {
         projectDescription: t("developers.shareCardProjectDescription"),
         title: "STAR DNA",
         subtitle: t("developers.shareCardPreview"),
+        userTitleSuffix: t("developers.shareCardUserTitleSuffix"),
         dnaLabel: t("developers.shareCardDnaLabel"),
         interests: t("developers.shareCardInterests"),
         starredRepos: t("developers.shareCardStarredRepos"),
@@ -978,12 +980,13 @@ export default function Developers() {
         fallbackPath: t("developers.shareCardFallbackPath"),
         footer: t("developers.shareCardFooter"),
         qrLabel: t("developers.shareCardQrLabel"),
-        systemUrlLabel: t("developers.shareCardSystemUrlLabel"),
         githubProfileLabel: t("developers.shareCardGithubProfileLabel"),
         fullReportHint: t("developers.shareCardFullReportHint"),
+        ctaTitle: t("developers.shareCardCtaTitle"),
+        ctaSubtitle: t("developers.shareCardCtaSubtitle"),
       },
     }
-  }, [activeDev, developerStats, developerSummary, developerTags, learningPath, starDna, t])
+  }, [activeDev, developerStats, developerSummary, developerTags, i18n.language, learningPath, starDna, t])
   // 星标趋势图表数据：保留完整 YYYY-MM，前端按需截短显示（同年只显示 MM，跨年显示完整）
   const trendData = useMemo(
     () => (Array.isArray(starTimeline) ? starTimeline : []).map((item) => ({ label: item.month, value: item.count })),
