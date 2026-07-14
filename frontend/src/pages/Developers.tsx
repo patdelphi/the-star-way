@@ -89,6 +89,7 @@ interface SyncRun {
 }
 
 const ITEMS_PER_PAGE = 20
+const STARWAY_PUBLIC_URL = "https://starway.patdelphi.xyz"
 
 // ===== 技术雷达六维映射规则（从 Dashboard 复制） =====
 const RADAR_TAG_MAP: Record<string, string[]> = {
@@ -953,6 +954,8 @@ export default function Developers() {
     return {
       login: activeDev.name,
       displayName: activeDev.displayName,
+      shareUrl: activeDev.profile_url || `https://github.com/${activeDev.name}`,
+      systemUrl: STARWAY_PUBLIC_URL,
       repoCount: developerSummary?.repoCount ?? developerStats?.repoCount ?? null,
       hiddenGemsCount: developerSummary?.hiddenGemsCount ?? null,
       sleepStarsCount: developerSummary?.sleepStarsCount ?? null,
@@ -961,9 +964,12 @@ export default function Developers() {
       starDna,
       language: getSettings().language,
       labels: {
-        brand: "the-star-way",
+        brand: t("app.title"),
+        projectName: t("developers.shareCardProjectName"),
+        projectDescription: t("developers.shareCardProjectDescription"),
         title: "STAR DNA",
         subtitle: t("developers.shareCardPreview"),
+        dnaLabel: t("developers.shareCardDnaLabel"),
         interests: t("developers.shareCardInterests"),
         starredRepos: t("developers.shareCardStarredRepos"),
         hiddenGems: t("developers.shareCardHiddenGems"),
@@ -971,6 +977,10 @@ export default function Developers() {
         learningPath: t("developers.shareCardLearningPath"),
         fallbackPath: t("developers.shareCardFallbackPath"),
         footer: t("developers.shareCardFooter"),
+        qrLabel: t("developers.shareCardQrLabel"),
+        systemUrlLabel: t("developers.shareCardSystemUrlLabel"),
+        githubProfileLabel: t("developers.shareCardGithubProfileLabel"),
+        fullReportHint: t("developers.shareCardFullReportHint"),
       },
     }
   }, [activeDev, developerStats, developerSummary, developerTags, learningPath, starDna, t])

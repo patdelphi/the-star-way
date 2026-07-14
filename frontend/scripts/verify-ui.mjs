@@ -129,6 +129,12 @@ const requiredLocaleKeys = [
   "developers.shareCardPreview",
   "developers.downloadShareCard",
   "developers.shareCardDownloadFailed",
+  "developers.shareCardProjectName",
+  "developers.shareCardProjectDescription",
+  "developers.shareCardSystemUrlLabel",
+  "developers.shareCardGithubProfileLabel",
+  "developers.shareCardDnaLabel",
+  "developers.shareCardFullReportHint",
 ]
 
 const requiredChineseTexts = [
@@ -285,8 +291,17 @@ const checks = [
   ["重新生成失败保留已有 AI 内容", !files.developers.includes("if (force && showLoading) {\\n      setStarDna(null)" ) && !files.developers.includes("if (force && showLoading) {\\n      setLearningPath(null)" )],
   ["同步历史区域始终可见", files.developers.includes("{activeDev && (") && files.developers.includes("syncRuns.length > 0 ?")],
   ["分享卡片组件已接入开发者页", files.developers.includes("ShareCard") && files.shareCard.includes("ShareCard")],
+  ["分享卡片预览按视口高度完整缩放", files.shareCard.includes("max-h-[calc(96vh-11rem)]") && files.shareCard.includes("overflow-hidden")],
   ["分享按钮位于开发者顶部操作区", files.developers.indexOf('t("developers.shareCard")') < files.developers.indexOf("Star DNA 画像卡片")],
   ["分享卡片包含 SVG 构建和 PNG 下载", files.shareCardBuilder.includes("buildShareCardSvg") && files.shareCardBuilder.includes("downloadShareCard")],
+  ["分享卡片包含网址二维码", files.shareCardBuilder.includes("buildQrMatrix") && files.shareCardBuilder.includes("renderQrSvg") && files.developers.includes("shareUrl: activeDev.profile_url")],
+  ["分享卡片长文本使用多行 SVG tspan", files.shareCardBuilder.includes("wrapSvgText") && files.shareCardBuilder.includes("<tspan")],
+  ["分享卡片学习路径限制字号和行数", files.shareCardBuilder.includes('font-size:18px') && files.shareCardBuilder.includes("summarizeLearningPath") && files.shareCardBuilder.includes("24, 2")],
+  ["分享卡片展示 Star Way 项目信息", files.shareCardBuilder.includes("projectName") && files.shareCardBuilder.includes("projectDescription") && files.developers.includes("shareCardProjectDescription")],
+  ["分享卡片展示线上系统网址", files.shareCardBuilder.includes("https://starway.patdelphi.xyz") && files.shareCardBuilder.includes("systemUrl") && files.developers.includes("systemUrl: STARWAY_PUBLIC_URL")],
+  ["分享卡片二维码指向线上系统", files.shareCardBuilder.includes("renderQrSvg(systemUrl") && !files.shareCardBuilder.includes("renderQrSvg(shareUrl")],
+  ["分享卡片只展示摘要并引导查看完整内容", files.shareCardBuilder.includes("buildLearningSummary") && files.shareCardBuilder.includes("fullReportHint")],
+  ["分享卡片装饰路径禁止默认黑色填充", files.shareCardBuilder.includes('fill="none" stroke="#9D9AFF"') && !files.shareCardBuilder.includes('M54 270C220 80 470 54 715 110C900 152 1010 270 1044 446" stroke=')],
   ["分享卡片提供双语下载文案", getByPath(locales.zh, "developers.downloadShareCard") && getByPath(locales.en, "developers.downloadShareCard")],
   ["纯英文演示标签已清理", forbiddenTexts.every((text) => !allPageText.includes(text) && !zhText.includes(text))],
 ]
