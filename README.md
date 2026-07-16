@@ -1,45 +1,45 @@
 # the-star-way
 
-> [English](./README.en.md) | 简体中文
+> English | [简体中文](./README.md)
 
-> **把 GitHub Stars 变成开发者技术画像、兴趣地图和学习路径。**
+> **Turn GitHub Stars into your developer interest map and AI-powered learning path.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-starway.patdelphi.xyz-blue?style=flat-square)](https://starway.patdelphi.xyz) [![Docs](https://img.shields.io/badge/Docs-📚-green?style=flat-square)](./Docs) [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-输入任意 GitHub 用户名，分析他的 starred repositories：
+Enter any GitHub username to analyze their starred repositories:
 
-- **Star DNA** — 开发者技术画像（AI 生成）
-- **Learning Path** — 个性化学习路径推荐（AI 生成）
-- **Hidden Gems** — 发现被忽略的低星优质项目
-- **Tech Map** — 语言、主题、协议、活跃度统计
+- **Star DNA** — Developer tech profile (AI-generated)
+- **Learning Path** — Personalized learning path recommendations (AI-generated)
+- **Hidden Gems** — Discover overlooked low-star quality projects
+- **Tech Map** — Language, topic, license, and activity statistics
 
-## 为什么值得用
+## Why It Matters
 
-每个开发者都曾对着自己的 GitHub Stars 列表发呆——上千个仓库堆在一起，谁也说不清自己到底收藏了什么、为什么收藏。更有意思的是，当我们去看那些我们佩服的开发者的星标列表时，往往能发现一条隐藏的学习路径：他们关注什么技术、读过什么书、用什么工具链、最近在折腾什么新东西。
+Every developer has stared at their own GitHub Stars list at some point—thousands of repos piled up, with no clear idea of what was actually saved or why. The interesting part is that when we look at the stars of developers we admire, we often uncover a hidden learning path: what technologies they care about, what they read, what toolchains they use, what they've been tinkering with lately.
 
-**the-star-way** 把这种"翻看别人收藏夹"的本能变成一个结构化的工具。它不只是另一个 Stars 管理器——它要回答的问题是：
+**the-star-way** turns that instinct of "browsing someone else's bookmarks" into a structured tool. It's not just another Stars manager—it answers:
 
-- 我（或某个开发者）的兴趣版图长什么样？
-- 那些星标仓库背后，藏着怎样的学习模式和成长轨迹？
-- 如果要补齐某个技术方向，下一步该学什么、做什么？
+- What does my (or another developer's) interest landscape look like?
+- What learning patterns and growth trajectories are hidden behind those starred repos?
+- If I want to fill a gap in a technical direction, what should I learn or build next?
 
-把混乱的星标列表变成一张可检索、可分析、可推导的技术资产地图——这就是 the-star-way 想做的。
+Turning a chaotic stars list into a searchable, analyzable, inferable map of technical assets—that's what the-star-way is about.
 
-## 核心功能
+## Core Features
 
-- **星标同步** — 同步任意 GitHub 用户的星标仓库，增量更新，标记已取消星标的仓库
-- **智能分类** — 基于 Topic、仓库名、描述的规则自动打标签（AI/LLM、前端框架、DevOps、工具等 60+ 分类）
-- **多维筛选** — 按语言、标签、关键词搜索、排序和分页浏览
-- **统计分析** — 语言分布、主题聚类、协议分布、活跃/沉睡仓库统计、星标时间轴趋势
-- **仓库分析** — 单个仓库的深度信息页，含协议合规分析（MIT/Apache/GPL/CC 等 12 类）
-- **AI 增强** —
-  - **Star DNA**：基于星标仓库生成开发者技术画像
-  - **Learning Path**：个性化学习路径推荐
-  - **README 摘要**：仓库 README 的智能摘要
-- **数据导出** — CSV / JSON / Markdown / HTML 四种格式
-- **多语言 UI** — 中文 / 英文切换
-- **主题三态** — 浅色 / 深色 / 跟随系统
-- **Demo 模式** — 内置真实星标仓库数据，无后端也能体验
+- **Star Sync** — Sync any GitHub user's starred repos, with incremental updates and removed-star tracking
+- **Smart Classification** — Auto-tagging based on topics, repo name, and description (60+ categories: AI/LLM, frontend frameworks, DevOps, tools, etc.)
+- **Multi-dimensional Filtering** — Filter by language, tag, keyword; sort and paginate
+- **Statistical Analysis** — Language distribution, topic clustering, license distribution, active/dormant repo stats, star timeline trends
+- **Repository Analysis** — Deep info page per repo, with license compliance analysis (MIT/Apache/GPL/CC, 12+ types)
+- **AI-Powered Insights** —
+  - **Star DNA**: Developer tech profile generated from starred repos
+  - **Learning Path**: Personalized learning path recommendations
+  - **README Summary**: Intelligent summary of repo READMEs
+- **Data Export** — CSV / JSON / Markdown / HTML formats
+- **Bilingual UI** — Chinese / English switch
+- **Tri-state Theme** — Light / Dark / System
+- **Demo Mode** — Built-in real starred repo data, works without backend
 
 ## Screenshots
 
@@ -62,26 +62,26 @@
   </tr>
 </table>
 
-## 技术栈
+## Tech Stack
 
-| 层 | 技术 |
+| Layer | Technology |
 |---|---|
-| 前端 | React 19 · Vite · TypeScript · Tailwind CSS 4 · Radix UI · recharts |
-| 后端（本地） | Node.js · TypeScript · better-sqlite3（WAL 模式） |
-| 后端（Cloudflare） | Cloudflare Workers · D1（SQLite） |
-| 共享层 | TypeScript 类型 + 纯逻辑（阈值函数、分类规则、标签字典） |
-| AI | OpenAI 兼容接口（支持智谱 GLM、阿里 dashscope、商汤 SenseNova、OpenAI、Ollama 等） |
-| 测试 | Vitest（后端 132 个测试 + Worker 85 个测试） |
+| Frontend | React 19 · Vite · TypeScript · Tailwind CSS 4 · Radix UI · recharts |
+| Backend (Local) | Node.js · TypeScript · better-sqlite3 (WAL mode) |
+| Backend (Cloudflare) | Cloudflare Workers · D1 (SQLite) |
+| Shared Layer | TypeScript types + pure logic (threshold functions, classification rules, tag dictionaries) |
+| AI | OpenAI-compatible API (supports Zhipu GLM, Alibaba dashscope, SenseNova, OpenAI, Ollama, etc.) |
+| Testing | Vitest (132 backend tests + 85 Worker tests) |
 
-## 多平台部署
+## Multi-platform Deployment
 
-the-star-way 支持两种部署形态，按需选择。
+the-star-way supports two deployment modes—choose based on your needs.
 
-### 方式一：本地 / VPS 部署（Node.js + SQLite）
+### Option 1: Local / VPS (Node.js + SQLite)
 
-适合个人使用、数据完全本地化、离线场景。
+For personal use, fully local data, or offline scenarios.
 
-**环境要求**：Node.js `v24.15.0` + pnpm `11.7.0`（通过 corepack 启用）。
+**Requirements**: Node.js `v24.15.0` + pnpm `11.7.0` (enable via corepack).
 
 ```bash
 # Windows
@@ -91,125 +91,125 @@ the-star-way 支持两种部署形态，按需选择。
 ./start.sh
 ```
 
-启动脚本会自动检查 Node 版本、编译 native 模块、启动前后端。
+The startup script checks Node version, compiles native modules, and launches both frontend and backend.
 
-- 后端 API：`http://localhost:3210`
-- 前端 UI：`http://localhost:5173`
+- Backend API: `http://localhost:3210`
+- Frontend UI: `http://localhost:5173`
 
-手动启动详见 [Docs/deployment.md](./Docs/deployment.md)。
+See [Docs/deployment.md](./Docs/deployment.md) for manual setup.
 
-### 方式二：Cloudflare 部署（Workers + D1 + Pages）
+### Option 2: Cloudflare (Workers + D1 + Pages)
 
-适合在线服务、免运维、全球边缘加速。
+For online services, zero-ops, global edge acceleration.
 
-**架构**：
+**Architecture**:
 
 ```
-前端 (Cloudflare Pages)  ──HTTPS──▶  Worker API (Cloudflare Workers)  ──绑定──▶  D1 数据库
+Frontend (Cloudflare Pages)  ──HTTPS──▶  Worker API (Cloudflare Workers)  ──bind──▶  D1 Database
 ```
 
-**部署步骤**（详见 [Docs/cloudflare-deployment.md](./Docs/cloudflare-deployment.md)）：
+**Deploy steps** (see [Docs/cloudflare-deployment.md](./Docs/cloudflare-deployment.md) for details):
 
 ```bash
-# 1. 创建 D1 数据库
+# 1. Create D1 database
 cd cloudflare/worker
 npx wrangler d1 create starway-db
-# 将返回的 database_id 写入 wrangler.toml
+# Write the returned database_id into wrangler.toml
 
-# 2. 执行数据库迁移
+# 2. Run database migration
 npx wrangler d1 execute starway-db --remote --file=../d1/migrations/0001_init.sql
 
-# 3. 配置 secrets
-npx wrangler secret put STARWAY_GITHUB_TOKEN      # GitHub 同步 token
-npx wrangler secret put STARWAY_AI_BASE_URL        # AI 端点
+# 3. Configure secrets
+npx wrangler secret put STARWAY_GITHUB_TOKEN      # GitHub sync token
+npx wrangler secret put STARWAY_AI_BASE_URL        # AI endpoint
 npx wrangler secret put STARWAY_AI_API_KEY         # AI key
-npx wrangler secret put STARWAY_AI_MODEL           # 模型名
+npx wrangler secret put STARWAY_AI_MODEL           # Model name
 
-# 4. 部署 Worker
+# 4. Deploy Worker
 npx wrangler deploy
 
-# 5. 前端通过 Cloudflare Pages 连接 GitHub 仓库自动构建
-#    配置环境变量 VITE_API_BASE 指向 Worker URL
+# 5. Frontend: connect GitHub repo to Cloudflare Pages for auto-build
+#    Set VITE_API_BASE env var to the Worker URL
 ```
 
-**CI/CD**：项目已内置 GitHub Actions workflow（`.github/workflows/deploy-cloudflare.yml`），push 到 master 自动部署 Worker 和 Pages。需在 GitHub 仓库 Settings → Secrets 配置：
+**CI/CD**: A GitHub Actions workflow is bundled (`.github/workflows/deploy-cloudflare.yml`); pushing to master auto-deploys Worker and Pages. Configure these in GitHub repo Settings → Secrets:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `D1_DATABASE_ID`
 
-### 方式三：Docker（规划中）
+### Option 3: Docker (Planned)
 
-容器化部署方案正在规划中，详见 [Docs/roadmap.md](./Docs/roadmap.md)。
+Containerized deployment is being planned—see [Docs/roadmap.md](./Docs/roadmap.md).
 
-## 项目结构
+## Project Structure
 
 ```
 the-star-way/
-├── shared/                # 跨端共享层（类型 + 纯逻辑）
-├── backend/               # 本地后端（Node.js + SQLite）
-├── frontend/              # 前端应用（React + Vite）
+├── shared/                # Cross-platform shared layer (types + pure logic)
+├── backend/               # Local backend (Node.js + SQLite)
+├── frontend/              # Frontend app (React + Vite)
 ├── cloudflare/
 │   ├── worker/            # Cloudflare Worker API
-│   └── d1/migrations/     # D1 数据库迁移脚本
-├── Docs/                  # 项目文档
-├── start.ps1 / start.sh   # 一键启动脚本
-└── .github/workflows/     # CI/CD 配置
+│   └── d1/migrations/     # D1 database migrations
+├── Docs/                  # Project docs
+├── start.ps1 / start.sh   # One-click startup scripts
+└── .github/workflows/     # CI/CD config
 ```
 
-## 快速开始
+## Quick Start
 
-### 本地体验（无需 Token）
+### Local Trial (No Token Required)
 
 ```bash
 git clone <repo-url> && cd the-star-way
-./start.sh              # 或 Windows: .\start.ps1
+./start.sh              # or Windows: .\start.ps1
 ```
 
-启动后自动加载 Demo 数据，可直接体验所有功能。
+Demo data loads automatically—explore all features immediately.
 
-### 配置环境变量
+### Environment Variables
 
-复制 `sample.env` 为 `.env`，按需填写：
+Copy `sample.env` to `.env` and fill as needed:
 
 ```bash
 cp sample.env .env
 ```
 
-| 变量 | 用途 | 必填 |
+| Variable | Purpose | Required |
 |---|---|---|
-| `STARWAY_GITHUB_TOKEN` | GitHub 同步 token（read:user 权限） | 同步真实数据时必填 |
-| `STARWAY_AI_BASE_URL` | AI 服务端点 | 使用 AI 功能时必填 |
-| `STARWAY_AI_API_KEY` | AI 服务 key | 使用 AI 功能时必填 |
-| `STARWAY_AI_MODEL` | 模型名（如 glm-5.2 / deepseek-v4-flash） | 使用 AI 功能时必填 |
+| `STARWAY_GITHUB_TOKEN` | GitHub sync token (read:user scope) | For real data sync |
+| `STARWAY_AI_BASE_URL` | AI service endpoint | For AI features |
+| `STARWAY_AI_API_KEY` | AI service key | For AI features |
+| `STARWAY_AI_MODEL` | Model name (e.g., glm-5.2 / deepseek-v4-flash) | For AI features |
 
-## API 接口
+## API Endpoints
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/users` | 用户列表 |
-| GET | `/api/users/:login/repos` | 仓库列表（筛选/排序/分页） |
-| GET | `/api/users/:login/stats` | 统计数据 |
-| GET | `/api/users/:login/summary` | 用户摘要（Sleep Stars / Hidden Gems） |
-| GET | `/api/users/:login/star-dna` | Star DNA 画像（AI 生成） |
-| GET | `/api/users/:login/learning-path` | 学习路径推荐（AI 生成） |
-| GET | `/api/repos/:fullName/readme-summary` | README 智能摘要（AI 生成） |
-| POST | `/api/sync` | 触发 GitHub 同步 |
-| GET | `/api/export` | 导出数据（CSV/JSON/Markdown/HTML） |
-| GET | `/api/overview` | 全局概览 |
+| GET | `/api/users` | User list |
+| GET | `/api/users/:login/repos` | Repo list (filter/sort/paginate) |
+| GET | `/api/users/:login/stats` | Statistics |
+| GET | `/api/users/:login/summary` | User summary (Sleep Stars / Hidden Gems) |
+| GET | `/api/users/:login/star-dna` | Star DNA profile (AI-generated) |
+| GET | `/api/users/:login/learning-path` | Learning path (AI-generated) |
+| GET | `/api/repos/:fullName/readme-summary` | README summary (AI-generated) |
+| POST | `/api/sync` | Trigger GitHub sync |
+| GET | `/api/export` | Export data (CSV/JSON/Markdown/HTML) |
+| GET | `/api/overview` | Global overview |
 
-完整接口列表详见 [Docs/api.md](./Docs/api.md)。
+See [Docs/api.md](./Docs/api.md) for the full API list.
 
-## 测试
+## Testing
 
 ```bash
-# 后端测试
+# Backend tests
 cd backend && corepack pnpm test
 
-# Worker 测试
+# Worker tests
 cd cloudflare/worker && corepack pnpm test
 ```
 
-## 开源协议
+## License
 
 MIT License
