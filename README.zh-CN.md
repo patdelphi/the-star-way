@@ -1,6 +1,6 @@
 # the-star-way
 
-> [English](./README.en.md) | 简体中文
+> [English](./README.md) | 简体中文
 
 > **把 GitHub Stars 变成开发者技术画像、兴趣地图和学习路径。**
 

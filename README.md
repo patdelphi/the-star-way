@@ -1,6 +1,6 @@
 # the-star-way
 
-> English | [简体中文](./README.md)
+> English | [简体中文](./README.zh-CN.md)
 
 > **Turn GitHub Stars into your developer interest map and AI-powered learning path.**
 
