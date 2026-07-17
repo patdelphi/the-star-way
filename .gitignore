@@ -36,4 +36,7 @@ backend/data/starway.db-*
 # Cloudflare Wrangler 本地缓存
 .wrangler/
 
+# 临时调试文件（share card 开发期间的调试产物）
+.tmp/
+
 chat_history.md
