@@ -40,10 +40,7 @@ database_id = "d338ce4b-12cd-46b0-b669-2e33b28212f0"
 # 前端 Pages URL，用于 Worker 根路径 / 重定向
 STARWAY_FRONTEND_URL = "https://the-star-way.pages.dev/"
 
-# 开发环境配置
-[env.development]
-name = "the-star-way-api-dev"
-
-# 生产环境配置
-[env.production]
-name = "the-star-way-api"
+# 说明：原 [env.development] / [env.production] 配置已移除。
+# wrangler 的 env 块不继承顶层 d1_databases / vars，导致 `wrangler deploy --env production`
+# 部署的 Worker 丢失 DB 绑定（"No bindings found"）。
+# CI 与本地均使用 `wrangler deploy`（不带 --env），直接采用顶层配置，name="the-star-way-api"。
