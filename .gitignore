@@ -40,3 +40,6 @@ backend/data/starway.db-*
 .tmp/
 
 chat_history.md
+
+# 大体积视频文件（超过 GitHub 100 MB 限制，请走外部存储 / Releases 附件）
+Docs/assets/*.mp4
