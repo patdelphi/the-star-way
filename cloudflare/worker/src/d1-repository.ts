@@ -980,11 +980,31 @@ export class D1StarRepository {
 
     const stmts: D1PreparedStatement[] = []
 
+    // 优化：批量预查询现有 github_id → full_name 映射，仅在仓库改名时才 push UPDATE stars。
+    // 背景：原实现为每个仓库都生成一条 UPDATE stars WHERE repo_full_name = (SELECT ...)，
+    // stars 表无 repo_full_name 单列索引，未改名时也会触发全表扫描，
+    // 1000 条同步 × N 行 stars 表 → rows read 爆炸式增长。
+    // 改名是罕见事件，预查询使用主键 github_id，成本极低。
+    const existingNamesById = new Map<number, string>()
+    const idChunkSize = 100
+    for (let i = 0; i < repos.length; i += idChunkSize) {
+      const chunk = repos.slice(i, i + idChunkSize)
+      const placeholders = chunk.map(() => '?').join(',')
+      const rows = await this.db
+        .prepare(`SELECT github_id, full_name FROM repos WHERE github_id IN (${placeholders})`)
+        .bind(...chunk.map(item => item.repo.id))
+        .all<{ github_id: number; full_name: string }>()
+      for (const row of rows.results ?? []) {
+        existingNamesById.set(row.github_id, row.full_name)
+      }
+    }
+
     for (const item of repos) {
       const repo = item.repo
 
       // 仓库转移或历史数据更正时，full_name 可能仍被旧 github_id 占用；先删除冲突的旧实体。
       // stars/repo_tags 使用 full_name 关联，删除实体不会丢失这些关系。
+      // 注：repos.full_name 有 UNIQUE 隐式索引，此 DELETE 走 index seek，无需额外优化。
       stmts.push(
         this.db.prepare(`
           DELETE FROM repos
@@ -993,14 +1013,20 @@ export class D1StarRepository {
       )
 
       // GitHub 仓库改名后 github_id 不变；先迁移旧名称的星标关系，避免产生孤儿记录。
-      stmts.push(
-        this.db.prepare(`
-          UPDATE stars
-          SET repo_full_name = ?
-          WHERE repo_full_name = (SELECT full_name FROM repos WHERE github_id = ?)
-            AND repo_full_name != ?
-        `).bind(repo.full_name, repo.id, repo.full_name),
-      )
+      // 优化：仅当该 github_id 已存在且 full_name 发生变化时才执行，
+      // 未改名（绝大多数情况）直接跳过，避免 stars 表无谓扫描。
+      // 即便跳过逻辑漏网，idx_stars_repo_full_name 索引（migration 0003）也会兜底走 index seek。
+      const existingFullName = existingNamesById.get(repo.id)
+      if (existingFullName !== undefined && existingFullName !== repo.full_name) {
+        stmts.push(
+          this.db.prepare(`
+            UPDATE stars
+            SET repo_full_name = ?
+            WHERE repo_full_name = ?
+              AND repo_full_name != ?
+          `).bind(repo.full_name, existingFullName, repo.full_name),
+        )
+      }
 
       // upsert 仓库
       stmts.push(

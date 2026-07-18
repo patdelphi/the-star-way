@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const MIGRATION_PATHS = [
   resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql'),
   resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0002_star_sync_continuation.sql'),
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0003_stars_repo_full_name_index.sql'),
 ]
 
 // 测试用 miniflare 实例
@@ -469,6 +470,51 @@ describe('D1StarRepository', () => {
       const duplicateCount = await d1.prepare('SELECT COUNT(*) AS count FROM repos WHERE full_name = ?')
         .bind('new-owner/new-name').first<{ count: number }>()
       expect(duplicateCount?.count).toBe(1)
+    })
+
+    it('batchUpsertReposAndStars 未改名仓库应跳过 UPDATE stars 并保留 first_seen_at', async () => {
+      // 优化回归测试：同一 github_id + 同一 full_name 的仓库再次同步时，
+      // 不应触发 UPDATE stars（原实现会全表扫描 stars 表）。
+      // 验证点：star 行的 first_seen_at 保持不变（INSERT ON CONFLICT 不覆盖该字段）。
+      const d1 = await mf.getD1Database('DB')
+      const now = new Date().toISOString()
+      const firstSeen = '2024-01-01T00:00:00Z'
+
+      // 预置：仓库和星标已存在
+      await d1.prepare(`
+        INSERT INTO repos (github_id, full_name, owner, name, html_url, created_at, updated_at, archived, fork)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+      `).bind(
+        200, 'stable/repo', 'stable', 'repo',
+        'https://github.com/stable/repo', firstSeen, firstSeen,
+      ).run()
+      await d1.prepare(`
+        INSERT INTO stars (user_login, repo_full_name, starred_at, first_seen_at, last_seen_at, removed_at)
+        VALUES (?, ?, ?, ?, ?, NULL)
+      `).bind('testuser', 'stable/repo', firstSeen, firstSeen, firstSeen).run()
+
+      // 再次同步同一仓库（github_id 和 full_name 均未变化）
+      await repo.batchUpsertReposAndStars('testuser', [{
+        repo: {
+          id: 200, full_name: 'stable/repo', owner: { login: 'stable' }, name: 'repo',
+          html_url: 'https://github.com/stable/repo', description: 'updated desc',
+          language: 'Go', license: null, stargazers_count: 50,
+          forks_count: 2, open_issues_count: 0, topics: [],
+          created_at: firstSeen, updated_at: now, pushed_at: now,
+          archived: false, fork: false, homepage: null,
+        },
+        starred_at: now,
+      }], now)
+
+      // 验证：星标行保留，first_seen_at 未被覆盖
+      const star = await d1.prepare('SELECT first_seen_at, last_seen_at, removed_at FROM stars WHERE user_login = ? AND repo_full_name = ?')
+        .bind('testuser', 'stable/repo').first<{ first_seen_at: string; last_seen_at: string; removed_at: string | null }>()
+      expect(star?.first_seen_at).toBe(firstSeen)
+      expect(star?.last_seen_at).toBe(now)
+      expect(star?.removed_at).toBeNull()
+      // 验证：仓库 description 被更新（证明 INSERT ON CONFLICT 仍然执行）
+      const repoRow = await d1.prepare('SELECT description FROM repos WHERE github_id = ?').bind(200).first<{ description: string }>()
+      expect(repoRow?.description).toBe('updated desc')
     })
 
   })

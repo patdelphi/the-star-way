@@ -22,6 +22,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const MIGRATION_PATHS = [
   resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0001_init.sql'),
   resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0002_star_sync_continuation.sql'),
+  resolve(__dirname, '..', '..', '..', 'd1', 'migrations', '0003_stars_repo_full_name_index.sql'),
 ]
 
 let mf: Miniflare
