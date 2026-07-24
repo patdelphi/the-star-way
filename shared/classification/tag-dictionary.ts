@@ -42,7 +42,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   // 后端 / 运维
   { keywords: ['docker', 'kubernetes', 'k8s', 'container', 'podman'], label: '容器 / 编排', category: 'DevOps' },
   { keywords: ['devops', 'ci-cd', 'github-actions', 'jenkins', 'gitlab-ci', 'terraform', 'ansible'], label: 'DevOps / CI-CD', category: 'DevOps' },
-  { keywords: ['linux', 'shell', 'bash', 'zsh', 'cli', 'command-line', 'terminal', 'tui'], label: 'CLI / Shell', category: '工具' },
+  { keywords: ['linux', 'shell', 'bash', 'zsh', 'cli', 'command-line', 'terminal', 'tui', 'clap', 'cobra', 'inquirer', 'prompt-kit'], label: 'CLI / Shell', category: '工具' },
   { keywords: ['cloud', 'aws', 'azure', 'gcp', 'serverless', 'cloud-native'], label: '云计算', category: 'DevOps' },
   { keywords: ['monitoring', 'observability', 'logging', 'prometheus', 'grafana', 'elk'], label: '监控 / 可观测', category: 'DevOps' },
 
@@ -51,7 +51,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   { keywords: ['orm', 'query-builder', 'migration', 'database-tool'], label: '数据库工具', category: '数据' },
 
   // 安全
-  { keywords: ['security', 'encryption', 'authentication', 'authorization', 'oauth', 'jwt', 'vpn', 'privacy', 'zero-trust'], label: '安全 / 隐私', category: '安全' },
+  { keywords: ['security', 'encryption', 'authentication', 'authorization', 'oauth', 'jwt', 'vpn', 'privacy', 'zero-trust', 'pentest', 'ctf', 'reverse-engineering', 'owasp', 'vulnerability', 'exploit'], label: '安全 / 隐私', category: '安全' },
   { keywords: ['cryptography', 'hash', 'ssl', 'tls', 'certificate'], label: '加密 / 密码学', category: '安全' },
 
   // 工具
@@ -65,6 +65,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   // 语言生态
   { keywords: ['python', 'python3', 'python-library'], label: 'Python', category: '语言' },
   { keywords: ['rust', 'cargo'], label: 'Rust', category: '语言' },
+  { keywords: ['rust-ecosystem', 'tokio', 'serde', 'axum', 'actix', 'async-rt', 'warp', 'rocket', 'hyper', 'tauri'], label: 'Rust 生态', category: '语言' },
   { keywords: ['go', 'golang'], label: 'Go', category: '语言' },
   { keywords: ['java', 'kotlin', 'scala', 'jvm', 'spring', 'gradle', 'maven'], label: 'Java / JVM', category: '语言' },
   { keywords: ['c', 'c-plus-plus', 'cpp', 'cplusplus'], label: 'C / C++', category: '语言' },
@@ -79,7 +80,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
 
   // 数据科学 / 分析
   { keywords: ['data-science', 'data-analysis', 'jupyter', 'notebook', 'pandas', 'numpy', 'matplotlib', 'plotly', 'data-visualization'], label: '数据科学', category: '数据' },
-  { keywords: ['big-data', 'spark', 'hadoop', 'kafka', 'streaming', 'data-pipeline', 'etl'], label: '大数据', category: '数据' },
+  { keywords: ['big-data', 'spark', 'hadoop', 'kafka', 'streaming', 'data-pipeline', 'etl', 'airflow', 'dbt', 'data-engineering', 'delta-lake', 'iceberg'], label: '大数据', category: '数据' },
 
   // 区块链
   { keywords: ['blockchain', 'crypto', 'ethereum', 'solidity', 'web3', 'defi', 'nft', 'smart-contract'], label: '区块链 / Web3', category: '区块链' },
@@ -91,6 +92,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   // 操作系统 / 底层
   { keywords: ['os', 'operating-system', 'kernel', 'linux-kernel', 'system-programming', 'embedded', 'iot'], label: '系统 / 嵌入式', category: '底层' },
   { keywords: ['networking', 'network', 'dns', 'proxy', 'vpn', 'firewall', 'nginx', 'caddy', 'traefik'], label: '网络', category: '底层' },
+  { keywords: ['homelab', 'self-host', 'proxmox', 'truenas', 'pihole', 'unraid', 'home-server', 'home-assistant', 'opnsense', 'pfsense'], label: '家庭实验室', category: '底层' },
 
   // 设计
   { keywords: ['design', 'ui', 'ux', 'design-system', 'figma', 'icon', 'font', 'color', 'accessibility'], label: '设计 / UI', category: '设计' },
