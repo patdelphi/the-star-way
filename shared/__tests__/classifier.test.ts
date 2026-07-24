@@ -59,6 +59,37 @@ describe('classifyRepo', () => {
     expect(tags).toEqual([])
   })
 
+  it('应匹配 Rust 生态关键词 (tokio, serde, axum)', () => {
+    const tags = classifyRepo('my-axum-app', 'A web server built with axum and tokio', '["rust", "tokio", "axum", "serde"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('Rust')
+    expect(tagNames).toContain('Rust 生态')
+  })
+
+  it('应匹配数据工程关键词 (airflow, dbt)', () => {
+    const tags = classifyRepo('my-dbt-project', 'Data pipeline using airflow and dbt', '["data-engineering", "airflow", "dbt"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('大数据')
+  })
+
+  it('应匹配安全扩展关键词 (pentest, ctf, owasp)', () => {
+    const tags = classifyRepo('ctf-tools', 'Penetration testing and CTF challenge toolkit', '["pentest", "ctf", "security"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('安全 / 隐私')
+  })
+
+  it('应匹配 CLI 工具扩展关键词 (clap, cobra)', () => {
+    const tags = classifyRepo('my-cli', 'A CLI tool built with clap', '["cli", "clap", "rust"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('CLI / Shell')
+  })
+
+  it('应匹配家庭实验室关键词 (proxmox, pihole)', () => {
+    const tags = classifyRepo('homelab-dashboard', 'A dashboard for proxmox and pihole', '["homelab", "proxmox", "pihole"]')
+    const tagNames = tags.map(t => t.tag)
+    expect(tagNames).toContain('家庭实验室')
+  })
+
   it('null 描述应正常处理', () => {
     const tags = classifyRepo('react-app', null, '["react"]')
     expect(tags.length).toBeGreaterThan(0)

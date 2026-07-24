@@ -58,6 +58,7 @@ export const TAG_LABEL_EN: Record<string, string> = {
   // 语言
   'Python': 'Python',
   'Rust': 'Rust',
+  'Rust 生态': 'Rust Ecosystem',
   'Go': 'Go',
   'Java / JVM': 'Java / JVM',
   'C / C++': 'C / C++',
@@ -80,6 +81,7 @@ export const TAG_LABEL_EN: Record<string, string> = {
   // 底层
   '系统 / 嵌入式': 'System / Embedded',
   '网络': 'Networking',
+  '家庭实验室': 'Homelab',
 
   // 设计
   '设计 / UI': 'Design / UI',
