@@ -1,4 +1,4 @@
-# the-star-way 推广任务清单
+﻿# the-star-way 推广任务清单
 
 > 基于 `Docs/starway promote.md` 方案，按顺序执行。
 > 截图/GIF 需用户手动制作，代码层无法自动截图（项目无 Playwright 等工具）。
@@ -89,3 +89,27 @@
 - [x] 同步成功后只刷新目标用户相关数据，清理目标用户 AI 缓存并重新拉取当前可见用户数据。
 - [x] 更新 `Docs/changelog.md` 记录根因、改动和验证结果。
 - [x] 运行幂等验证：backend 相关测试、frontend 静态 UI 校验、frontend build。
+
+## 2026-07-27：Cloudflare 安全防护只读审计
+
+### 完成标准
+
+- [x] 确认 `starway.patdelphi.xyz` 是否经过 Cloudflare 代理，且不存在明显源站绕过入口。
+- [x] 核验 Cloudflare 当前可见的 DDoS、WAF、Bot、限流与 TLS 配置，区分平台默认能力和项目显式配置。
+- [x] 检查 Pages、Worker 与应用代码中的安全响应头、CORS、鉴权、防爆破及高成本接口保护。
+- [ ] 仅做正常频率的只读请求，不执行压力测试、漏洞利用、部署或配置修改。
+- [x] 输出当前防护结论、风险等级和最小加固建议，并说明无法从现有权限确认的项目。
+
+### 执行状态
+
+- [x] 用户已授权访问公开站点，并允许通过 Wrangler CLI 读取 Worker/Pages 状态。
+- [x] 读取当前部署、域名与安全相关配置。
+- [x] 对照公开响应和项目实现交叉验证。
+- [x] 汇总结论并记录验证证据。
+
+### 审计结论
+
+- Pages 与 Worker 均由 Cloudflare 边缘直接承载，已具备 Cloudflare 默认的自动 DDoS 防护和 HTTPS 重定向。
+- WAF Managed Rules、Bot Fight Mode 与自定义 Rate Limiting 的实际开关状态无法通过 Wrangler 确认；控制台只读页面连续超时，未将“功能可用”误报为“已启用”。
+- Worker 没有鉴权或应用层限流，且 CORS 允许任意来源。公开调用方可触发 GitHub 同步、分类以及带 `force=1` 的 AI 重新生成，存在配额、费用与可用性风险。
+- Pages 与 Worker 响应缺少 CSP、HSTS、点击劫持防护和 Permissions Policy；Pages 的 `pages.dev` 生产及历史部署地址仍可直接访问。
