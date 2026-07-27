@@ -3,6 +3,7 @@
 
 # Wrangler 本地临时产物（构建缓存、本地 D1 sqlite 等）
 .wrangler/
+.wrangler-dry-run/
 
 # 依赖
 node_modules/

@@ -49,30 +49,13 @@ export function dataResponse<T>(data: T, status = 200): Response {
 }
 
 /**
- * 构造带 CORS 头的 JSON 响应
+ * 构造 JSON 响应；CORS 和安全头由 routes.ts 外层统一添加。
  */
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  })
-}
-
-/**
- * 构造 CORS 预检响应
- */
-export function corsPreflightResponse(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
     },
   })
 }

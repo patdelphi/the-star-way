@@ -113,3 +113,37 @@
 - WAF Managed Rules、Bot Fight Mode 与自定义 Rate Limiting 的实际开关状态无法通过 Wrangler 确认；控制台只读页面连续超时，未将“功能可用”误报为“已启用”。
 - Worker 没有鉴权或应用层限流，且 CORS 允许任意来源。公开调用方可触发 GitHub 同步、分类以及带 `force=1` 的 AI 重新生成，存在配额、费用与可用性风险。
 - Pages 与 Worker 响应缺少 CSP、HSTS、点击劫持防护和 Permissions Policy；Pages 的 `pages.dev` 生产及历史部署地址仍可直接访问。
+
+## 2026-07-27：Cloudflare 应用层安全加固
+
+### 完成标准
+
+- [x] 保留现有公开只读 API 和前端功能，不引入登录系统或数据库迁移。
+- [x] Worker 仅向正式前端、Pages 项目域名和本地开发地址返回 CORS 授权。
+- [x] GitHub 同步、分类和 AI 生成接口通过 Cloudflare Workers Rate Limiting binding 按来源 IP 限流。
+- [x] Pages 与 Worker 补齐 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 和 Permissions Policy。
+- [ ] 先补安全回归测试，再通过 Worker test/build、Wrangler dry-run、前端校验和生产构建。
+- [x] 更新 `Docs/changelog.md` 与对话记录；验证通过后创建独立 commit，不 push、不部署。
+
+### 实施边界与恢复方式
+
+- Worker 使用两个可选 Rate Limiting binding：写操作和 AI 操作分别计数；本地测试缺少 binding 时保持兼容。
+- CORS 白名单由 `STARWAY_ALLOWED_ORIGINS` 配置，并显式允许 `starway.patdelphi.xyz`、本项目 `pages.dev` 域名和本地开发端口。
+- 不新增 secret，不把管理 Token 放入前端，不改变 D1 schema。
+- 如需回滚，删除 `wrangler.toml` 的 `ratelimits` 与允许来源变量，并还原 Worker 安全包装及 `frontend/public/_headers`；不涉及数据恢复。
+
+### 待执行计划
+
+- [x] 新增失败测试，覆盖允许/拒绝来源、安全响应头和高成本接口 429。
+- [x] 实现 Worker 统一安全响应包装与高成本路由限流。
+- [x] 配置 Wrangler Rate Limiting bindings 与 CORS 允许来源。
+- [x] 新增 Cloudflare Pages `_headers`。
+- [x] 更新 changelog，运行可用的幂等验证。
+- [x] 审查最终 diff 并提交安全加固改动。
+
+### 验证结果
+
+- 独立安全策略测试：9 项通过。
+- Worker TypeScript 类型检查通过；Wrangler dry-run 通过并列出两个 `ratelimit` binding。
+- 前端静态校验 97 项通过，TypeScript 类型检查和 Vite 生产构建通过，`dist/_headers` 已生成。
+- 完整 Worker 路由测试在 Miniflare 启动 D1 时触发 Windows `0xc0000005` 原生进程异常，51 项测试在执行断言前被跳过；因此完整 Worker test 完成标准暂未勾选。

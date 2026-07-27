@@ -29,6 +29,19 @@ binding = "DB"
 database_name = "starway-db"
 database_id = "d338ce4b-12cd-46b0-b669-2e33b28212f0"
 
+# 高成本接口限流（按 CF-Connecting-IP + 路由分组计数）
+[[unsafe.bindings]]
+name = "WRITE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
+
+[[unsafe.bindings]]
+name = "AI_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
+
 # Worker secrets（通过 wrangler secret put 写入，不在此明文配置）
 # - STARWAY_GITHUB_TOKEN: GitHub Token
 # - STARWAY_AI_BASE_URL: AI API base URL（第二阶段）
@@ -39,6 +52,8 @@ database_id = "d338ce4b-12cd-46b0-b669-2e33b28212f0"
 [vars]
 # 前端 Pages URL，用于 Worker 根路径 / 重定向
 STARWAY_FRONTEND_URL = "https://the-star-way.pages.dev/"
+# CORS 正式允许来源；项目 Pages 预览域名和本地 5173/5174 由代码校验
+STARWAY_ALLOWED_ORIGINS = "https://starway.patdelphi.xyz,https://the-star-way.pages.dev"
 
 # 说明：原 [env.development] / [env.production] 配置已移除。
 # wrangler 的 env 块不继承顶层 d1_databases / vars，导致 `wrangler deploy --env production`

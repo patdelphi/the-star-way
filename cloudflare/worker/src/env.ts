@@ -10,6 +10,8 @@ import { loadAiConfig } from './ai/config.js'
  * - DB: D1 数据库绑定（在 wrangler.toml 中声明）
  * - STARWAY_GITHUB_TOKEN: GitHub Token（通过 wrangler secret put 写入）
  * - STARWAY_GITHUB_MAX_PAGES: 单次同步最大页数，默认 20
+ * - STARWAY_ALLOWED_ORIGINS: 允许访问 Worker API 的前端来源
+ * - WRITE_RATE_LIMITER / AI_RATE_LIMITER: Cloudflare 原生限流绑定
  * - STARWAY_AI_BASE_URL / API_KEY / MODEL: AI 配置（三项齐全才启用）
  */
 export interface Env {
@@ -25,6 +27,13 @@ export interface Env {
   // 前端 URL（非敏感，配置在 wrangler.toml [vars]）
   // 用于根路径 / 重定向到前端 Pages
   STARWAY_FRONTEND_URL?: string
+
+  // CORS 允许来源（逗号分隔，非敏感配置）
+  STARWAY_ALLOWED_ORIGINS?: string
+
+  // 高成本接口使用 Cloudflare 原生 Rate Limiting binding
+  WRITE_RATE_LIMITER?: RateLimit
+  AI_RATE_LIMITER?: RateLimit
 
   // AI 配置（通过 wrangler secret put 写入，三项齐全才启用）
   STARWAY_AI_BASE_URL?: string

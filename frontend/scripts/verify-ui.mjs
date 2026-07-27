@@ -70,6 +70,7 @@ const files = {
   chartTooltip: readText("src/components/ui/chart-tooltip.tsx"),
   shareCard: readText("src/components/ShareCard.tsx"),
   shareCardBuilder: readText("src/lib/share-card.ts"),
+  pagesHeaders: readText("public/_headers"),
 }
 
 const locales = {
@@ -199,6 +200,14 @@ const forbiddenTexts = [
 ]
 
 const checks = [
+  ["Cloudflare Pages 安全响应头", [
+    "Content-Security-Policy",
+    "Strict-Transport-Security",
+    "X-Content-Type-Options",
+    "X-Frame-Options",
+    "Referrer-Policy",
+    "Permissions-Policy",
+  ].every((header) => files.pagesHeaders.includes(header))],
   ["中英文 locale 可解析", Boolean(locales.zh.app && locales.en.app)],
   ["前端源码无中文字符串硬编码（locale 除外）", chineseStringLiterals.length === 0],
   ["核心 locale key 完整", requiredLocaleKeys.every((key) => getByPath(locales.zh, key) && getByPath(locales.en, key))],

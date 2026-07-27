@@ -157,6 +157,26 @@ npx wrangler dev
 
 会在 `http://localhost:8787` 启动本地 Worker，使用本地 D1 模拟数据。
 
+### 4.4 安全配置
+
+生产 Worker 使用两个 Cloudflare Rate Limiting binding：
+
+- `WRITE_RATE_LIMITER`：`/api/sync` 和分类写操作，每个来源 IP、每个路由每分钟最多 5 次。
+- `AI_RATE_LIMITER`：README 摘要、Star DNA 和学习路径，每个来源 IP、每个路由每分钟最多 10 次。
+
+项目内 Wrangler 3.114 使用 `[[unsafe.bindings]]` 传递 `ratelimit` binding；部署前必须运行 `wrangler deploy --dry-run`，并确认输出同时列出两个 `ratelimit` binding。升级到明确支持 `[[ratelimits]]` 的 Wrangler 4 后，可以再迁移为新版字段。
+
+`STARWAY_ALLOWED_ORIGINS` 保存正式 CORS 来源，当前包含：
+
+```toml
+[vars]
+STARWAY_ALLOWED_ORIGINS = "https://starway.patdelphi.xyz,https://the-star-way.pages.dev"
+```
+
+代码还允许本项目的 `*.the-star-way.pages.dev` 部署地址，以及 `localhost` / `127.0.0.1` 的 5173、5174 开发端口。不要恢复 `Access-Control-Allow-Origin: *`。
+
+Pages 安全响应头位于 `frontend/public/_headers`，Vite 构建后应复制到 `frontend/dist/_headers`。修改外部字体、图片或 API 域名时，需要同步调整其中的 CSP。
+
 ## 5. 部署前端到 Pages
 
 ### 5.1 构建前端

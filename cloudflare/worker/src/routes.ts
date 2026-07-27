@@ -24,6 +24,11 @@ import type { Env } from './env.js'
 import { resolveGitHubToken, getGitHubTokenSource, isAiConfigured } from './env.js'
 import { D1StarRepository, SYSTEM_DEMO_LOGIN } from './d1-repository.js'
 import { WorkerApiError, errorResponse, dataResponse, jsonResponse } from './errors.js'
+import {
+  applySecurityHeaders,
+  enforceRateLimit,
+  rejectDisallowedPreflight,
+} from './security.js'
 import { syncStars as syncStarsWorker } from './github-sync.js'
 import {
   generateRepoAnalysis,
@@ -209,6 +214,28 @@ async function readBody(request: Request): Promise<unknown> {
 export async function handleRequest(
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const rejectedPreflight = rejectDisallowedPreflight(request, env)
+  if (rejectedPreflight) {
+    return applySecurityHeaders(request, rejectedPreflight, env)
+  }
+
+  const rateLimitedResponse = await enforceRateLimit(request, env)
+  if (rateLimitedResponse) {
+    return applySecurityHeaders(request, rateLimitedResponse, env)
+  }
+
+  const response = await dispatchRequest(request, env, ctx)
+  return applySecurityHeaders(request, response, env)
+}
+
+/**
+ * 执行实际业务路由，统一安全策略由 handleRequest 在外层处理。
+ */
+async function dispatchRequest(
+  request: Request,
+  env: Env,
   _ctx: ExecutionContext,
 ): Promise<Response> {
   const url = new URL(request.url)
@@ -219,11 +246,6 @@ export async function handleRequest(
   if (method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
     })
   }
 

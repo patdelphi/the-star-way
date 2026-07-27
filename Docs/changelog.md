@@ -1,5 +1,12 @@
 ﻿# the-star-way 变更记录
 
+## 2026-07-27
+
+- Cloudflare Worker 增加统一安全响应包装：CORS 从任意来源收紧为正式站点、项目 Pages 域名和本地开发地址，并为全部响应补充 CSP、HSTS、点击劫持、MIME 嗅探、Referrer Policy 与 Permissions Policy。
+- GitHub 同步、仓库分类和 AI 生成接口接入 Cloudflare Workers Rate Limiting binding；写操作按 IP 和路由限制为每分钟 5 次，AI 路由每分钟 10 次，binding 异常时保留原接口可用性。
+- Cloudflare Pages 新增 `_headers`，为静态前端补充 CSP、HSTS 和浏览器能力限制；前端静态校验同步覆盖安全头文件。
+- 不新增 Secret、不修改 D1 schema；本轮只提交本地代码和配置，不部署、不 push。
+
 ## 2026-07-14
 
 - 重构本地后端 Star DNA / 学习路径生成链路：抽出用户级 AI 内容服务，统一缓存读取、数据准备、中文生成、英文翻译、事务写入和错误回退。

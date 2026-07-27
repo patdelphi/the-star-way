@@ -55,11 +55,17 @@ async function setupMiniflare(): Promise<Miniflare> {
 /**
  * 构造测试用 Request
  */
-function makeRequest(method: string, path: string, body?: unknown): Request {
+function makeRequest(
+  method: string,
+  path: string,
+  body?: unknown,
+  headers?: HeadersInit,
+): Request {
   const url = `https://worker.test${path}`
-  const init: RequestInit = { method }
+  const requestHeaders = new Headers(headers)
+  const init: RequestInit = { method, headers: requestHeaders }
   if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
+    requestHeaders.set('Content-Type', 'application/json')
     init.body = JSON.stringify(body)
   }
   return new Request(url, init)
@@ -164,7 +170,11 @@ async function seedTestData(): Promise<void> {
 beforeAll(async () => {
   mf = await setupMiniflare()
   const d1 = await mf.getD1Database('DB')
-  env = { DB: d1, STARWAY_GITHUB_TOKEN: 'test-token' }
+  env = {
+    DB: d1,
+    STARWAY_GITHUB_TOKEN: 'test-token',
+    STARWAY_ALLOWED_ORIGINS: 'https://starway.patdelphi.xyz',
+  }
 })
 
 afterAll(async () => {
@@ -188,18 +198,39 @@ afterEach(() => {
   env.STARWAY_AI_BASE_URL = undefined
   env.STARWAY_AI_API_KEY = undefined
   env.STARWAY_AI_MODEL = undefined
+  env.WRITE_RATE_LIMITER = undefined
+  env.AI_RATE_LIMITER = undefined
 })
 
 // ===== CORS 预检 =====
 describe('CORS 预检', () => {
-  it('OPTIONS 请求返回 204 + CORS 头', async () => {
-    const res = await handleRequest(makeRequest('OPTIONS', '/api/users'), env, mockCtx())
+  it('允许来源的 OPTIONS 请求返回 204 + 精确来源 CORS 头', async () => {
+    const res = await handleRequest(
+      makeRequest('OPTIONS', '/api/users', undefined, {
+        Origin: 'https://starway.patdelphi.xyz',
+      }),
+      env,
+      mockCtx(),
+    )
     expect(res.status).toBe(204)
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://starway.patdelphi.xyz')
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('GET')
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST')
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('DELETE')
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('OPTIONS')
+    expect(res.headers.get('Vary')).toContain('Origin')
+  })
+
+  it('拒绝未授权来源的 OPTIONS 请求', async () => {
+    const res = await handleRequest(
+      makeRequest('OPTIONS', '/api/users', undefined, {
+        Origin: 'https://attacker.example',
+      }),
+      env,
+      mockCtx(),
+    )
+    expect(res.status).toBe(403)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 })
 
@@ -810,10 +841,77 @@ describe('统一响应格式', () => {
     expect(body).not.toHaveProperty('data')
   })
 
-  it('所有响应含 CORS 头', async () => {
-    const res = await handleRequest(makeRequest('GET', '/api/users'), env, mockCtx())
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
+  it('所有响应含安全头，允许来源获得精确 CORS 头', async () => {
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users', undefined, {
+        Origin: 'https://starway.patdelphi.xyz',
+      }),
+      env,
+      mockCtx(),
+    )
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://starway.patdelphi.xyz')
     expect(res.headers.get('Content-Type')).toContain('application/json')
+    expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'none'")
+    expect(res.headers.get('Strict-Transport-Security')).toContain('max-age=31536000')
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(res.headers.get('X-Frame-Options')).toBe('DENY')
+    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')
+    expect(res.headers.get('Permissions-Policy')).toContain('camera=()')
+  })
+})
+
+// ===== 高成本接口限流 =====
+describe('高成本接口限流', () => {
+  it('写操作超过限制时在业务处理前返回 429', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: false })
+    env.WRITE_RATE_LIMITER = { limit } as RateLimit
+
+    const res = await handleRequest(
+      makeRequest('POST', '/api/sync', { username: 'testuser' }, {
+        'CF-Connecting-IP': '203.0.113.10',
+      }),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('60')
+    expect(limit).toHaveBeenCalledWith({ key: '203.0.113.10:sync' })
+    const body = await res.json()
+    expect(body.error.code).toBe('RATE_LIMITED')
+  })
+
+  it('AI 接口超过限制时在生成前返回 429', async () => {
+    const limit = vi.fn().mockResolvedValue({ success: false })
+    env.AI_RATE_LIMITER = { limit } as RateLimit
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna?force=1', undefined, {
+        'CF-Connecting-IP': '203.0.113.11',
+      }),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(429)
+    expect(limit).toHaveBeenCalledWith({ key: '203.0.113.11:star-dna' })
+  })
+
+  it('限流服务异常时保留原有接口可用性', async () => {
+    const limit = vi.fn().mockRejectedValue(new Error('limiter unavailable'))
+    env.AI_RATE_LIMITER = { limit } as RateLimit
+
+    const res = await handleRequest(
+      makeRequest('GET', '/api/users/testuser/star-dna', undefined, {
+        'CF-Connecting-IP': '203.0.113.12',
+      }),
+      env,
+      mockCtx(),
+    )
+
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error.code).toBe('AI_NOT_CONFIGURED')
   })
 })
 
