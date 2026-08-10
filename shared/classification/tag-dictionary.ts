@@ -53,6 +53,7 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   // 安全
   { keywords: ['security', 'encryption', 'authentication', 'authorization', 'oauth', 'jwt', 'vpn', 'privacy', 'zero-trust'], label: '安全 / 隐私', category: '安全' },
   { keywords: ['cryptography', 'hash', 'ssl', 'tls', 'certificate'], label: '加密 / 密码学', category: '安全' },
+  { keywords: ['pentest', 'penetration-testing', 'ctf', 'capture-the-flag', 'owasp', 'exploit', 'vulnerability', 'nmap', 'metasploit', 'burp'], label: '渗透测试', category: '安全' },
 
   // 工具
   { keywords: ['git', 'version-control'], label: '版本控制', category: '工具' },
@@ -95,6 +96,9 @@ export const TOPIC_TAG_RULES: TagRule[] = [
   // 设计
   { keywords: ['design', 'ui', 'ux', 'design-system', 'figma', 'icon', 'font', 'color', 'accessibility'], label: '设计 / UI', category: '设计' },
   { keywords: ['image', 'screenshot', 'photo', 'video', 'audio', 'media', 'ffmpeg', 'svg'], label: '多媒体', category: '设计' },
+
+  // 家庭实验室
+  { keywords: ['homelab', 'proxmox', 'truenas', 'pihole', 'unraid', 'esxi', 'freebsd', 'home-server', 'self-hosted'], label: '家庭实验室', category: '基础设施' },
 ]
 
 // ===== 仓库名称关键词匹配规则 =====

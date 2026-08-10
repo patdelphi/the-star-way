@@ -39,6 +39,7 @@ export const TAG_LABEL_EN: Record<string, string> = {
   // 安全
   '安全 / 隐私': 'Security / Privacy',
   '加密 / 密码学': 'Cryptography',
+  '渗透测试': 'Penetration Testing',
 
   // 工具
   '版本控制': 'Version Control',
@@ -80,6 +81,9 @@ export const TAG_LABEL_EN: Record<string, string> = {
   // 底层
   '系统 / 嵌入式': 'System / Embedded',
   '网络': 'Networking',
+
+  // 家庭实验室
+  '家庭实验室': 'Homelab',
 
   // 设计
   '设计 / UI': 'Design / UI',

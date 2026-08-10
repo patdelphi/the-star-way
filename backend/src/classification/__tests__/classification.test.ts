@@ -96,6 +96,24 @@ describe('分类功能', () => {
       const tags = classifyRepo('xyz', 'some random text', '[]')
       expect(tags).toEqual([])
     })
+
+    it('应从 topics 匹配渗透测试标签', () => {
+      const tags = classifyRepo('some-pentest-tool', 'A pentesting toolkit', '["pentest", "nmap", "owasp"]')
+      const tagNames = tags.map(t => t.tag)
+      expect(tagNames).toContain('渗透测试')
+    })
+
+    it('应从 topics 匹配家庭实验室标签', () => {
+      const tags = classifyRepo('pi-hole', 'DNS sinkhole for home networks', '["homelab", "pihole", "dns"]')
+      const tagNames = tags.map(t => t.tag)
+      expect(tagNames).toContain('家庭实验室')
+    })
+
+    it('proxmox 应匹配家庭实验室', () => {
+      const tags = classifyRepo('pve/pve', 'Proxmox VE virtualization platform', '["proxmox", "homelab", "virtualization"]')
+      const tagNames = tags.map(t => t.tag)
+      expect(tagNames).toContain('家庭实验室')
+    })
   })
 
   describe('classifyAllRepos（批量分类）', () => {
