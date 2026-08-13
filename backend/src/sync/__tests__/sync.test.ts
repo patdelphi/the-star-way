@@ -321,6 +321,56 @@ describe('GitHub 同步', () => {
     expect(result.rateLimit).not.toBeNull()
     expect(result.rateLimit!.remaining).toBe(55)
   })
+
+  it('仓库改名/转移后同步不应因 github_id 冲突失败，且引用迁移到新 full_name', async () => {
+    // 预置：repos 表已有旧名仓库（github_id=5000），且 stars / user_repos 引用它
+    const now = '2026-01-01T00:00:00Z'
+    db.prepare('INSERT OR IGNORE INTO users (login, synced_at) VALUES (?, ?)').run('testuser', now)
+    db.prepare(`
+      INSERT OR IGNORE INTO repos (github_id, full_name, owner, name, html_url, stars, forks, open_issues, archived, fork)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(5000, 'oldowner/renamed', 'oldowner', 'renamed', 'https://github.com/oldowner/renamed', 10, 1, 0, 0, 0)
+    db.prepare(`
+      INSERT OR IGNORE INTO stars (user_login, repo_full_name, first_seen_at, last_seen_at)
+      VALUES (?, ?, ?, ?)
+    `).run('testuser', 'oldowner/renamed', now, now)
+    db.prepare(`
+      INSERT OR IGNORE INTO user_repos (user_login, repo_full_name, first_seen_at, last_seen_at)
+      VALUES (?, ?, ?, ?)
+    `).run('testuser', 'oldowner/renamed', now, now)
+
+    // 本次同步 GitHub 返回改名后的仓库（github_id 不变，full_name 变为新名）
+    const renamed = makeMockStarredRepo({
+      starred_at: '2025-06-01T00:00:00Z',
+      repo: makeMockRepo({
+        id: 5000,
+        full_name: 'newowner/renamed',
+        owner: { login: 'newowner', avatar_url: 'https://github.com/newowner.png' },
+        name: 'renamed',
+      }),
+    })
+    const { GitHubClient } = await import('../../sync/github-client.js')
+    vi.mocked(GitHubClient).mockImplementationOnce(() => ({
+      getUserProfile: () => Promise.resolve({ login: 'testuser', avatar_url: 'x', html_url: 'y' }),
+      listStarredRepos: () => Promise.resolve({ repos: [renamed], rateLimit: null }),
+      listUserOwnedRepos: () => Promise.resolve({ repos: [renamed.repo], rateLimit: null }),
+    }))
+
+    const result = await syncStars(db, 'testuser')
+    // 不应抛 github_id 冲突
+    expect(result.complete).toBe(true)
+
+    // repos 表中 github_id=5000 的 full_name 已更新为新名，旧名行消失
+    const repo = db.prepare('SELECT full_name FROM repos WHERE github_id = ?').get(5000) as { full_name: string }
+    expect(repo.full_name).toBe('newowner/renamed')
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM repos WHERE full_name = ?').get('oldowner/renamed')).toEqual({ cnt: 0 })
+
+    // 引用已迁移到新 full_name
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE repo_full_name = ?').get('newowner/renamed')).toEqual({ cnt: 1 })
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM stars WHERE repo_full_name = ?').get('oldowner/renamed')).toEqual({ cnt: 0 })
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM user_repos WHERE repo_full_name = ?').get('newowner/renamed')).toEqual({ cnt: 1 })
+    expect(db.prepare('SELECT COUNT(*) as cnt FROM user_repos WHERE repo_full_name = ?').get('oldowner/renamed')).toEqual({ cnt: 0 })
+  })
 })
 
 describe('GitHub 同步错误处理', () => {

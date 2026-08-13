@@ -42,7 +42,7 @@ import {
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend, Brush } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getOwnedStats, getCreatorDna, getStats, getTags, getUserSummary, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getOwnedStats, getCreatorDna, getStats, getTags, getUserSummary, getUserStarTimeline, deleteUser, getApiErrorMessage, ApiRequestError } from "@/lib/api"
 import type { UserStats, OwnedRepoStats } from "@/lib/api"
 import { ShareCard } from "@/components/ShareCard"
 import { getSettings } from "@/lib/settings"
@@ -427,6 +427,8 @@ export default function Developers() {
   const isMountedRef = useRef(true)
   const syncingLoginRef = useRef<string | null>(null)
   const aiContentLoginRef = useRef<string | null>(null)
+  // 产出画像数据为空时，自动先同步自有项目再重试生成；记录已自动同步过的开发者，避免重复触发
+  const creatorAutoSyncedRef = useRef<string | null>(null)
   // 同步进行中标记：防止 useEffect [activeDevName] 在同步后清空 DNA/学习路径
   // 同步完成后由 runSync 显式用 force=true 重新加载
   const isSyncingRef = useRef(false)
@@ -780,6 +782,12 @@ export default function Developers() {
       if (result?.dna) setCreatorDna(result.dna)
     } catch (err) {
       if (!isMountedRef.current) return
+      // 自有项目未同步时后端返回 EMPTY_CREATOR_DATA；自动先同步该开发者的自有项目，再重试生成
+      if (err instanceof ApiRequestError && err.code === "EMPTY_CREATOR_DATA" && creatorAutoSyncedRef.current !== normalizedLogin) {
+        creatorAutoSyncedRef.current = normalizedLogin
+        await runSync(normalizedLogin)
+        return loadCreatorDna(normalizedLogin, true)
+      }
       setCreatorError(getApiErrorMessage(err, t, t("developers.creatorEmpty")))
     } finally {
       if ((force || isInitialLoad) && isMountedRef.current) setCreatorLoading(false)
@@ -817,6 +825,7 @@ export default function Developers() {
       // 只有真实切换开发者才清空旧 AI 内容，避免重复刷新把刚返回的内容覆盖为空态。
       if (aiContentLoginRef.current !== normalizedActiveLogin) {
         aiContentLoginRef.current = normalizedActiveLogin
+        creatorAutoSyncedRef.current = null
         setStarDna(null)
         setLearningPath(null)
         setDnaError("")

@@ -28,6 +28,43 @@ export function normalizeGitHubUsername(input: string): string {
   return value.replace(/^@+/, '').trim()
 }
 
+/** 依赖 repos.full_name 的引用表；仓库改名/转移时需同步迁移这些表的关联键 */
+const REPO_REFERENCE_TABLES = ['stars', 'user_repos', 'repo_tags', 'translations'] as const
+
+/** 将旧 full_name 的所有引用迁移到新 full_name，保证仓库改名后数据一致 */
+function migrateRepoReferences(db: Database.Database, from: string, to: string): void {
+  for (const table of REPO_REFERENCE_TABLES) {
+    db.prepare(`UPDATE ${table} SET repo_full_name = ? WHERE repo_full_name = ?`).run(to, from)
+  }
+}
+
+/**
+ * 处理仓库改名/转移导致的 github_id 主键冲突。
+ * repos 主键是 github_id、full_name 唯一。当同一仓库改名/转移后 full_name 变化时，
+ * 库中旧行仍占用 github_id 主键，而新 full_name 与旧 full_name 不同，导致 upsert 的
+ * ON CONFLICT(full_name) 不触发、反而触发 github_id 主键冲突导致同步失败。
+ * 这里把旧行合并到新 full_name（并迁移引用），保证 upsert 成功且数据一致。
+ * @returns 是否继续执行后续 upsert；返回 false 表示新 full_name 已被另一仓库占用（已合并删除旧行），应跳过。
+ */
+function alignRepoRename(db: Database.Database, repo: { id: number; full_name: string }): boolean {
+  const existing = db.prepare('SELECT full_name FROM repos WHERE github_id = ?').get(repo.id) as { full_name: string } | undefined
+  if (!existing || existing.full_name === repo.full_name) return true
+
+  const old = existing.full_name
+  const target = db.prepare('SELECT github_id FROM repos WHERE full_name = ? AND github_id != ?').get(repo.full_name, repo.id)
+  if (target) {
+    // 极罕见：新 full_name 已被另一仓库占用（GitHub 不允许同名，正常不会发生）。
+    // 把旧行引用迁移到目标仓库，删除旧行，跳过本次 upsert，避免再次冲突。
+    migrateRepoReferences(db, old, repo.full_name)
+    db.prepare('DELETE FROM repos WHERE github_id = ?').run(repo.id)
+    return false
+  }
+  // 仓库改名/转移：先把旧行引用迁移到新 full_name，再改 repos 主键 full_name
+  migrateRepoReferences(db, old, repo.full_name)
+  db.prepare('UPDATE repos SET full_name = ? WHERE github_id = ?').run(repo.full_name, repo.id)
+  return true
+}
+
 /**
  * 执行 GitHub Star 同步
  * @param db 数据库连接（如果未传则自动创建）
@@ -155,6 +192,9 @@ export async function syncStars(
     for (const item of repos) {
       const repo = item.repo
 
+      // 仓库改名/转移时先合并 github_id 主键冲突；返回 false 表示该仓库已合并到其他行，跳过
+      if (!alignRepoRename(db, repo)) continue
+
       upsertRepo.run(
         repo.id,
         repo.full_name,
@@ -240,6 +280,8 @@ export async function syncStars(
           homepage = excluded.homepage
       `)
       for (const repo of ownedRepos) {
+        // 仓库改名/转移时先合并 github_id 主键冲突；返回 false 表示该仓库已合并到其他行，跳过
+        if (!alignRepoRename(db, repo)) continue
         upsertRepo.run(
           repo.id,
           repo.full_name,
