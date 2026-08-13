@@ -34,6 +34,7 @@ import {
   generateRepoAnalysis,
   generateStarDna,
   generateLearningPath,
+  generateCreatorDna,
   translateToEnglish,
   translateRepoAnalysisToEnglish,
   type RepoAnalysisResult,
@@ -453,6 +454,44 @@ async function dispatchRequest(
       return dataResponse(runs)
     }
 
+    // ===== GET /api/users/:login/owned-repos（自有公开项目列表） =====
+    const ownedReposMatch = matchRoute('/api/users/:login/owned-repos', pathname)
+    if (method === 'GET' && ownedReposMatch) {
+      const login = normalizeRouteLogin(ownedReposMatch.login)
+      if (!(await repo.ensureUserExists(login))) {
+        throw new WorkerApiError(`用户 ${login} 不存在`, 'USER_NOT_FOUND', 404)
+      }
+      const query = parseQuery(url)
+      const result = await repo.listUserOwnedRepos(login, {
+        language: query.language,
+        search: query.q || query.search,
+        sortBy: (query.sort as any) || 'stars',
+        sortOrder: (query.direction as any) || 'DESC',
+        limit: parseInt(query.pageSize || query.limit || '20', 10),
+        offset: parseInt(query.page ? ((parseInt(query.page, 10) - 1) * parseInt(query.pageSize || '20', 10)).toString() : '0', 10),
+      })
+      return dataResponse({
+        items: result.items.map(item => ({
+          ...item.repo,
+          starred_at: null,
+          tags: item.tags,
+        })),
+        total: result.total,
+      })
+    }
+
+    // ===== GET /api/users/:login/owned-stats（自有公开项目统计） =====
+    const ownedStatsMatch = matchRoute('/api/users/:login/owned-stats', pathname)
+    if (method === 'GET' && ownedStatsMatch) {
+      const login = normalizeRouteLogin(ownedStatsMatch.login)
+      if (!(await repo.ensureUserExists(login))) {
+        throw new WorkerApiError(`用户 ${login} 不存在`, 'USER_NOT_FOUND', 404)
+      }
+      const thresholdOpts = parseThresholdOptions(parseQuery(url))
+      const stats = await repo.getUserOwnedRepoStats(login, thresholdOpts)
+      return dataResponse(stats)
+    }
+
     // ===== POST /api/users/:login/classify =====
     const classifyMatch = matchRoute('/api/users/:login/classify', pathname)
     if (method === 'POST' && classifyMatch) {
@@ -814,6 +853,110 @@ async function dispatchRequest(
       // 10. 返回请求语言版本
       const result = lang === 'en' ? (pathEn || pathZh) : pathZh
       return dataResponse({ path: result, cached: false })
+    }
+
+    // GET /api/users/:login/creator-dna
+    // 生成开发者产出画像（Creator DNA），基于自有公开项目，支持中英文双语缓存
+    const creatorDnaMatch = matchRoute('/api/users/:login/creator-dna', pathname)
+    if (method === 'GET' && creatorDnaMatch) {
+      const login = normalizeRouteLogin(creatorDnaMatch.login)
+      const query = parseQuery(url)
+      const force = query.force === '1'
+      const lang = query.lang === 'en' ? 'en' : 'zh'
+      const cacheKey = `creator-${lang}`
+
+      // 1. 校验用户存在
+      const userExists = await repo.ensureUserExists(login)
+      if (!userExists) {
+        throw new WorkerApiError(`用户 ${login} 不存在`, 'USER_NOT_FOUND', 404)
+      }
+
+      // 2. 查缓存（非强制刷新时）
+      if (!force) {
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ dna: cached, cached: true })
+        }
+        if (lang === 'en') {
+          const cachedZh = await repo.getCachedTranslation(`user:${login}`, 'creator-zh')
+          if (cachedZh) {
+            try {
+              const translated = await translateToEnglish(cachedZh, env)
+              await repo.cacheUserAiTextPair(login, 'creator-zh', cachedZh, 'creator-en', translated, new Date().toISOString())
+              return dataResponse({ dna: translated || cachedZh, cached: false })
+            } catch {
+              return dataResponse({ dna: cachedZh, cached: true })
+            }
+          }
+        }
+      }
+
+      // 3. 校验最新同步是否完整
+      await assertUserAiDataReady(repo, login)
+
+      // 4. 检查 AI 是否启用
+      if (!aiEnabled) {
+        throw new WorkerApiError(
+          '产出画像功能未启用，请配置 AI 相关环境变量',
+          'AI_NOT_CONFIGURED',
+          503,
+        )
+      }
+
+      // 5. 校验自有公开项目数 > 0
+      const ownedStats = await repo.getUserOwnedRepoStats(login)
+      if (ownedStats.repoCount === 0) {
+        throw new WorkerApiError(
+          `用户 ${login} 暂无自有公开项目数据，请先同步自有项目`,
+          'EMPTY_CREATOR_DATA',
+          400,
+        )
+      }
+
+      // 6. 生成中文产出画像
+      let dnaZh: string
+      try {
+        dnaZh = await generateCreatorDna(
+          login,
+          {
+            repoCount: ownedStats.repoCount,
+            activeRepoCount: ownedStats.activeRepoCount,
+            totalStars: ownedStats.totalStars,
+            languages: ownedStats.languages,
+            topRepos: ownedStats.topRepos,
+          },
+          env,
+        )
+      } catch (err) {
+        // AI 失败时降级返回缓存
+        const cached = await repo.getCachedTranslation(`user:${login}`, cacheKey)
+        if (cached) {
+          return dataResponse({ dna: cached, cached: true })
+        }
+        throw new WorkerApiError(
+          err instanceof Error ? err.message : 'AI 生成产出画像失败',
+          'AI_ERROR',
+          500,
+        )
+      }
+
+      // 7. 英文请求才同步翻译，中文请求不等待英文翻译。
+      const now = new Date().toISOString()
+      let dnaEn = ''
+      if (lang === 'en') {
+        try {
+          dnaEn = await translateToEnglish(dnaZh, env)
+        } catch {
+          // 翻译失败不阻塞
+        }
+      }
+
+      // 8. 缓存中英文（事务写入）
+      await repo.cacheUserAiTextPair(login, 'creator-zh', dnaZh, 'creator-en', dnaEn, now)
+
+      // 9. 返回请求语言版本
+      const result = lang === 'en' ? (dnaEn || dnaZh) : dnaZh
+      return dataResponse({ dna: result, cached: false })
     }
 
     // ===== 以下接口仍返回 501 NOT_IMPLEMENTED =====

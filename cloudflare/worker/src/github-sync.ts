@@ -146,6 +146,32 @@ export async function syncStars(
   const starsUpserted = starsUpsertedBefore + upsertResult.starsUpserted
   const pagesFetched = pagesFetchedBefore + totalPages
 
+  // ===== 4.5 抓取用户自己发布的公开仓库（type=owner，排除 fork）=====
+  // 自有仓库独立存储于 user_repos 表，失败或数据为空不影响标星同步主流程。
+  let ownedRepoError: string | null = null
+  let ownedReposUpserted = 0
+  let ownedReposRemoved = 0
+  try {
+    const ownedResult = await client.listUserOwnedRepos(profile.login)
+    const ownedRepos = ownedResult.repos
+    if (ownedRepos.length > 0) {
+      const ownedUpsert = await repo.batchUpsertUserRepos(profile.login, ownedRepos, now)
+      ownedReposUpserted = ownedUpsert.reposUpserted
+    }
+    // 只有完整同步的最终批次才标记 removed_at
+    if (complete) {
+      ownedReposRemoved = await repo.markRemovedUserRepos(
+        profile.login,
+        ownedRepos.map(r => r.full_name),
+        now,
+      )
+    }
+  } catch (err) {
+    // 自有仓库抓取失败不阻塞标星同步主流程
+    ownedRepoError = err instanceof Error ? err.message : String(err)
+    console.warn(`用户 ${profile.login} 自有仓库抓取失败（不影响标星同步）:`, err)
+  }
+
   // 5. 只有完整同步的最终批次才标记 removed_at
   let reposMarkedRemoved = 0
   if (complete) {
@@ -219,6 +245,9 @@ export async function syncStars(
     rateLimit,
     complete,
     syncId: syncRunId,
+    ownedReposUpserted,
+    ownedReposRemoved,
+    ownedFetchError: ownedRepoError,
     ...(complete ? {} : { nextPage }),
     warning,
   }

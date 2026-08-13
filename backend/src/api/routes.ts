@@ -17,6 +17,8 @@ import {
   queryUserListSummaries,
   queryGlobalOverview,
   queryUserStarTimeline,
+  queryOwnedRepos,
+  queryUserOwnedRepoStats,
   SYSTEM_DEMO_LOGIN,
   type ThresholdOptions,
 } from '../repository/repo-queries.js'
@@ -538,6 +540,53 @@ export function createRouter(db: Database.Database) {
         return
       }
 
+      // ===== GET /api/users/:login/owned-repos（自有公开项目列表） =====
+      const ownedReposMatch = matchRoute('/api/users/:login/owned-repos', url.split('?')[0])
+      if (method === 'GET' && ownedReposMatch) {
+        const login = normalizeRouteLogin(ownedReposMatch.login)
+        const query = parseQuery(url)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
+        if (!user) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+
+        const result = queryOwnedRepos(db, login, {
+          language: query.language,
+          search: query.q || query.search,
+          sortBy: (query.sort as any) || 'stars',
+          sortOrder: (query.direction as any) || 'DESC',
+          limit: parseInt(query.pageSize || query.limit || '20', 10),
+          offset: parseInt(query.page ? ((parseInt(query.page, 10) - 1) * parseInt(query.pageSize || '20', 10)).toString() : '0', 10),
+        })
+
+        json(res, {
+          data: {
+            items: result.items.map(item => ({
+              ...item.repo,
+              starred_at: null,
+              tags: item.tags,
+            })),
+            total: result.total,
+          },
+        })
+        return
+      }
+
+      // ===== GET /api/users/:login/owned-stats（自有公开项目统计） =====
+      const ownedStatsMatch = matchRoute('/api/users/:login/owned-stats', url.split('?')[0])
+      if (method === 'GET' && ownedStatsMatch) {
+        const login = normalizeRouteLogin(ownedStatsMatch.login)
+        const user = db.prepare('SELECT login FROM users WHERE login = ? AND deleted_at IS NULL').get(login)
+        if (!user) {
+          error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
+          return
+        }
+        const thresholdOpts = parseThresholdOptions(parseQuery(url))
+        json(res, { data: queryUserOwnedRepoStats(db, login, thresholdOpts) })
+        return
+      }
+
       // ===== GET /api/users/:login/repos/*fullName（支持 owner/repo 格式） =====
       const repoMatch = matchRoute('/api/users/:login/repos/*', url.split('?')[0])
       if (method === 'GET' && repoMatch) {
@@ -646,7 +695,9 @@ export function createRouter(db: Database.Database) {
           error(res, 'USER_NOT_FOUND', `用户 ${login} 不存在`, 404)
           return
         }
-        const result = classifyReposForUser(db, login)
+        const query = parseQuery(url)
+        const scope = query.scope === 'owned' ? 'owned' : 'stars'
+        const result = classifyReposForUser(db, login, scope)
         json(res, { data: result })
         return
       }
@@ -716,6 +767,26 @@ export function createRouter(db: Database.Database) {
             return
           }
           error(res, 'AI_ERROR', err?.message || 'AI 生成学习路径失败', 500)
+        }
+      return
+    }
+
+      // ===== GET /api/users/:login/creator-dna =====
+      // 生成开发者产出画像（Creator DNA），基于自有公开项目，支持中英文双语缓存
+      const creatorDnaMatch = matchRoute('/api/users/:login/creator-dna', url.split('?')[0])
+      if (method === 'GET' && creatorDnaMatch) {
+        const login = normalizeRouteLogin(creatorDnaMatch.login)
+        const force = parseQuery(url).force === '1'
+        const lang = parseQuery(url).lang === 'en' ? 'en' : 'zh'
+        try {
+          const result = await getUserAiContent(db, login, 'creator-dna', lang, force)
+          json(res, { data: { dna: result.content, cached: result.cached } })
+        } catch (err: any) {
+          if (err instanceof UserAiContentError) {
+            error(res, err.code, err.message, err.status)
+            return
+          }
+          error(res, 'AI_ERROR', err?.message || 'AI 生成产出画像失败', 500)
         }
         return
       }

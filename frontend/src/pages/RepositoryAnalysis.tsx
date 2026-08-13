@@ -40,7 +40,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectOption } from "@/components/ui/select"
-import { getRepos, getRepo, getStats, getTags, getReadmeSummary, getSimilarRepos, type SimilarRepo } from "@/lib/api"
+import { getRepos, getRepo, getOwnedRepos, getStats, getTags, getReadmeSummary, getSimilarRepos, type SimilarRepo } from "@/lib/api"
 import type { Repo, UserStats } from "@/lib/api"
 import { getSettings } from "@/lib/settings"
 import { getTagLabel } from "@/lib/tag-labels"
@@ -218,8 +218,9 @@ export default function RepositoryAnalysis() {
     async function loadData() {
       setLoading(true)
       try {
-        const [reposResult, statsResult, tagsResult] = await Promise.all([
+        const [reposResult, ownedResult, statsResult, tagsResult] = await Promise.all([
           getRepos(currentLogin, { pageSize: 100 }),
+          getOwnedRepos(currentLogin, { pageSize: 100 }),
           getStats(currentLogin),
           getTags(currentLogin),
         ])
@@ -227,9 +228,19 @@ export default function RepositoryAnalysis() {
         if (cancelled) return
 
         const repoItems = Array.isArray(reposResult.items) ? reposResult.items : []
+        const ownedItems = Array.isArray(ownedResult?.items) ? ownedResult.items : []
+        // 星标 + 发布项目合并，按 full_name 去重，作为检索下拉数据源
+        const merged = [...repoItems]
+        const seen = new Set(repoItems.map((r) => r.full_name))
+        for (const r of ownedItems) {
+          if (!seen.has(r.full_name)) {
+            seen.add(r.full_name)
+            merged.push(r)
+          }
+        }
         const tagItems = Array.isArray(tagsResult) ? tagsResult : []
 
-        setApiRepos(repoItems)
+        setApiRepos(merged)
         setUserStats(statsResult)
         setAllTags(tagItems)
 

@@ -5,6 +5,7 @@
 export * from './user.js'
 export * from './repo.js'
 export * from './star.js'
+export * from './owned.js'
 export * from './stats.js'
 export * from './tag.js'
 export * from './sync.js'

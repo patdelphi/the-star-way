@@ -18,6 +18,8 @@ import type {
   LanguageStat,
   TopicStat,
   LicenseStat,
+  OwnedReposQueryParams,
+  OwnedRepoStats,
 } from '@shared/api-contracts/index.js'
 import {
   resolveThresholds,
@@ -219,6 +221,7 @@ export class D1StarRepository {
    * 查询指定用户的单个仓库详情
    */
   async getRepoForUser(userLogin: string, fullName: string): Promise<RepoWithStar | null> {
+    // 优先查星标仓库，未命中时回退查询自有发布项目
     const row = await this.db
       .prepare(`
         SELECT r.*, s.starred_at,
@@ -230,12 +233,32 @@ export class D1StarRepository {
       .bind(userLogin, fullName)
       .first<any>()
 
-    if (!row) return null
+    if (row) {
+      return {
+        repo: this.mapRepoRow(row),
+        starred_at: row.starred_at,
+        tags: row.tag_list ? row.tag_list.split(',') : [],
+      }
+    }
+
+    // 未命中则回退查询自有发布项目
+    const ownedRow = await this.db
+      .prepare(`
+        SELECT r.*, NULL as starred_at,
+          (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
+        FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        WHERE ur.user_login = ? AND ur.removed_at IS NULL AND r.full_name = ?
+      `)
+      .bind(userLogin, fullName)
+      .first<any>()
+
+    if (!ownedRow) return null
 
     return {
-      repo: this.mapRepoRow(row),
-      starred_at: row.starred_at,
-      tags: row.tag_list ? row.tag_list.split(',') : [],
+      repo: this.mapRepoRow(ownedRow),
+      starred_at: null,
+      tags: ownedRow.tag_list ? ownedRow.tag_list.split(',') : [],
     }
   }
 
@@ -1108,6 +1131,287 @@ export class D1StarRepository {
       .bind(now, userLogin, syncRunId)
       .run()
     return Number(result.meta?.changes ?? 0)
+  }
+
+  /**
+   * 批量 upsert 用户自有仓库（type=owner）到 repos 表 + user_repos 关系表。
+   * 自有仓库与标星仓库共用 repos 元数据表，仅关系存储于 user_repos。
+   * @returns upserted 数量
+   */
+  async batchUpsertUserRepos(
+    userLogin: string,
+    repos: Array<{
+      id: number
+      full_name: string
+      owner: { login: string }
+      name: string
+      html_url: string
+      description: string | null
+      language: string | null
+      license: { spdx_id: string } | null
+      stargazers_count: number
+      forks_count: number
+      open_issues_count: number
+      topics: string[]
+      created_at: string
+      updated_at: string
+      pushed_at: string | null
+      archived: boolean
+      fork: boolean
+      homepage: string | null
+    }>,
+    now: string,
+  ): Promise<{ reposUpserted: number }> {
+    if (repos.length === 0) {
+      return { reposUpserted: 0 }
+    }
+
+    const stmts: D1PreparedStatement[] = []
+
+    for (const repo of repos) {
+      // 仓库转移或历史数据更正时，先删除冲突的旧实体（与标星批量逻辑一致）
+      stmts.push(
+        this.db.prepare(`
+          DELETE FROM repos
+          WHERE full_name = ? AND github_id != ?
+        `).bind(repo.full_name, repo.id),
+      )
+
+      // upsert 仓库元数据
+      stmts.push(
+        this.db.prepare(`
+          INSERT INTO repos (github_id, full_name, owner, name, html_url, description, language, license,
+            stars, forks, open_issues, topics_json, created_at, updated_at, pushed_at, archived, fork, homepage)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(github_id) DO UPDATE SET
+            full_name = excluded.full_name,
+            owner = excluded.owner,
+            name = excluded.name,
+            html_url = excluded.html_url,
+            description = excluded.description,
+            language = excluded.language,
+            license = excluded.license,
+            stars = excluded.stars,
+            forks = excluded.forks,
+            open_issues = excluded.open_issues,
+            topics_json = excluded.topics_json,
+            updated_at = excluded.updated_at,
+            pushed_at = excluded.pushed_at,
+            archived = excluded.archived,
+            fork = excluded.fork,
+            homepage = excluded.homepage
+        `).bind(
+          repo.id,
+          repo.full_name,
+          repo.owner.login,
+          repo.name,
+          repo.html_url,
+          repo.description,
+          repo.language,
+          repo.license?.spdx_id ?? null,
+          repo.stargazers_count,
+          repo.forks_count,
+          repo.open_issues_count,
+          JSON.stringify(repo.topics),
+          repo.created_at,
+          repo.updated_at,
+          repo.pushed_at,
+          repo.archived ? 1 : 0,
+          repo.fork ? 1 : 0,
+          repo.homepage,
+        ),
+      )
+
+      // upsert 自有仓库关系
+      stmts.push(
+        this.db.prepare(`
+          INSERT INTO user_repos (user_login, repo_full_name, first_seen_at, last_seen_at, removed_at)
+          VALUES (?, ?, ?, ?, NULL)
+          ON CONFLICT(user_login, repo_full_name) DO UPDATE SET
+            last_seen_at = excluded.last_seen_at,
+            removed_at = NULL
+        `).bind(userLogin, repo.full_name, now, now),
+      )
+    }
+
+    // D1 batch 原子执行；分块降低单次批量语句压力
+    const chunkSize = 100
+    for (let i = 0; i < stmts.length; i += chunkSize) {
+      await this.db.batch(stmts.slice(i, i + chunkSize))
+    }
+
+    return { reposUpserted: repos.length }
+  }
+
+  /**
+   * 标记已移除的自有仓库：用户在本次 API 返回的集合中不再存在的自有仓库。
+   * 仅在最终完整批次调用（complete=true 时）。
+   */
+  async markRemovedUserRepos(userLogin: string, seenFullNames: string[], now: string): Promise<number> {
+    if (seenFullNames.length === 0) {
+      // 无本次数据时忽略，避免误删（与标星 markRemoved 为空集合时不同：自有仓库不应被清空）
+      return 0
+    }
+    const placeholders = seenFullNames.map(() => '?').join(',')
+    const result = await this.db
+      .prepare(`
+        UPDATE user_repos
+        SET removed_at = ?
+        WHERE user_login = ? AND removed_at IS NULL AND repo_full_name NOT IN (${placeholders})
+      `)
+      .bind(now, userLogin, ...seenFullNames)
+      .run()
+    return Number(result.meta?.changes ?? 0)
+  }
+
+  // ===== 自有公开项目查询 =====
+
+  /**
+   * 查询用户自有公开项目列表（带标签，支持筛选、排序、分页）
+   */
+  async listUserOwnedRepos(userLogin: string, params: OwnedReposQueryParams = {}): Promise<{ items: RepoWithStar[]; total: number }> {
+    const {
+      language,
+      search,
+      sortBy = 'stars',
+      sortOrder = 'DESC',
+      limit = 20,
+      offset = 0,
+    } = params
+
+    const conditions: string[] = ['ur.user_login = ?', 'ur.removed_at IS NULL']
+    const values: unknown[] = [userLogin]
+
+    if (language) {
+      conditions.push('r.language = ?')
+      values.push(language)
+    }
+    if (search) {
+      conditions.push('(r.full_name LIKE ? OR r.description LIKE ?)')
+      values.push(`%${search}%`, `%${search}%`)
+    }
+
+    const where = `WHERE ${conditions.join(' AND ')}`
+
+    // 排序字段白名单
+    const allowedSortColumns: Record<string, string> = {
+      stars: 'r.stars',
+      forks: 'r.forks',
+      open_issues: 'r.open_issues',
+      pushed_at: 'r.pushed_at',
+      created_at: 'r.created_at',
+    }
+    const sortCol = allowedSortColumns[sortBy] || 'r.stars'
+    const order = sortOrder === 'ASC' ? 'ASC' : 'DESC'
+
+    const countRow = await this.db
+      .prepare(`SELECT COUNT(*) as total FROM repos r JOIN user_repos ur ON r.full_name = ur.repo_full_name ${where}`)
+      .bind(...values)
+      .first<{ total: number }>()
+    const total = countRow?.total ?? 0
+
+    const rows = await this.db
+      .prepare(`
+        SELECT r.*,
+          (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
+        FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        ${where}
+        ORDER BY ${sortCol} ${order}
+        LIMIT ? OFFSET ?
+      `)
+      .bind(...values, limit, offset)
+      .all()
+
+    const items: RepoWithStar[] = (rows.results || []).map((row: any) => ({
+      repo: this.mapRepoRow(row),
+      starred_at: null,
+      tags: row.tag_list ? row.tag_list.split(',') : [],
+    }))
+
+    return { items, total }
+  }
+
+  /**
+   * 查询用户自有公开项目统计：总数、活跃数、总 star 数、语言分布、代表性项目、最后同步时间。
+   */
+  async getUserOwnedRepoStats(userLogin: string, options?: ThresholdOptions): Promise<OwnedRepoStats> {
+    const { sleepMs } = resolveThresholds(options)
+    const cutoffDate = new Date(Date.now() - sleepMs).toISOString()
+
+    const repoCountRow = await this.db
+      .prepare('SELECT COUNT(*) as cnt FROM user_repos WHERE user_login = ? AND removed_at IS NULL')
+      .bind(userLogin)
+      .first<{ cnt: number }>()
+    const repoCount = repoCountRow?.cnt ?? 0
+
+    const activeRow = await this.db
+      .prepare(`
+        SELECT COUNT(*) as cnt FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        WHERE ur.user_login = ? AND ur.removed_at IS NULL AND r.pushed_at >= ?
+      `)
+      .bind(userLogin, cutoffDate)
+      .first<{ cnt: number }>()
+    const activeRepoCount = activeRow?.cnt ?? 0
+
+    const totalStarsRow = await this.db
+      .prepare(`
+        SELECT COALESCE(SUM(r.stars), 0) as total FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        WHERE ur.user_login = ? AND ur.removed_at IS NULL
+      `)
+      .bind(userLogin)
+      .first<{ total: number }>()
+    const totalStars = totalStarsRow?.total ?? 0
+
+    const langRows = await this.db
+      .prepare(`
+        SELECT COALESCE(r.language, 'Unknown') as language, COUNT(*) as count FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        WHERE ur.user_login = ? AND ur.removed_at IS NULL
+        GROUP BY COALESCE(r.language, 'Unknown')
+        ORDER BY count DESC
+      `)
+      .bind(userLogin)
+      .all<{ language: string; count: number }>()
+    const languages = langRows.results || []
+
+    const topRows = await this.db
+      .prepare(`
+        SELECT r.full_name, r.description, r.html_url, r.language, r.stars, r.forks, r.pushed_at
+        FROM repos r
+        JOIN user_repos ur ON r.full_name = ur.repo_full_name
+        WHERE ur.user_login = ? AND ur.removed_at IS NULL
+        ORDER BY r.stars DESC
+        LIMIT 5
+      `)
+      .bind(userLogin)
+      .all<{
+        full_name: string
+        description: string | null
+        html_url: string
+        language: string | null
+        stars: number
+        forks: number
+        pushed_at: string | null
+      }>()
+    const topRepos = topRows.results || []
+
+    const userRow = await this.db
+      .prepare('SELECT synced_at FROM users WHERE login = ?')
+      .bind(userLogin)
+      .first<{ synced_at: string | null }>()
+    const lastSyncedAt = userRow?.synced_at ?? null
+
+    return {
+      repoCount,
+      activeRepoCount,
+      totalStars,
+      languages,
+      topRepos,
+      lastSyncedAt,
+    }
   }
 
   /**

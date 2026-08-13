@@ -3,6 +3,7 @@ import { Sidebar } from "./components/layout/Sidebar"
 import { TopBar } from "./components/layout/TopBar"
 import Developers from "./pages/Developers"
 import StarExplorer from "./pages/StarExplorer"
+import PublishedProjects from "./pages/PublishedProjects"
 import RepositoryAnalysis from "./pages/RepositoryAnalysis"
 import Settings from "./pages/Settings"
 import Dashboard from "./pages/Dashboard"
@@ -29,6 +30,7 @@ function App() {
               <Routes>
                 <Route path="/developers" element={<Developers />} />
                 <Route path="/explorer" element={<StarExplorer />} />
+                <Route path="/published" element={<PublishedProjects />} />
                 <Route path="/catalog" element={<StarCatalog />} />
                 <Route path="/analysis" element={<RepositoryAnalysis />} />
                 <Route path="/dashboard" element={<Dashboard />} />

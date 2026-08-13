@@ -50,6 +50,28 @@ export interface GitHubUserProfile {
   public_repos: number
 }
 
+// 自有仓库 API 返回的数据结构（无 starred_at 包裹，直接是 repo 对象）
+export interface GitHubOwnedRepo {
+  id: number
+  full_name: string
+  owner: { login: string; avatar_url: string }
+  name: string
+  html_url: string
+  description: string | null
+  language: string | null
+  license: { spdx_id: string; name: string } | null
+  stargazers_count: number
+  forks_count: number
+  open_issues_count: number
+  topics: string[]
+  created_at: string
+  updated_at: string
+  pushed_at: string | null
+  archived: boolean
+  fork: boolean
+  homepage: string | null
+}
+
 export interface RateLimitInfo {
   limit: number
   remaining: number
@@ -150,6 +172,53 @@ export class GitHubClient {
     }
 
     return await response.json() as GitHubUserProfile
+  }
+
+  /**
+   * 获取用户自己发布的公开仓库（type=owner，排除 fork），从指定页开始，限制本次请求页数。
+   * 与 listStarredRepos 相同的分页/续传语义。
+   */
+  async listUserOwnedRepos(
+    username: string,
+    onPage?: (page: number, repos: GitHubOwnedRepo[]) => void,
+    startPage = 1,
+  ): Promise<{ repos: GitHubOwnedRepo[]; rateLimit: RateLimitInfo | null; totalPages: number; complete: boolean; nextPage?: number; warning?: string }> {
+    const allRepos: GitHubOwnedRepo[] = []
+    let page = startPage
+    let rateLimit: RateLimitInfo | null = null
+    const perPage = 100
+
+    const endPage = startPage + this.maxPages - 1
+    while (page <= endPage) {
+      const url = `${this.baseUrl}/users/${encodeURIComponent(username)}/repos?type=owner&per_page=${perPage}&page=${page}`
+      const response = await this.fetchWithAuth(url)
+
+      if (!response.ok) {
+        throw createSyncError(response.status, await response.text())
+      }
+
+      rateLimit = parseRateLimitHeaders(response.headers)
+      const data = await response.json() as GitHubOwnedRepo[]
+
+      if (data.length === 0) break
+
+      allRepos.push(...data)
+      onPage?.(page, data)
+
+      if (data.length < perPage) {
+        return { repos: allRepos, rateLimit, totalPages: page - startPage + 1, complete: true }
+      }
+
+      page++
+    }
+
+    if (allRepos.length >= this.maxPages * perPage) {
+      const warning = `用户 ${username} 自有仓库本批次达到 Worker 同步上限 ${this.maxPages * perPage} 条，本次同步到第 ${page - 1} 页`
+      console.warn(warning)
+      return { repos: allRepos, rateLimit, totalPages: this.maxPages, complete: false, nextPage: page, warning }
+    }
+
+    return { repos: allRepos, rateLimit, totalPages: Math.max(0, page - startPage), complete: true }
   }
 
   /**

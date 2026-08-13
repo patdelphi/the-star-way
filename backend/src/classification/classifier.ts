@@ -14,6 +14,9 @@ export interface ClassificationResult {
   tagsCreated: number
 }
 
+// 分类来源：星标仓库 / 自有发布项目
+export type ClassifyScope = 'stars' | 'owned'
+
 // re-export 纯函数和类型，保持向后兼容
 export const classifyRepo = classifyRepoImpl
 export type { ClassifyTagResult } from '@shared/classification/classifier.js'
@@ -28,13 +31,20 @@ export function classifyAllRepos(db: Database.Database): ClassificationResult {
 }
 
 /**
- * 对指定用户的星标仓库执行规则分类
+ * 对指定用户指定来源的仓库执行规则分类
  * @param db 数据库连接
  * @param userLogin 用户登录名，不传则处理全部仓库
+ * @param scope 来源：stars=星标仓库（默认），owned=自有发布项目
  * @returns 分类结果统计
  */
-export function classifyReposForUser(db: Database.Database, userLogin?: string): ClassificationResult {
-  // 构建查询：如果指定了用户，只查该用户星标的仓库
+export function classifyReposForUser(
+  db: Database.Database,
+  userLogin?: string,
+  scope: ClassifyScope = 'stars',
+): ClassificationResult {
+  // 来源对应关系表：stars 或 user_repos（内部常量，无 SQL 注入风险）
+  const relationTable = scope === 'owned' ? 'user_repos' : 'stars'
+  // 构建查询：如果指定了用户，只查该用户对应来源的仓库
   let sql = `
     SELECT full_name, name, topics_json, description
     FROM repos
@@ -43,7 +53,7 @@ export function classifyReposForUser(db: Database.Database, userLogin?: string):
     sql = `
       SELECT r.full_name, r.name, r.topics_json, r.description
       FROM repos r
-      JOIN stars s ON r.full_name = s.repo_full_name
+      JOIN ${relationTable} s ON r.full_name = s.repo_full_name
       WHERE s.user_login = ?
     `
   }
@@ -59,11 +69,11 @@ export function classifyReposForUser(db: Database.Database, userLogin?: string):
 
   withTransaction(db, () => {
     if (userLogin) {
-      // 只清除该用户星标仓库上的旧规则标签
+      // 只清除该用户对应来源仓库上的旧规则标签
       db.prepare(`
         DELETE FROM repo_tags
         WHERE tag_source != 'manual'
-          AND repo_full_name IN (SELECT repo_full_name FROM stars WHERE user_login = ?)
+          AND repo_full_name IN (SELECT repo_full_name FROM ${relationTable} WHERE user_login = ?)
       `).run(userLogin)
     } else {
       // 清除全部旧规则标签

@@ -11,4 +11,6 @@ export {
   queryRepoCount,
   queryActiveRepoCount,
   queryUserSummary,
+  queryOwnedRepos,
+  queryUserOwnedRepoStats,
 } from './repo-queries.js'

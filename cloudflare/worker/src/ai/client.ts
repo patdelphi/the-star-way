@@ -7,7 +7,7 @@
  */
 import type { Env } from '../env.js'
 import { loadAiConfig } from './config.js'
-import { buildLearningPathPrompt, buildStarDnaPrompt } from '@shared/ai/index.js'
+import { buildCreatorDnaPrompt, buildLearningPathPrompt, buildStarDnaPrompt } from '@shared/ai/index.js'
 
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant'
@@ -235,6 +235,36 @@ export async function generateLearningPath(
         role: 'system',
         content:
           '你是一个资深技术学习规划师，擅长根据开发者的兴趣标签和星标仓库生成个性化的学习路径。请引用具体项目名称给出有针对性的建议。',
+      },
+      { role: 'user', content: prompt },
+    ],
+    env,
+  )
+}
+
+/**
+ * 生成开发者"产出画像"（Creator DNA）
+ * 基于该用户自己发布的公开仓库（type=owner），分析其实际开发产出与口碑。
+ */
+export async function generateCreatorDna(
+  login: string,
+  stats: {
+    repoCount: number
+    activeRepoCount: number
+    totalStars: number
+    languages: { language: string; count: number }[]
+    topRepos: Array<{ full_name: string; description: string | null; stars: number }>
+  },
+  env: Env,
+): Promise<string> {
+  const prompt = buildCreatorDnaPrompt(login, stats)
+
+  return chat(
+    [
+      {
+        role: 'system',
+        content:
+          '你是一个资深开发者社区分析师，擅长根据 GitHub 用户自己发布的公开仓库数据给出有洞察力的开发者产出画像。',
       },
       { role: 'user', content: prompt },
     ],

@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Search, Star, GitFork, Tags } from "lucide-react"
-import { getRepos } from "@/lib/api"
+import { getRepos, getOwnedRepos } from "@/lib/api"
 import type { Repo } from "@/lib/api"
 import { getTagLabel } from "@/lib/tag-labels"
 import { useDeveloper } from "@/contexts/DeveloperContext"
@@ -47,40 +47,47 @@ const StarCatalog: React.FC = () => {
   const { currentLogin } = useDeveloper()
 
   // 数据状态
-  const [repos, setRepos] = useState<CatalogRepo[]>([])
+  const [starRepos, setStarRepos] = useState<CatalogRepo[]>([])
+  const [ownedRepos, setOwnedRepos] = useState<CatalogRepo[]>([])
   const [loading, setLoading] = useState(true)
   const [isDemoMode, setIsDemoMode] = useState(false)
 
   // UI 状态
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  // 数据来源：全部 / 星标仓库 / 发布项目
+  const [source, setSource] = useState<'all' | 'stars' | 'owned'>('all')
 
-  // 加载仓库数据
+  // 加载仓库数据（星标 + 发布项目，并行拉取）
   useEffect(() => {
     let cancelled = false
 
     async function fetchData() {
       setLoading(true)
       try {
-        const reposRes = await getRepos(currentLogin, { pageSize: 10000 })
+        const [starRes, ownedRes] = await Promise.all([
+          getRepos(currentLogin, { pageSize: 10000 }),
+          getOwnedRepos(currentLogin, { pageSize: 10000 }),
+        ])
 
         if (cancelled) return
 
-        const hasRepos = reposRes.items && reposRes.items.length > 0
-        if (hasRepos) {
-          const enriched: CatalogRepo[] = reposRes.items.map((r) => {
+        const enrich = (items: Repo[]): CatalogRepo[] =>
+          items.map((r) => {
             const { autoTags, topics } = extractTags(r)
             return { ...r, autoTags, allTags: [...new Set([...autoTags, ...topics])] }
           })
-          setRepos(enriched)
-          setIsDemoMode(false)
-        } else {
-          setRepos([])
-          setIsDemoMode(true)
-        }
+
+        const starRepos = starRes?.items && starRes.items.length > 0 ? enrich(starRes.items) : []
+        const ownedRepos = ownedRes?.items && ownedRes.items.length > 0 ? enrich(ownedRes.items) : []
+
+        setStarRepos(starRepos)
+        setOwnedRepos(ownedRepos)
+        setIsDemoMode(starRepos.length === 0 && ownedRepos.length === 0)
       } catch {
         if (!cancelled) {
-          setRepos([])
+          setStarRepos([])
+          setOwnedRepos([])
           setIsDemoMode(true)
         }
       } finally {
@@ -91,6 +98,15 @@ const StarCatalog: React.FC = () => {
     fetchData()
     return () => { cancelled = true }
   }, [currentLogin])
+
+  // 来源切换后的仓库集合（全部时按 full_name 去重合并）
+  const repos = useMemo<CatalogRepo[]>(() => {
+    if (source === 'stars') return starRepos
+    if (source === 'owned') return ownedRepos
+    const map = new Map<string, CatalogRepo>()
+    for (const r of [...starRepos, ...ownedRepos]) map.set(r.full_name, r)
+    return [...map.values()]
+  }, [source, starRepos, ownedRepos])
 
   // 统一标签云：autoTags 全部保留 + topics 按数量取前 64
   const tagCounts = useMemo(() => {
@@ -173,6 +189,34 @@ const StarCatalog: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* 来源切换 */}
+        <Card className="glass-panel">
+          <CardContent className="p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {([
+                ['all', t("starCatalog.sourceAll")],
+                ['stars', t("starCatalog.sourceStars")],
+                ['owned', t("starCatalog.sourceOwned")],
+              ] as ['all' | 'stars' | 'owned', string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSource(key)}
+                  className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                    source === key
+                      ? "border-primary bg-primary text-on-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-on-surface"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="ml-auto text-sm text-muted-foreground">
+                {repos.length} {t("starCatalog.repos")}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 搜索框 */}
         <Card className="glass-panel">

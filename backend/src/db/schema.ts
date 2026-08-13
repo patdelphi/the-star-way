@@ -57,6 +57,19 @@ CREATE TABLE IF NOT EXISTS stars (
   FOREIGN KEY (repo_full_name) REFERENCES repos(full_name)
 );
 
+-- 自有仓库表：记录用户自己发布的公开项目（owner 为本人，排除 fork）
+-- 与 stars（标星）关系对称，用于抓取、列出、分析开发者自己的产出
+CREATE TABLE IF NOT EXISTS user_repos (
+  user_login      TEXT NOT NULL,
+  repo_full_name  TEXT NOT NULL,
+  first_seen_at   TEXT NOT NULL,
+  last_seen_at    TEXT NOT NULL,
+  removed_at      TEXT,
+  PRIMARY KEY (user_login, repo_full_name),
+  FOREIGN KEY (user_login)    REFERENCES users(login),
+  FOREIGN KEY (repo_full_name) REFERENCES repos(full_name)
+);
+
 -- 仓库标签表
 CREATE TABLE IF NOT EXISTS repo_tags (
   repo_full_name  TEXT NOT NULL,
@@ -112,6 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_repos_stars       ON repos(stars DESC);
 CREATE INDEX IF NOT EXISTS idx_repos_pushed_at   ON repos(pushed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stars_user_login  ON stars(user_login);
 CREATE INDEX IF NOT EXISTS idx_stars_starred_at   ON stars(starred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_repos_user    ON user_repos(user_login);
 CREATE INDEX IF NOT EXISTS idx_repo_tags_tag      ON repo_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_sync_runs_user     ON sync_runs(user_login, started_at DESC);
 `

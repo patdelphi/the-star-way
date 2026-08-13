@@ -16,4 +16,6 @@ export type {
   LanguageStat,
   TopicStat,
   LicenseStat,
+  OwnedReposQueryParams,
+  OwnedRepoStats,
 } from '@shared/api-contracts/index.js'

@@ -3,7 +3,7 @@
  * 存放运行时无关的 prompt 构造、缓存 key 和常量，避免本地后端与 Worker 漂移。
  */
 
-export const USER_AI_CACHE_KEYS = ['dna-zh', 'dna-en', 'learning-zh', 'learning-en'] as const
+export const USER_AI_CACHE_KEYS = ['dna-zh', 'dna-en', 'learning-zh', 'learning-en', 'creator-zh', 'creator-en'] as const
 
 export type UserAiCacheKey = typeof USER_AI_CACHE_KEYS[number]
 
@@ -82,4 +82,39 @@ ${topRepoNames || '无'}
 ## 学习建议
 - 2-3 条具体可行的学习建议
 `
+}
+
+// 自有公开项目画像的输入统计结构
+export interface CreatorStats {
+  repoCount: number
+  activeRepoCount: number
+  totalStars: number
+  languages: { language: string; count: number }[]
+  topRepos: Array<{ full_name: string; description: string | null; stars: number }>
+}
+
+/**
+ * 生成开发者"产出画像"（Creator DNA）的 prompt。
+ * 基于该用户自己发布的公开仓库（type=owner），分析其实际开发产出与口碑。
+ */
+export function buildCreatorDnaPrompt(login: string, stats: CreatorStats): string {
+  const topLangs = stats.languages.slice(0, 5).map((l) => `${l.language}(${l.count})`).join(', ')
+  const topRepoNames = stats.topRepos
+    .slice(0, 5)
+    .map((r) => `- ${r.full_name}: ${r.description || ''}（${r.stars} stars）`)
+    .join('\n')
+
+  return `基于以下 GitHub 用户自己发布的公开仓库数据，生成一段中文"开发者产出画像"（100-150 字）。
+这里分析的是该用户实际创建并维护的 public repositories（非 star 的别人的项目），请重点刻画其真实开发能力、技术栈、高产度和项目口碑。
+要有洞察力，不要只罗列数据。
+
+用户：${login}
+自有公开仓库数：${stats.repoCount}
+活跃仓库数：${stats.activeRepoCount}
+累计获得的 star 数：${stats.totalStars}
+自有项目主要语言：${topLangs || '无'}
+代表性自有项目：
+${topRepoNames || '无'}
+
+请直接输出画像描述，不要加任何前缀或格式标记。`
 }

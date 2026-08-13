@@ -149,7 +149,7 @@ export class ApiRequestError extends Error {
 function resolveTimeout(url: string): number {
   const s = getSettings()
   if (url.includes('/sync')) return s.syncTimeout
-  if (url.includes('readme-summary') || url.includes('star-dna') || url.includes('learning-path')) {
+  if (url.includes('readme-summary') || url.includes('star-dna') || url.includes('learning-path') || url.includes('creator-dna')) {
     return s.aiTimeout
   }
   return s.apiTimeout
@@ -476,9 +476,10 @@ export async function getTags(login: string): Promise<{ tag: string; count: numb
 /**
  * 触发规则分类
  */
-export async function classifyRepos(login: string): Promise<{ classified: number; errors: number } | null> {
+export async function classifyRepos(login: string, scope: 'stars' | 'owned' = 'stars'): Promise<{ classified: number; errors: number } | null> {
   try {
-    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/classify`, {
+    const qs = scope === 'owned' ? '?scope=owned' : ''
+    const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/classify${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -735,4 +736,42 @@ export async function exportData(
     return null
   } catch { /* 忽略错误 */ }
   return null
+}
+
+// 自有公开项目统计类型
+export interface OwnedRepoStats {
+  repoCount: number
+  activeRepoCount: number
+  totalStars: number
+  languages: { language: string; count: number }[]
+  topRepos: Array<{ full_name: string; description: string | null; html_url: string; language: string | null; stars: number; forks: number; pushed_at: string | null }>
+  lastSyncedAt: string | null
+}
+
+/** 获取开发者自有公开项目列表 */
+export async function getOwnedRepos(login: string, params: RepoQueryParams = {}): Promise<RepoListResult | null> {
+  const qs = new URLSearchParams()
+  if (params.language) qs.set('language', params.language)
+  if (params.q) qs.set('q', params.q)
+  if (params.sort) qs.set('sort', params.sort)
+  if (params.direction) qs.set('direction', params.direction)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize))
+  const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/owned-repos?${qs.toString()}`)
+  return readJsonDataOrThrow<RepoListResult>(res)
+}
+
+/** 获取开发者自有公开项目统计 */
+export async function getOwnedStats(login: string): Promise<OwnedRepoStats | null> {
+  const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/owned-stats`)
+  return readJsonDataOrThrow<OwnedRepoStats>(res)
+}
+
+/** 获取开发者产出画像（Creator DNA） */
+export async function getCreatorDna(login: string, force = false): Promise<{ dna: string; cached: boolean } | null> {
+  const params = new URLSearchParams()
+  if (force) params.set('force', '1')
+  params.set('lang', getLangParam())
+  const res = await fetchWithTimeout(`${API_BASE}/api/users/${encodeLogin(login)}/creator-dna?${params}`)
+  return readJsonDataOrThrow<{ dna: string; cached: boolean }>(res)
 }

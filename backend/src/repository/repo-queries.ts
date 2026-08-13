@@ -10,6 +10,8 @@ import type {
   LanguageStat,
   TopicStat,
   LicenseStat,
+  OwnedReposQueryParams,
+  OwnedRepoStats,
 } from '../db/types.js'
 // 阈值口径从 shared/scoring 引用，与 Cloudflare Worker 共用同一份逻辑
 import {
@@ -172,9 +174,11 @@ export function queryRepoByName(db: Database.Database, fullName: string): RepoWi
 
 /**
  * 查询指定用户的单个仓库详情
+ * 优先查星标仓库，未命中时回退查询自有发布项目
  */
 export function queryRepoByNameForUser(db: Database.Database, userLogin: string, fullName: string): RepoWithStar | null {
-  const row = db
+  // 先在星标来源中查找
+  const starRow = db
     .prepare(`
       SELECT r.*, s.starred_at,
         (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
@@ -184,8 +188,26 @@ export function queryRepoByNameForUser(db: Database.Database, userLogin: string,
     `)
     .get(userLogin, fullName) as any
 
-  if (!row) return null
+  if (starRow) return mapRepoRow(starRow)
 
+  // 未命中则回退查询自有发布项目
+  const ownedRow = db
+    .prepare(`
+      SELECT r.*, NULL as starred_at,
+        (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
+      FROM repos r
+      JOIN user_repos ur ON r.full_name = ur.repo_full_name
+      WHERE ur.user_login = ? AND ur.removed_at IS NULL AND r.full_name = ?
+    `)
+    .get(userLogin, fullName) as any
+
+  if (!ownedRow) return null
+
+  return mapRepoRow(ownedRow)
+}
+
+// 将仓库查询行映射为 RepoWithStar
+function mapRepoRow(row: any): RepoWithStar {
   return {
     repo: {
       github_id: row.github_id,
@@ -644,4 +666,139 @@ export function queryUserStarTimeline(
     GROUP BY month
     ORDER BY month ASC
   `).all(login) as Array<{ month: string; count: number }>
+}
+
+// ===== 自有公开项目查询 =====
+
+/**
+ * 查询用户自有公开项目列表（带标签，支持筛选、排序、分页）
+ * 自有仓库：type=owner 抓取，记录于 user_repos 表（排除 fork）
+ */
+export function queryOwnedRepos(db: Database.Database, userLogin: string, params: OwnedReposQueryParams = {}): {
+  items: RepoWithStar[]
+  total: number
+} {
+  const { language, search, sortBy = 'stars', sortOrder = 'DESC', limit = 20, offset = 0 } = params
+
+  const conditions: string[] = ['ur.user_login = ?', 'ur.removed_at IS NULL']
+  const values: any[] = [userLogin]
+
+  if (language) {
+    conditions.push('r.language = ?')
+    values.push(language)
+  }
+  if (search) {
+    conditions.push('(r.full_name LIKE ? OR r.description LIKE ?)')
+    values.push(`%${search}%`, `%${search}%`)
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`
+
+  const allowedSortColumns: Record<string, string> = {
+    stars: 'r.stars',
+    forks: 'r.forks',
+    open_issues: 'r.open_issues',
+    pushed_at: 'r.pushed_at',
+    created_at: 'r.created_at',
+  }
+  const sortCol = allowedSortColumns[sortBy] || 'r.stars'
+  const order = sortOrder === 'ASC' ? 'ASC' : 'DESC'
+
+  const countRow = db.prepare(`SELECT COUNT(*) as total FROM repos r JOIN user_repos ur ON r.full_name = ur.repo_full_name ${where}`).get(...values) as { total: number }
+
+  const rows = db.prepare(`
+    SELECT r.*,
+      (SELECT GROUP_CONCAT(tag) FROM repo_tags WHERE repo_full_name = r.full_name) as tag_list
+    FROM repos r
+    JOIN user_repos ur ON r.full_name = ur.repo_full_name
+    ${where}
+    ORDER BY ${sortCol} ${order}
+    LIMIT ? OFFSET ?
+  `).all(...values, limit, offset) as any[]
+
+  const items: RepoWithStar[] = rows.map(row => ({
+    repo: {
+      github_id: row.github_id,
+      full_name: row.full_name,
+      owner: row.owner,
+      name: row.name,
+      html_url: row.html_url,
+      description: row.description,
+      language: row.language,
+      license: row.license,
+      stars: row.stars,
+      forks: row.forks,
+      open_issues: row.open_issues,
+      topics_json: row.topics_json,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      pushed_at: row.pushed_at,
+      archived: row.archived,
+      fork: row.fork,
+      homepage: row.homepage,
+    },
+    starred_at: null,
+    tags: row.tag_list ? row.tag_list.split(',') : [],
+  }))
+
+  return { items, total: countRow.total }
+}
+
+/**
+ * 查询用户自有公开项目统计：总数、活跃数、总 star 数、语言分布、代表性项目、最后同步时间。
+ */
+export function queryUserOwnedRepoStats(db: Database.Database, userLogin: string, options?: ThresholdOptions): OwnedRepoStats {
+  const { sleepMs } = resolveThresholds(options)
+  const cutoffDate = new Date(Date.now() - sleepMs).toISOString()
+
+  const repoCountRow = db.prepare('SELECT COUNT(*) as cnt FROM user_repos WHERE user_login = ? AND removed_at IS NULL').get(userLogin) as { cnt: number }
+
+  const activeRow = db.prepare(`
+    SELECT COUNT(*) as cnt FROM repos r
+    JOIN user_repos ur ON r.full_name = ur.repo_full_name
+    WHERE ur.user_login = ? AND ur.removed_at IS NULL AND r.pushed_at >= ?
+  `).get(userLogin, cutoffDate) as { cnt: number }
+
+  const totalStarsRow = db.prepare(`
+    SELECT COALESCE(SUM(r.stars), 0) as total FROM repos r
+    JOIN user_repos ur ON r.full_name = ur.repo_full_name
+    WHERE ur.user_login = ? AND ur.removed_at IS NULL
+  `).get(userLogin) as { total: number }
+
+  const languages = db.prepare(`
+    SELECT COALESCE(r.language, 'Unknown') as language, COUNT(*) as count FROM repos r
+    JOIN user_repos ur ON r.full_name = ur.repo_full_name
+    WHERE ur.user_login = ? AND ur.removed_at IS NULL
+    GROUP BY COALESCE(r.language, 'Unknown')
+    ORDER BY count DESC
+  `).all(userLogin) as LanguageStat[]
+
+  const topRepos = db.prepare(`
+    SELECT r.full_name, r.description, r.html_url, r.language, r.stars, r.forks, r.pushed_at
+    FROM repos r
+    JOIN user_repos ur ON r.full_name = ur.repo_full_name
+    WHERE ur.user_login = ? AND ur.removed_at IS NULL
+    ORDER BY r.stars DESC
+    LIMIT 5
+  `).all(userLogin) as Array<{
+    full_name: string
+    description: string | null
+    html_url: string
+    language: string | null
+    stars: number
+    forks: number
+    pushed_at: string | null
+  }>
+
+  const userRow = db.prepare('SELECT synced_at FROM users WHERE login = ?').get(userLogin) as { synced_at: string | null } | undefined
+  const lastSyncedAt = userRow?.synced_at ?? null
+
+  return {
+    repoCount: repoCountRow.cnt,
+    activeRepoCount: activeRow.cnt,
+    totalStars: totalStarsRow.total,
+    languages,
+    topRepos,
+    lastSyncedAt,
+  }
 }

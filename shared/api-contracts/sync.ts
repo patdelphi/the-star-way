@@ -27,6 +27,12 @@ export interface SyncResult {
   /** 下一次请求应从 GitHub 哪一页开始。 */
   nextPage?: number
   warning?: string
+  /** 本次同步抓取到的自有公开仓库数量（非必填，抓取失败或无数据时可为 0）。 */
+  ownedReposUpserted?: number
+  /** 标记为已移除（removed）的自有仓库数量。 */
+  ownedReposRemoved?: number
+  /** 自有仓库抓取失败时的错误信息（不影响标星同步结果）。 */
+  ownedFetchError?: string | null
 }
 
 // 同步运行记录（数据库 sync_runs 表）

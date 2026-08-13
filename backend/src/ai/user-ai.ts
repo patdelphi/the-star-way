@@ -9,10 +9,10 @@ import {
   getIncompleteSyncMessage,
   type SyncStatus,
 } from '@shared/sync/index.js'
-import { queryActiveRepoCount } from '../repository/repo-queries.js'
-import { generateLearningPath, generateStarDna, translateToEnglish } from './client.js'
+import { queryActiveRepoCount, queryUserOwnedRepoStats } from '../repository/repo-queries.js'
+import { generateCreatorDna, generateLearningPath, generateStarDna, translateToEnglish } from './client.js'
 
-export type UserAiContentKind = 'star-dna' | 'learning-path'
+export type UserAiContentKind = 'star-dna' | 'learning-path' | 'creator-dna'
 export type UserAiLang = 'zh' | 'en'
 
 export interface UserAiContentResult {
@@ -50,6 +50,12 @@ const KIND_CONFIG: Record<UserAiContentKind, UserAiKindConfig> = {
     enKey: 'learning-en',
     tagLimit: 10,
     repoLimit: 8,
+  },
+  'creator-dna': {
+    zhKey: 'creator-zh',
+    enKey: 'creator-en',
+    tagLimit: 0,
+    repoLimit: 5,
   },
 }
 
@@ -122,6 +128,14 @@ function buildLocalFallbackContent(
     return `${login} 已同步 ${stats.repoCount} 个星标仓库。当前技术画像基于语言分布（${languagesZh}）、兴趣标签（${tagsZh}）和代表项目（${reposZh}）生成。AI 服务暂不可用时，本地会先给出这份稳定画像，后续可重新生成获取更深入分析。`
   }
 
+  if (kind === 'creator-dna') {
+    const totalStars = 'totalStars' in stats ? stats.totalStars : 0
+    if (lang === 'en') {
+      return `${login} has published ${stats.repoCount} public repositories (${stats.activeRepoCount} active) with ${totalStars} stars in total. The current local creator profile is based on language distribution (${languagesZh}) and representative projects (${reposZh}). AI generation is unavailable, so this profile uses deterministic local statistics.`
+    }
+    return `${login} 已发布 ${stats.repoCount} 个公开项目（活跃 ${stats.activeRepoCount} 个），累计获得 ${totalStars} 个 star。当前产出画像基于语言分布（${languagesZh}）和代表项目（${reposZh}）生成。AI 服务暂不可用时，本地会先给出这份稳定画像，后续可重新生成获取更深入分析。`
+  }
+
   if (lang === 'en') {
     return `## Stage 1: Consolidate fundamentals
 - Start from the dominant languages and topics: ${languagesZh}; ${tagsZh}.
@@ -185,6 +199,25 @@ function getUserStarCount(db: Database.Database, login: string): number {
 /** 收集生成用户级 AI 内容所需的统计数据。 */
 function collectUserAiStats(db: Database.Database, login: string, kind: UserAiContentKind) {
   const config = KIND_CONFIG[kind]
+
+  // 产出画像基于自有公开仓库（user_repos），与星标/学习路径的数据源不同。
+  if (kind === 'creator-dna') {
+    const owned = queryUserOwnedRepoStats(db, login)
+    return {
+      repoCount: owned.repoCount,
+      activeRepoCount: owned.activeRepoCount,
+      totalStars: owned.totalStars,
+      languages: owned.languages,
+      tags: [] as { tag: string; count: number }[],
+      // 规整为与星标分支一致的简单结构，避免 union 类型在调用方产生不兼容
+      topRepos: owned.topRepos.map(r => ({
+        full_name: r.full_name,
+        description: r.description ?? '',
+        stars: r.stars,
+      })),
+    }
+  }
+
   const repoCount = getUserStarCount(db, login)
   const languages = db.prepare(`
     SELECT language, COUNT(*) as count FROM repos
@@ -230,6 +263,16 @@ async function generateZhContent(
       activeRepoCount: stats.activeRepoCount ?? 0,
       languages: stats.languages,
       tags: stats.tags,
+      topRepos: stats.topRepos,
+    })
+  }
+
+  if (kind === 'creator-dna') {
+    return generateCreatorDna(login, {
+      repoCount: stats.repoCount,
+      activeRepoCount: stats.activeRepoCount ?? 0,
+      totalStars: (stats as { totalStars?: number }).totalStars ?? 0,
+      languages: stats.languages,
       topRepos: stats.topRepos,
     })
   }
@@ -282,7 +325,10 @@ export async function getUserAiContent(
 
   const stats = collectUserAiStats(db, login, kind)
   if (stats.repoCount === 0) {
-    throw new UserAiContentError('EMPTY_STAR_DATA', `用户 ${login} 暂无星标数据，请先同步星标`, 400)
+    const message = kind === 'creator-dna'
+      ? `用户 ${login} 暂无自有公开项目数据，请先同步自有项目`
+      : `用户 ${login} 暂无星标数据，请先同步星标`
+    throw new UserAiContentError(kind === 'creator-dna' ? 'EMPTY_CREATOR_DATA' : 'EMPTY_STAR_DATA', message, 400)
   }
 
   try {

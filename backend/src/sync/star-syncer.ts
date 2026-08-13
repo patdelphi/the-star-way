@@ -5,7 +5,7 @@
  */
 import type Database from 'better-sqlite3'
 import { createConnection, initDatabase, withTransaction } from '../db/connection.js'
-import { GitHubClient, type GitHubStarredRepo, type RateLimitInfo } from './github-client.js'
+import { GitHubClient, type GitHubStarredRepo, type GitHubOwnedRepo, type RateLimitInfo } from './github-client.js'
 import type { GitHubClientConfig } from './github-client.js'
 import { GitHubSyncError } from './errors.js'
 import { mkdirSync, existsSync } from 'node:fs'
@@ -209,6 +209,92 @@ export async function syncStars(
     return { reposUpserted, starsUpserted, reposMarkedRemoved }
   })
 
+  // ===== 抓取用户自己发布的公开仓库（type=owner，排除 fork）=====
+  // 自有仓库与标星仓库独立存储于 user_repos 表，失败或数据为空不影响标星同步结果。
+  let ownedFetchError: string | null = null
+  let ownedReposUpserted = 0
+  let ownedReposMarkedRemoved = 0
+  try {
+    const ownedResult = await client.listUserOwnedRepos(username)
+    const ownedRepos = ownedResult.repos
+    const ownedSeen = new Set(ownedRepos.map(r => r.full_name))
+
+    const ownedTx = withTransaction(db, () => {
+      // 复用 repo 表 upsert 语句（自有仓库与标星仓库共用仓库元数据表）
+      const upsertRepo = db.prepare(`
+        INSERT INTO repos (github_id, full_name, owner, name, html_url, description, language, license,
+          stars, forks, open_issues, topics_json, created_at, updated_at, pushed_at, archived, fork, homepage)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(full_name) DO UPDATE SET
+          description = excluded.description,
+          language = excluded.language,
+          license = excluded.license,
+          stars = excluded.stars,
+          forks = excluded.forks,
+          open_issues = excluded.open_issues,
+          topics_json = excluded.topics_json,
+          updated_at = excluded.updated_at,
+          pushed_at = excluded.pushed_at,
+          archived = excluded.archived,
+          fork = excluded.fork,
+          homepage = excluded.homepage
+      `)
+      for (const repo of ownedRepos) {
+        upsertRepo.run(
+          repo.id,
+          repo.full_name,
+          repo.owner.login,
+          repo.name,
+          repo.html_url,
+          repo.description,
+          repo.language,
+          repo.license?.spdx_id ?? null,
+          repo.stargazers_count,
+          repo.forks_count,
+          repo.open_issues_count,
+          JSON.stringify(repo.topics),
+          repo.created_at,
+          repo.updated_at,
+          repo.pushed_at,
+          repo.archived ? 1 : 0,
+          repo.fork ? 1 : 0,
+          repo.homepage,
+        )
+      }
+
+      // 写入 user_repos 关系表
+      const upsertUserRepo = db.prepare(`
+        INSERT INTO user_repos (user_login, repo_full_name, first_seen_at, last_seen_at, removed_at)
+        VALUES (?, ?, ?, ?, NULL)
+        ON CONFLICT(user_login, repo_full_name) DO UPDATE SET
+          last_seen_at = excluded.last_seen_at,
+          removed_at = NULL
+      `)
+      for (const repo of ownedRepos) {
+        upsertUserRepo.run(username, repo.full_name, now, now)
+      }
+
+      // 标记 removed_at：本地有但本次 API 未返回的自有仓库
+      let markedRemoved = 0
+      if (ownedRepos.length > 0) {
+        const markRemoved = db.prepare(`
+          UPDATE user_repos SET removed_at = ?
+          WHERE user_login = ? AND removed_at IS NULL AND repo_full_name NOT IN (${Array.from(ownedSeen).map(() => '?').join(',')})
+        `)
+        markedRemoved = markRemoved.run(now, username, ...ownedSeen).changes
+      }
+
+      return { upserted: ownedRepos.length, markedRemoved }
+    })
+
+    ownedReposUpserted = ownedTx.upserted
+    ownedReposMarkedRemoved = ownedTx.markedRemoved
+  } catch (err) {
+    // 自有仓库抓取失败不阻塞标星同步主流程，记录错误信息
+    ownedFetchError = err instanceof Error ? err.message : String(err)
+    console.warn(`用户 ${username} 自有仓库抓取失败（不影响标星同步）:`, err)
+  }
+
   // 更新 sync_runs 为成功状态
   const endedAt = new Date().toISOString()
   db.prepare(`
@@ -240,6 +326,9 @@ export async function syncStars(
     totalPages,
     rateLimit,
     complete: true,
+    ownedReposUpserted,
+    ownedReposRemoved: ownedReposMarkedRemoved,
+    ownedFetchError,
   }
 }
 

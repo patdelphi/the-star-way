@@ -13,6 +13,7 @@ import {
   Menu,
   Star,
   FileText,
+  FolderGit2,
   LayoutDashboard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,7 @@ const navGroups = [
     titleKey: "nav.groupBrowse",
     items: [
       { path: "/explorer", icon: Compass, labelKey: "nav.starExplorer" },
+      { path: "/published", icon: FolderGit2, labelKey: "nav.publishedProjects" },
       { path: "/catalog", icon: FileText, labelKey: "nav.starCatalog" },
     ],
   },

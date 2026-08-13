@@ -130,6 +130,13 @@ vi.mock('../../sync/github-client.js', () => {
           rateLimit: { limit: 60, remaining: 55, reset: 1234567890, used: 5 },
         })
       }),
+      listUserOwnedRepos: vi.fn().mockImplementation(() => {
+        // 自有仓库：返回所有 mock 仓库的 repo 元数据（给 user_repos 同步用）
+        return Promise.resolve({
+          repos: MOCK_REPOS.map((s) => s.repo),
+          rateLimit: null,
+        })
+      }),
     })),
   }
 })
@@ -182,6 +189,24 @@ describe('GitHub 同步', () => {
     expect(star).toBeDefined()
     expect((star as any).starred_at).toBe('2025-06-01T00:00:00Z')
     expect((star as any).removed_at).toBeNull()
+  })
+
+  it('同步后应记录自有仓库（user_repos）', async () => {
+    await syncStars(db, 'testuser')
+
+    // 检查自有仓库关系
+    const ownedRows = db.prepare(`
+      SELECT repo_full_name, removed_at FROM user_repos WHERE user_login = ? ORDER BY repo_full_name
+    `).all('testuser') as Array<{ repo_full_name: string; removed_at: string | null }>
+    expect(ownedRows.length).toBeGreaterThan(0)
+    // 所有自有仓库不应被标记为 removed
+    for (const row of ownedRows) {
+      expect(row.removed_at).toBeNull()
+    }
+    // 验证 listUserOwnedRepos 被调用过
+    const { GitHubClient } = await import('../../sync/github-client.js')
+    const mockInstance = vi.mocked(GitHubClient).mock.results[0].value
+    expect(mockInstance.listUserOwnedRepos).toHaveBeenCalled()
   })
 
   it('同步成功后应清理该用户的 AI 缓存，避免基于旧星标生成结果', async () => {

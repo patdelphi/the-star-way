@@ -44,6 +44,28 @@ export interface GitHubUserProfile {
   public_repos: number
 }
 
+// GitHub 自有仓库 API 返回的数据结构（无 starred_at 包裹，直接是 repo 对象）
+export interface GitHubOwnedRepo {
+  id: number
+  full_name: string
+  owner: { login: string; avatar_url: string }
+  name: string
+  html_url: string
+  description: string | null
+  language: string | null
+  license: { spdx_id: string; name: string } | null
+  stargazers_count: number
+  forks_count: number
+  open_issues_count: number
+  topics: string[]
+  created_at: string
+  updated_at: string
+  pushed_at: string | null
+  archived: boolean
+  fork: boolean
+  homepage: string | null
+}
+
 // GitHub rate limit 响应头
 export interface RateLimitInfo {
   limit: number
@@ -147,6 +169,53 @@ export class GitHubClient {
     }
 
     return await response.json() as GitHubUserProfile
+  }
+
+  /**
+   * 获取指定用户自己发布的公开仓库（type=owner，排除 fork）
+   * 分页拉取全部页面
+   */
+  async listUserOwnedRepos(
+    username: string,
+    onPage?: (page: number, repos: GitHubOwnedRepo[]) => void,
+  ): Promise<{ repos: GitHubOwnedRepo[]; rateLimit: RateLimitInfo | null }> {
+    const allRepos: GitHubOwnedRepo[] = []
+    let page = 1
+    let rateLimit: RateLimitInfo | null = null
+    const perPage = 100
+
+    while (true) {
+      const url = `${this.baseUrl}/users/${encodeURIComponent(username)}/repos?type=owner&per_page=${perPage}&page=${page}`
+      const response = await this.fetchWithAuth(url)
+
+      if (!response.ok) {
+        throw createSyncError(response.status, await response.text())
+      }
+
+      rateLimit = parseRateLimitHeaders(response.headers)
+      const data = await response.json() as GitHubOwnedRepo[]
+
+      if (data.length === 0) break
+
+      allRepos.push(...data)
+      onPage?.(page, data)
+
+      if (data.length < perPage) break
+
+      page++
+
+      // 安全限制：防止无限循环（最多 1000 页 = 10 万条）
+      if (page > 1000) {
+        throw new GitHubSyncError(
+          `用户 ${username} 自有仓库超过 100,000 条，已达到安全上限`,
+          'GITHUB_TOO_MANY_REPOS',
+          undefined,
+          false,
+        )
+      }
+    }
+
+    return { repos: allRepos, rateLimit }
   }
 
   /**

@@ -42,8 +42,8 @@ import {
 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RechartsPie, Pie, Cell, Legend, Brush } from "recharts"
 import { ThemedChartTooltip } from "@/components/ui/chart-tooltip"
-import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getStats, getTags, getUserSummary, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
-import type { UserStats } from "@/lib/api"
+import { getUsers, syncStars, getGitHubToken, getSyncRuns, getStarDna, getLearningPath, getOwnedStats, getCreatorDna, getStats, getTags, getUserSummary, getUserStarTimeline, deleteUser, getApiErrorMessage } from "@/lib/api"
+import type { UserStats, OwnedRepoStats } from "@/lib/api"
 import { ShareCard } from "@/components/ShareCard"
 import { getSettings } from "@/lib/settings"
 import { useDeveloper } from "@/contexts/DeveloperContext"
@@ -406,6 +406,10 @@ export default function Developers() {
   const [learningPath, setLearningPath] = useState<string | null>(null)
   const [pathLoading, setPathLoading] = useState(false)
   const [pathError, setPathError] = useState("")
+  const [creatorDna, setCreatorDna] = useState<string | null>(null)
+  const [creatorLoading, setCreatorLoading] = useState(false)
+  const [creatorError, setCreatorError] = useState("")
+  const [ownedStats, setOwnedStats] = useState<OwnedRepoStats | null>(null)
   const [developerStats, setDeveloperStats] = useState<UserStats | null>(null)
   const [developerSummary, setDeveloperSummary] = useState<Awaited<ReturnType<typeof getUserSummary>>>(null)
   const [developerTags, setDeveloperTags] = useState<{ tag: string; count: number }[]>([])
@@ -763,6 +767,39 @@ export default function Developers() {
     }
   }
 
+  // 加载产出画像（Creator DNA）
+  const loadCreatorDna = async (login: string, force = false) => {
+    const normalizedLogin = normalizeGitHubLogin(login)
+    if (!normalizedLogin) return
+    const isInitialLoad = !force
+    if (isMountedRef.current) setCreatorLoading(true)
+    if (isMountedRef.current) setCreatorError("")
+    try {
+      const result = await getCreatorDna(normalizedLogin, force)
+      if (!isMountedRef.current) return
+      if (result?.dna) setCreatorDna(result.dna)
+    } catch (err) {
+      if (!isMountedRef.current) return
+      setCreatorError(getApiErrorMessage(err, t, t("developers.creatorEmpty")))
+    } finally {
+      if ((force || isInitialLoad) && isMountedRef.current) setCreatorLoading(false)
+    }
+  }
+
+  // 加载发布项目统计
+  const loadOwnedProjects = async (login: string) => {
+    const normalizedLogin = normalizeGitHubLogin(login)
+    if (!normalizedLogin) return
+    try {
+      const stats = await getOwnedStats(normalizedLogin)
+      if (!isMountedRef.current) return
+      if (stats) setOwnedStats(stats)
+    } catch (err) {
+      if (!isMountedRef.current) return
+      console.error(`加载 ${normalizedLogin} 发布项目统计失败:`, err)
+    }
+  }
+
   // 当前选中开发者变化时，加载同步历史和 Star DNA
   const activeDevName = activeDev?.name
   activeDevNameRef.current = activeDevName ? normalizeGitHubLogin(activeDevName) : null
@@ -786,6 +823,10 @@ export default function Developers() {
         setPathError("")
         setDnaLoading(false)
         setPathLoading(false)
+        setCreatorDna(null)
+        setCreatorError("")
+        setCreatorLoading(false)
+        setOwnedStats(null)
       }
       setDeveloperSummary(null)
       setShareCardOpen(false)
@@ -796,6 +837,8 @@ export default function Developers() {
       if (!isSyncingActiveDeveloper) {
         loadStarDna(activeDevName)
         loadLearningPath(activeDevName)
+        loadCreatorDna(activeDevName)
+        loadOwnedProjects(activeDevName)
       }
     } else {
       detailRequestSeq.current += 1
@@ -804,6 +847,10 @@ export default function Developers() {
       setLearningPath(null)
       setDnaError("")
       setPathError("")
+      setCreatorDna(null)
+      setCreatorError("")
+      setCreatorLoading(false)
+      setOwnedStats(null)
       setDeveloperStats(null)
       setDeveloperSummary(null)
       setDeveloperTags([])
@@ -819,6 +866,8 @@ export default function Developers() {
       setPathError("")
       loadStarDna(activeDevName)
       loadLearningPath(activeDevName)
+      loadCreatorDna(activeDevName)
+      loadOwnedProjects(activeDevName)
       loadDeveloperDetails(activeDevName)
     }
   }, [i18n.language])
@@ -826,7 +875,7 @@ export default function Developers() {
   // 同步完成后独立刷新 AI 内容，不阻塞同步状态和同步按钮。
   const refreshDeveloperAi = (login: string) => {
     if (isCurrentDeveloperRequest(login, 0)) {
-      void Promise.allSettled([loadStarDna(login, true), loadLearningPath(login, true)]).then(() => {
+      void Promise.allSettled([loadStarDna(login, true), loadLearningPath(login, true), loadCreatorDna(login, true)]).then(() => {
         if (isCurrentDeveloperRequest(login, 0)) {
           loadDeveloperDetails(login)
         }
@@ -835,7 +884,7 @@ export default function Developers() {
     }
 
     // 用户已切换时只写入缓存，不更新当前页面。
-    void Promise.allSettled([getStarDna(login, true), getLearningPath(login, true)])
+    void Promise.allSettled([getStarDna(login, true), getLearningPath(login, true), getCreatorDna(login, true)])
   }
 
   // 同步当前开发者星标（调用真实 API）
@@ -1445,6 +1494,62 @@ export default function Developers() {
                   )}
                 </CardContent>
               </Card>
+            )}
+            {/* 我的项目区块 */}
+            {activeDev && (
+              <div className="mt-6">
+                <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                  <FolderGit2 className="w-4 h-4" />
+                  {t("developers.myProjectsTitle")}
+                </h3>
+                {/* 产出画像（Creator DNA）卡片 */}
+                <Card className="bg-surface-container-low/50 border-primary/20 mt-3">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          {t("developers.creatorTitle")}
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-xs shrink-0"
+                          disabled={creatorLoading}
+                          onClick={() => {
+                            // 强制重生成二次确认开关
+                            if (getSettings().confirmForceRegen && !window.confirm(t("developers.confirmRegen"))) return
+                            loadCreatorDna(activeDev.name, true)
+                          }}
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${creatorLoading ? "animate-spin" : ""}`} />
+                          {creatorLoading ? t("developers.creatorLoading") : t("developers.regenerateCreator")}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {creatorLoading && !creatorDna ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          {t("developers.creatorLoading")}
+                        </div>
+                      ) : creatorDna ? (
+                        <p className="text-sm leading-relaxed text-on-surface">{creatorDna}</p>
+                      ) : creatorError ? (
+                        <p className="text-sm text-status-danger">{creatorError}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">{t("developers.creatorEmpty")}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                {/* 统计摘要行 */}
+                {ownedStats && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    <Badge variant="secondary">{t("developers.repoCount", { count: ownedStats.repoCount })}</Badge>
+                    <Badge variant="secondary">{t("developers.activeRepoCount", { count: ownedStats.activeRepoCount })}</Badge>
+                    <Badge variant="secondary">{t("developers.totalStars", { count: ownedStats.totalStars })}</Badge>
+                  </div>
+                )}
+              </div>
             )}
             {activeDev && shareCardData && (
               <ShareCard

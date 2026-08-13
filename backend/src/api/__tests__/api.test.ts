@@ -16,6 +16,7 @@ vi.mock('../../ai/client.js', async (importOriginal) => {
     ...actual,
     generateStarDna: vi.fn(async () => '测试 DNA 画像'),
     generateLearningPath: vi.fn(async () => '## 阶段一：巩固基础\n- 测试学习路径'),
+    generateCreatorDna: vi.fn(async () => '测试产出画像'),
     translateToEnglish: vi.fn(async (text: string) => `EN: ${text}`),
   }
 })
@@ -69,6 +70,7 @@ describe('API 路由', () => {
     vi.clearAllMocks()
     vi.mocked(aiClient.generateStarDna).mockReset().mockImplementation(async () => '测试 DNA 画像')
     vi.mocked(aiClient.generateLearningPath).mockReset().mockImplementation(async () => '## 阶段一：巩固基础\n- 测试学习路径')
+    vi.mocked(aiClient.generateCreatorDna).mockReset().mockImplementation(async () => '测试产出画像')
     vi.mocked(aiClient.translateToEnglish).mockReset().mockImplementation(async (text: string) => `EN: ${text}`)
     // :memory: 数据库：每个测试全新实例，无需文件清理
     db = createConnection(':memory:')
@@ -242,6 +244,27 @@ describe('API 路由', () => {
     expect(data.error).toBeDefined()
     // 不存在仓库会匹配通配路由 → 返回 REPO_NOT_FOUND 或 NOT_FOUND
     expect(['REPO_NOT_FOUND', 'NOT_FOUND']).toContain(data.error.code)
+  })
+
+  it('GET /api/users/:login/repos/:fullName 未星标但属自有发布项目时应回退返回', async () => {
+    // 插入一个仅存在于 repos 表、未星标、但属于自有发布项目的仓库
+    db.prepare(`
+      INSERT INTO repos (
+        github_id, full_name, owner, name, html_url, description, language, license, stars, forks, open_issues, topics_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(9001, 'owner/published-tool', 'owner', 'published-tool', 'https://github.com/owner/published-tool', '自有发布工具', 'TypeScript', 'MIT', 42, 7, 3, '["tool"]')
+    db.prepare(`
+      INSERT INTO user_repos (user_login, repo_full_name, first_seen_at, last_seen_at)
+      VALUES (?, ?, ?, ?)
+    `).run(DEMO_USER_LOGIN, 'owner/published-tool', new Date().toISOString(), new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks(`/api/users/${DEMO_USER_LOGIN}/repos/owner/published-tool`)
+    await router(req, res)
+    expect(getStatusCode()).toBe(200)
+    const data = JSON.parse(getBody())
+    expect(data.data.full_name).toBe('owner/published-tool')
+    expect(data.data.stars).toBe(42)
   })
 
   it('路径参数编码异常时不应返回 500', async () => {
@@ -511,6 +534,125 @@ describe('API 路由', () => {
     `).get(`user:${DEMO_USER_LOGIN}`) as { provider: string; translated_readme_summary: string }
     expect(cached.provider).toBe('local')
     expect(cached.translated_readme_summary).toContain('本地已同步统计')
+  })
+
+  // ---- creator-dna（产出画像）测试 ----
+  // 关联已有 repos 表数据，模拟用户已同步的自有公开项目
+  function seedOwnedRepos(login: string, fullNames: string[]) {
+    const now = new Date().toISOString()
+    const ins = db.prepare(`
+      INSERT INTO user_repos (user_login, repo_full_name, first_seen_at, last_seen_at)
+      VALUES (?, ?, ?, ?)
+    `)
+    for (const fullName of fullNames) ins.run(login, fullName, now, now)
+  }
+
+  it('GET /api/users/:login/creator-dna 用户不存在应返回 404', async () => {
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks('/api/users/missing/creator-dna')
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(404)
+    expect(data.error.code).toBe('USER_NOT_FOUND')
+    expect(vi.mocked(aiClient.generateCreatorDna)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/creator-dna 无自有项目数据应返回 400', async () => {
+    db.prepare('INSERT INTO users (login) VALUES (?)').run('empty-user')
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks('/api/users/empty-user/creator-dna')
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(400)
+    expect(data.error.code).toBe('EMPTY_CREATOR_DATA')
+    expect(vi.mocked(aiClient.generateCreatorDna)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/creator-dna 应优先返回缓存', async () => {
+    seedOwnedRepos(DEMO_USER_LOGIN, ['octocat/Hello-World'])
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'creator-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存产出画像', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/creator-dna?lang=zh`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '缓存产出画像', cached: true })
+    expect(vi.mocked(aiClient.generateCreatorDna)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/creator-dna 强制生成失败时应回退已有缓存', async () => {
+    seedOwnedRepos(DEMO_USER_LOGIN, ['octocat/Hello-World'])
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'creator-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存产出画像', new Date().toISOString())
+    vi.mocked(aiClient.generateCreatorDna).mockRejectedValueOnce(new Error('AI unavailable'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/creator-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '缓存产出画像', cached: true })
+  })
+
+  it('GET /api/users/:login/creator-dna 生成失败且无缓存时应返回本地兜底画像', async () => {
+    seedOwnedRepos(DEMO_USER_LOGIN, ['octocat/Hello-World', 'torvalds/linux'])
+    vi.mocked(aiClient.generateCreatorDna).mockRejectedValueOnce(new Error('AI_REQUEST_TIMEOUT'))
+
+    const router = createRouter(db)
+    const { req, res, getBody, getStatusCode } = createMocks(`/api/users/${DEMO_USER_LOGIN}/creator-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(getStatusCode()).toBe(200)
+    expect(data.data.dna).toContain(`${DEMO_USER_LOGIN} 已发布 2 个公开项目`)
+    expect(data.data.cached).toBe(false)
+
+    const cached = db.prepare(`
+      SELECT provider, translated_readme_summary
+      FROM translations
+      WHERE repo_full_name = ? AND target_lang = 'creator-zh'
+    `).get(`user:${DEMO_USER_LOGIN}`) as { provider: string; translated_readme_summary: string }
+    expect(cached.provider).toBe('local')
+    expect(cached.translated_readme_summary).toContain('本地')
+  })
+
+  it('GET /api/users/:login/creator-dna 中文生成不等待英文翻译', async () => {
+    seedOwnedRepos(DEMO_USER_LOGIN, ['octocat/Hello-World'])
+    vi.mocked(aiClient.translateToEnglish).mockRejectedValueOnce(new Error('translation timeout'))
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/creator-dna?lang=zh&force=1`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: '测试产出画像', cached: false })
+    expect(vi.mocked(aiClient.generateCreatorDna)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(aiClient.translateToEnglish)).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/users/:login/creator-dna 英文缺缓存时翻译中文缓存，不重新生成', async () => {
+    seedOwnedRepos(DEMO_USER_LOGIN, ['octocat/Hello-World'])
+    db.prepare(`
+      INSERT INTO translations (repo_full_name, target_lang, translated_readme_summary, provider, updated_at)
+      VALUES (?, 'creator-zh', ?, 'ai', ?)
+    `).run(`user:${DEMO_USER_LOGIN}`, '缓存产出画像', new Date().toISOString())
+
+    const router = createRouter(db)
+    const { req, res, getBody } = createMocks(`/api/users/${DEMO_USER_LOGIN}/creator-dna?lang=en`)
+    await router(req, res)
+
+    const data = JSON.parse(getBody())
+    expect(data.data).toEqual({ dna: 'EN: 缓存产出画像', cached: false })
+    expect(vi.mocked(aiClient.generateCreatorDna)).not.toHaveBeenCalled()
+    expect(vi.mocked(aiClient.translateToEnglish)).toHaveBeenCalledWith('缓存产出画像')
   })
 
   it('GET /api/users/不存在的用户/repos 应返回 404', async () => {

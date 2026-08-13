@@ -1,3 +1,7 @@
+allowBuilds:
+  esbuild: set this to true or false
+  sharp: set this to true or false
+  workerd: set this to true or false
 # pnpm 11 配置文件
 # pnpm 11 不再读取 .npmrc 中的非 auth/registry 配置
 # 所有其他设置必须放在 pnpm-workspace.yaml（即使单包项目也用此文件）

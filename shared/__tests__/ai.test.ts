@@ -39,7 +39,7 @@ describe('shared ai prompts', () => {
 
 describe('shared ai cache keys', () => {
   it('集中定义用户级 AI 缓存 key', () => {
-    expect(USER_AI_CACHE_KEYS).toEqual(['dna-zh', 'dna-en', 'learning-zh', 'learning-en'])
+    expect(USER_AI_CACHE_KEYS).toEqual(['dna-zh', 'dna-en', 'learning-zh', 'learning-en', 'creator-zh', 'creator-en'])
     expect(getUserAiCacheKey('backnotprop')).toBe('user:backnotprop')
   })
 
