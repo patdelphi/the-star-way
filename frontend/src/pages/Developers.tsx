@@ -1516,8 +1516,7 @@ export default function Developers() {
                           className="gap-1.5 text-xs shrink-0"
                           disabled={creatorLoading}
                           onClick={() => {
-                            // 强制重生成二次确认开关
-                            if (getSettings().confirmForceRegen && !window.confirm(t("developers.confirmRegen"))) return
+                            // 直接强制重生成，不弹确认框
                             loadCreatorDna(activeDev.name, true)
                           }}
                         >
